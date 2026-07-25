@@ -1,0 +1,406 @@
+// ============================================================
+// Sistema de Qualidade - Big Dutchman Brasil
+// Schema do banco de dados (PostgreSQL)
+// Nucleo compartilhado + Modulo SQE (recebimento de fornecedores)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------- NUCLEO ----------------------
+
+enum Papel {
+  QUALIDADE
+  PRODUCAO
+  ADMIN
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  papel     Papel    @default(QUALIDADE)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  planejamentos   PlanejamentoSemanal[] @relation("PlanejamentoCriadoPor")
+  entregas        EntregaPortaria[]     @relation("EntregaConfirmadoPor")
+  inspecoesVisual InspecaoVisual[]      @relation("InspVisualInspetor")
+  inspecoesLote   InspecaoLote[]        @relation("InspLoteInspetor")
+  rncs            Rnc[]                 @relation("RncCriadoPor")
+  anexos          Anexo[]
+  historicos      HistoricoStatus[]
+}
+
+// Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
+enum Classificacao {
+  A
+  B
+  C
+  D
+}
+
+enum EsforcoQualidade {
+  BAIXO
+  MEDIO
+  ALTO
+}
+
+model Fornecedor {
+  id     Int    @id @default(autoincrement())
+  codigo String @unique
+  nome   String
+  cnpj   String?
+
+  // Dados complementares (opcionais no MVP)
+  endereco String?
+
+  // Escopo / classificacao (planilha "Escopo" + "Base de Fornecedores")
+  tipoFornecimento    String? // ex: Paineis eletricos, Materia-prima, Parafusos
+  categoriaInspecao   String? // ex: Eletrico/Montagem, Plastico injetado, Fixadores
+  planoInspecao       String? // resumo textual do escopo
+  controlesPrincipais String? // texto detalhado do que checar
+  escopoTexto         String? // texto livre do escopo (aba Escopo)
+  esforcoQualidade    EsforcoQualidade @default(MEDIO)
+
+  // Classificacao de fornecimento (manual) - define periodicidade/nivel/NQA
+  classificacaoFornecimento Classificacao @default(C)
+  // Escopo de inspeicao: quais formularios o sistema deve abrir
+  fazVisual Boolean @default(true)
+  fazLote   Boolean @default(false)
+
+  // Contadores
+  contadorEntregas    Int @default(0) // ciclico: zera quando dispara inspecao
+  totalEntregas       Int @default(0) // acumulado historico (dashboard)
+  totalInspecoes      Int @default(0) // acumulado historico (dashboard)
+  lotesInspecionados  Int @default(0) // trimestre corrente
+  lotesReprovados     Int @default(0) // trimestre corrente
+
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  contatos         Contato[]
+  itens            Item[]
+  planejamentos    PlanejamentoSemanal[]
+  entregas         EntregaPortaria[]
+  inspecoesVisual  InspecaoVisual[]
+  inspecoesLote    InspecaoLote[]
+  rncs             Rnc[]
+  historicoClasses HistoricoClassificacao[]
+}
+
+// Ate 2 contatos por fornecedor (cadastro simples)
+model Contato {
+  id           Int        @id @default(autoincrement())
+  fornecedorId Int
+  fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+  nome         String
+  email        String?
+  telefone     String?
+  funcao       String?
+
+  @@index([fornecedorId])
+}
+
+model Item {
+  id           Int         @id @default(autoincrement())
+  codigo       String      @unique
+  descricao    String
+  unidade      String?
+  fornecedorId Int?
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  planejamentos   PlanejamentoSemanal[]
+  entregas        EntregaPortaria[]
+  inspecoesVisual InspecaoVisual[]
+  inspecoesLote   InspecaoLote[]
+  rncs            Rnc[]
+}
+
+// Tabela de referencia de periodicidade por classificacao (pre-setada e editavel)
+model PeriodicidadeConfig {
+  id                Int           @id @default(autoincrement())
+  classificacao     Classificacao @unique
+  periodicidadeTexto String       // ex: "1 a cada 5 entregas"
+  frequenciaN       Int           // 5, 3, 1
+  tipoInspecao      String        @default("Amostragem")
+  nivelInspecaoTexto String       // ex: "Inspecao Reduzida (30% itens)"
+  nivelRomano       String        // I, II, III
+  percentualAmostra Int           // 30, 50, 100
+  nqa               Float         // 4.0, 2.5, 1.0
+  // bandas de conformidade para reclassificacao
+  conformidadeMin   Float         // A>=98, B>=90, C>=80, D>=0
+  updatedAt         DateTime      @updatedAt
+}
+
+// Anexo polimorfico: serve para qualquer entidade (Inspecao, RNC, modulos futuros)
+model Anexo {
+  id           Int      @id @default(autoincrement())
+  entidadeTipo String // ex: "RNC", "INSPECAO_VISUAL", "INSPECAO_LOTE"
+  entidadeId   Int
+  nomeArquivo  String
+  caminho      String
+  mimeType     String?
+  tamanho      Int?
+  uploadedById Int?
+  uploadedBy   Usuario? @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([entidadeTipo, entidadeId])
+}
+
+// Historico de status polimorfico: registra toda mudanca de status de qualquer entidade
+model HistoricoStatus {
+  id             Int      @id @default(autoincrement())
+  entidadeTipo   String // ex: "RNC"
+  entidadeId     Int
+  statusAnterior String?
+  statusNovo     String
+  comentario     String?
+  usuarioId      Int?
+  usuario        Usuario? @relation(fields: [usuarioId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([entidadeTipo, entidadeId])
+}
+
+// Historico de classificacao por trimestre fiscal (out->set)
+model HistoricoClassificacao {
+  id                    Int           @id @default(autoincrement())
+  fornecedorId          Int
+  fornecedor            Fornecedor    @relation(fields: [fornecedorId], references: [id])
+  trimestreFiscal       String        // ex: "FY26-Q3"
+  periodoInicio         DateTime
+  periodoFim            DateTime
+  classificacaoInicial  Classificacao // classificacao de fornecimento do periodo
+  lotesInspecionados    Int
+  lotesReprovados       Int
+  pctConformidade       Float
+  classificacaoApurada  Classificacao // calculada pela conformidade
+  createdAt             DateTime      @default(now())
+
+  @@index([fornecedorId])
+}
+
+// ---------------------- MODULO SQE ----------------------
+
+enum StatusPlanejamento {
+  PENDENTE
+  ENTREGUE
+}
+
+model PlanejamentoSemanal {
+  id               Int                @id @default(autoincrement())
+  semanaReferencia String // ex: "2026-W28"
+  fornecedorId     Int
+  fornecedor       Fornecedor         @relation(fields: [fornecedorId], references: [id])
+  itemId           Int?
+  item             Item?              @relation(fields: [itemId], references: [id])
+  dataPrevista     DateTime?
+  status           StatusPlanejamento @default(PENDENTE)
+  criadoPorId      Int?
+  criadoPor        Usuario?           @relation("PlanejamentoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt        DateTime           @default(now())
+
+  entregas EntregaPortaria[]
+}
+
+model EntregaPortaria {
+  id              Int                  @id @default(autoincrement())
+  planejamentoId  Int?
+  planejamento    PlanejamentoSemanal? @relation(fields: [planejamentoId], references: [id])
+  fornecedorId    Int
+  fornecedor      Fornecedor           @relation(fields: [fornecedorId], references: [id])
+  itemId          Int?
+  item            Item?                @relation(fields: [itemId], references: [id])
+  dataEntrega     DateTime             @default(now())
+  semanaReferencia String?             // W do recebimento (domingo->sabado)
+  semana          String?              // semana no formato W## (ex: W28)
+  ano             Int?                 // ano do recebimento
+  notaFiscal      String?
+  po              String?
+  quantidade      Float?
+  // Decisao automatica de inspecao
+  numeroEntregaAcumulado Int?          // valor do contador no momento
+  passivelInspecao       Boolean       @default(false) // sistema decidiu inspecionar?
+  confirmadoPorId Int?
+  confirmadoPor   Usuario?             @relation("EntregaConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  createdAt       DateTime             @default(now())
+
+  inspecoesVisual InspecaoVisual[]
+  inspecoesLote   InspecaoLote[]
+}
+
+enum ResultadoInspecao {
+  APROVADO
+  REPROVADO
+}
+
+enum OrigemInspecao {
+  PLANO_INSPECAO
+  HOMOLOGACAO
+  DEVOLUCAO
+  RETRABALHO
+  RELATORIO_OCORRENCIA
+  OUTROS
+}
+
+// Formulario VISUAL - Doc BDBR.QUA.FMR.06.07
+// Checklist de 12 grupos armazenado em JSON (fiel a planilha)
+model InspecaoVisual {
+  id           Int              @id @default(autoincrement())
+  entregaId    Int?
+  entrega      EntregaPortaria? @relation(fields: [entregaId], references: [id])
+  fornecedorId Int
+  fornecedor   Fornecedor       @relation(fields: [fornecedorId], references: [id])
+  itemId       Int
+  item         Item             @relation(fields: [itemId], references: [id])
+
+  // Cabecalho comum
+  desenhoRev      String?
+  toleranciasNorm String?
+  notaFiscal      String?
+  po              String?
+  qtdInspecionada Float?
+  qtdTotal        Float?
+  relatorioNumero String?
+  origem          OrigemInspecao @default(PLANO_INSPECAO)
+
+  // Checklist (12 grupos) - JSON: [{ grupo, itens: [{ texto, status }] }]
+  checklist Json
+
+  observacoes String?
+  resultado   ResultadoInspecao @default(APROVADO)
+  dataInspecao DateTime         @default(now())
+  semana       String?          // semana da inspecao no formato W## (ex: W28)
+  ano          Int?             // ano da inspecao
+  inspetorId   Int?
+  inspetor     Usuario?         @relation("InspVisualInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime         @default(now())
+
+  rncs Rnc[]
+}
+
+// Formulario LOTE / DIMENSIONAL - Doc BDBR.QUA.FMR.011.06
+model InspecaoLote {
+  id           Int              @id @default(autoincrement())
+  entregaId    Int?
+  entrega      EntregaPortaria? @relation(fields: [entregaId], references: [id])
+  fornecedorId Int
+  fornecedor   Fornecedor       @relation(fields: [fornecedorId], references: [id])
+  itemId       Int
+  item         Item             @relation(fields: [itemId], references: [id])
+
+  // Cabecalho comum
+  desenhoRev      String?
+  toleranciasNorm String?
+  notaFiscal      String?
+  po              String?
+  qtdInspecionada Float?
+  qtdTotal        Float?
+  relatorioNumero String?
+  origem          OrigemInspecao @default(PLANO_INSPECAO)
+
+  // Tabela de cotas - JSON: [{ localizacao, especificado, tolUpper, tolLower, pecas:[..], instrumento, desvioMin, desvioMax }]
+  cotas Json
+
+  observacoes String?
+  resultado   ResultadoInspecao @default(APROVADO)
+  dataInspecao DateTime         @default(now())
+  semana       String?          // semana da inspecao no formato W## (ex: W28)
+  ano          Int?             // ano da inspecao
+  inspetorId   Int?
+  inspetor     Usuario?         @relation("InspLoteInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime         @default(now())
+
+  rncs Rnc[]
+}
+
+// RNC - Doc BDBR.QUA.FMR.003.03 (controle interno)
+enum StatusRnc {
+  EM_ANDAMENTO
+  FINALIZADA
+  CANCELADA
+}
+
+enum VerificacaoEficacia {
+  PENDENTE
+  APROVADO
+  REPROVADO
+  NAO_APLICAVEL
+}
+
+enum NivelPlano {
+  SATISFATORIO
+  EXCELENTE
+  NAO_APLICAVEL
+}
+
+model Rnc {
+  id     Int    @id @default(autoincrement())
+  numero String @unique // formato {seq}/{aa} - ex: 149/26
+  ano    Int    // ano da RNC (para gerar sequencial por ano)
+  sequencial Int // sequencial dentro do ano
+
+  // origem (inspecao reprovada)
+  inspecaoVisualId Int?
+  inspecaoVisual   InspecaoVisual? @relation(fields: [inspecaoVisualId], references: [id])
+  inspecaoLoteId   Int?
+  inspecaoLote     InspecaoLote?   @relation(fields: [inspecaoLoteId], references: [id])
+
+  // Informacoes do documento
+  dataAbertura DateTime @default(now())
+  semana       String?  // semana da abertura no formato W## (ex: W28)
+  solicitante  String   @default("Qualidade")
+
+  // Informacoes do item
+  itemId       Int
+  item         Item       @relation(fields: [itemId], references: [id])
+  quantidadeLote Float?
+  po           String?
+  notaFiscal   String?
+
+  // Informacoes do fornecedor
+  fornecedorId Int
+  fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id])
+
+  // Informacoes sobre o desvio
+  tipoDesvio      String  // texto livre
+  reincidencia    Boolean @default(false)
+  descricaoDesvio String
+
+  // Custos RNC
+  quantidadePecas Float?
+  valorUnitario   Float?
+  valorTotal      Float?  // = quantidadePecas * valorUnitario
+
+  // Plano de acao
+  disposicao         String? // texto livre
+  houveRetorno       Boolean?
+  dataRetorno        DateTime?
+  tempoRetornoDias   Int?     // = dataRetorno - dataAbertura
+  fornecedorAceitou  String?  // "Sim" / "Nao (Ver observacoes)"
+  fornecedorEnviouPlano Boolean?
+  nivelPlano         NivelPlano?
+  status             StatusRnc @default(EM_ANDAMENTO)
+  motivoCancelamento String?  // motivo quando status = CANCELADA
+  verificacaoEficacia VerificacaoEficacia @default(PENDENTE)
+  dataVerificacao    DateTime?
+
+  evidencias  String?
+  observacoes String?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("RncCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([ano, sequencial])
+}

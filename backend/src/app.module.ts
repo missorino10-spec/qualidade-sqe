@@ -1,0 +1,53 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
+import { FornecedoresModule } from './fornecedores/fornecedores.module';
+import { PeriodicidadeModule } from './periodicidade/periodicidade.module';
+import { ItensModule } from './itens/itens.module';
+import { AnexosModule } from './anexos/anexos.module';
+import { HistoricoModule } from './historico/historico.module';
+import { PlanejamentoModule } from './sqe/planejamento/planejamento.module';
+import { EntregasModule } from './sqe/entregas/entregas.module';
+import { InspecoesModule } from './sqe/inspecoes/inspecoes.module';
+import { RncModule } from './sqe/rnc/rnc.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+
+// Pasta com o frontend ja compilado (usada no pacote portatil, onde o proprio
+// backend serve as telas numa unica porta). No modo Docker/dev o nginx serve o
+// frontend e esta pasta pode nao existir — por isso so ativamos se ela existir.
+const frontendDir =
+  process.env.FRONTEND_DIR || join(process.cwd(), 'public');
+const servirFrontend = existsSync(frontendDir);
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ...(servirFrontend
+      ? [
+          ServeStaticModule.forRoot({
+            rootPath: frontendDir,
+            exclude: ['/api*'],
+          }),
+        ]
+      : []),
+    PrismaModule,
+    AuthModule,
+    UsuariosModule,
+    FornecedoresModule,
+    PeriodicidadeModule,
+    ItensModule,
+    AnexosModule,
+    HistoricoModule,
+    PlanejamentoModule,
+    EntregasModule,
+    InspecoesModule,
+    RncModule,
+    DashboardModule,
+  ],
+})
+export class AppModule {}

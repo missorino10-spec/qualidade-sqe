@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: qualidade-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qualidade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qualidade}
+      POSTGRES_DB: ${POSTGRES_DB:-qualidade}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-qualidade}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: qualidade-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-qualidade}:${POSTGRES_PASSWORD:-qualidade}@postgres:5432/${POSTGRES_DB:-qualidade}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-troque-esta-chave-secreta}
+      UPLOAD_DIR: /app/uploads
+      PORT: 3000
+    volumes:
+      - uploads_data:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: qualidade-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '${APP_PORT:-8080}:80'
+
+volumes:
+  postgres_data:
+  uploads_data:

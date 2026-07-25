@@ -1,0 +1,9 @@
+# Scripts e arquivos usados no servidor Linux DEVEM manter quebra de linha LF.
+# Se virarem CRLF (padrao do Windows), o Linux nao consegue executa-los.
+*.sh            text eol=lf
+Caddyfile       text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+docker-entrypoint.sh text eol=lf
+nginx.conf      text eol=lf

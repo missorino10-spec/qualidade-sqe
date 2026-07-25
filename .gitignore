@@ -1,0 +1,37 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+build/
+
+# Ambiente
+.env
+
+# Uploads locais (fora do Docker)
+uploads/
+
+# Prisma
+*.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / SO
+.DS_Store
+.vscode/
+.idea/
+
+# Kit portatil montado (binarios Node/PostgreSQL ~1.9GB - NAO versionar)
+deploy-portatil/runtime/
+deploy-portatil/_cache/
+deploy-portatil/Qualidade-SQE/
+
+# Pasta criada por engano (typo de comando)
+backend;C/
+
+# Pacotes/arquivos grandes
+*.zip
+*.7z
+*.exe
