@@ -11,6 +11,10 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // DIRECT_URL: conexao direta (porta 5432), usada SOMENTE para criar/alterar
+  // tabelas. A DATABASE_URL aponta para o pooler em modo transaction (6543),
+  // otimo para a aplicacao mas incapaz de executar DDL e advisory locks.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------- NUCLEO ----------------------
