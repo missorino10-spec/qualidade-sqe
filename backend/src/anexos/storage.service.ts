@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { StorageClient } from '@supabase/storage-js';
 
 // Guarda os arquivos anexados no Supabase Storage.
 //
@@ -9,12 +9,16 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 //
 // O bucket e PRIVADO: nenhum arquivo tem URL publica. Todo download continua
 // passando pelo backend, protegido pelo JWT da aplicacao.
+//
+// Usamos StorageClient e nao o supabase-js completo: aquele inicializa o
+// modulo Realtime, que exige WebSocket nativo (Node 22+). O runtime aqui e
+// Node 20, entao o supabase-js quebraria na primeira chamada.
 @Injectable()
 export class StorageService {
-  private cliente: SupabaseClient | null = null;
+  private cliente: StorageClient | null = null;
   private readonly bucket = process.env.SUPABASE_BUCKET || 'anexos';
 
-  private conectar(): SupabaseClient {
+  private conectar(): StorageClient {
     if (this.cliente) return this.cliente;
 
     const url = process.env.SUPABASE_URL;
@@ -26,15 +30,16 @@ export class StorageService {
       );
     }
 
-    this.cliente = createClient(url, chave, {
-      auth: { persistSession: false, autoRefreshToken: false },
+    this.cliente = new StorageClient(`${url}/storage/v1`, {
+      apikey: chave,
+      Authorization: `Bearer ${chave}`,
     });
     return this.cliente;
   }
 
   async enviar(nome: string, bytes: Buffer, mimeType?: string): Promise<void> {
     const { error } = await this.conectar()
-      .storage.from(this.bucket)
+      .from(this.bucket)
       .upload(nome, bytes, {
         contentType: mimeType || 'application/octet-stream',
         upsert: false,
@@ -48,7 +53,7 @@ export class StorageService {
 
   async baixar(nome: string): Promise<Buffer> {
     const { data, error } = await this.conectar()
-      .storage.from(this.bucket)
+      .from(this.bucket)
       .download(nome);
     if (error || !data) {
       throw new InternalServerErrorException(
