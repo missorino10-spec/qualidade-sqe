@@ -24,7 +24,10 @@ function simNao(v?: boolean | null): string {
 
 // Gera o PDF da RNC fiel ao formulario BDBR.QUA.FMR.003.05 (bilingue PT/EN),
 // incluindo o Registro Fotografico com as fotos anexadas a RNC.
-export function gerarPdfRnc(rnc: any, fotos: string[] = []): PDFKit.PDFDocument {
+//
+// As fotos chegam como bytes (e nao como caminho de arquivo) porque ficam
+// guardadas no Supabase Storage, nao no disco do servidor.
+export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M });
 
   // ---------- Celula bilingue com borda ----------
@@ -206,7 +209,7 @@ export function gerarPdfRnc(rnc: any, fotos: string[] = []): PDFKit.PDFDocument 
   const areaAltura = doc.page.height - 60 - areaTop;
   doc.lineWidth(0.8).strokeColor(PRETO).rect(X0, areaTop, W, areaAltura).stroke();
 
-  const validas = fotos.filter((p) => existsSync(p)).slice(0, 4);
+  const validas = fotos.slice(0, 4);
   if (validas.length) {
     const cols = validas.length === 1 ? 1 : 2;
     const linhas = Math.ceil(validas.length / cols);

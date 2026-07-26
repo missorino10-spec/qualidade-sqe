@@ -12,35 +12,27 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
-if (!existsSync(UPLOAD_DIR)) {
-  mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+import { StorageService } from './storage.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('anexos')
 export class AnexosController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   // Upload: /api/anexos?entidadeTipo=RNC&entidadeId=1  (multipart, campo "file")
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: UPLOAD_DIR,
-        filename: (_req, file, cb) => {
-          const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          cb(null, `${unico}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
     }),
   )
@@ -54,12 +46,21 @@ export class AnexosController {
     if (!entidadeTipo || !entidadeId) {
       throw new BadRequestException('entidadeTipo e entidadeId obrigatorios');
     }
+
+    // Mesmo formato de nome de antes, para a coluna "caminho" nao mudar.
+    const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const nomeNoStorage = `${unico}${extname(file.originalname)}`;
+
+    // Grava o arquivo primeiro: se o Storage falhar, nao fica registro orfao
+    // no banco apontando para um anexo que nao existe.
+    await this.storage.enviar(nomeNoStorage, file.buffer, file.mimetype);
+
     return this.prisma.anexo.create({
       data: {
         entidadeTipo,
         entidadeId: Number(entidadeId),
         nomeArquivo: file.originalname,
-        caminho: file.filename,
+        caminho: nomeNoStorage,
         mimeType: file.mimetype,
         tamanho: file.size,
         uploadedById: user.id,
@@ -84,10 +85,13 @@ export class AnexosController {
       where: { id: Number(id) },
     });
     if (!anexo) throw new NotFoundException('Anexo nao encontrado');
-    const caminhoAbs = join(UPLOAD_DIR, anexo.caminho);
-    if (!existsSync(caminhoAbs)) {
-      throw new NotFoundException('Arquivo fisico nao encontrado');
-    }
-    res.download(caminhoAbs, anexo.nomeArquivo);
+
+    const bytes = await this.storage.baixar(anexo.caminho);
+    res.set({
+      'Content-Type': anexo.mimeType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${anexo.nomeArquivo}"`,
+      'Content-Length': String(bytes.length),
+    });
+    res.send(bytes);
   }
 }

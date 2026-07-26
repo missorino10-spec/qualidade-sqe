@@ -21,11 +21,10 @@ import {
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { join } from 'path';
-import { existsSync } from 'fs';
 import type { Response } from 'express';
 import { RncService } from './rnc.service';
 import { gerarPdfRnc } from './rnc-pdf';
+import { StorageService } from '../../anexos/storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -92,6 +91,7 @@ export class RncController {
   constructor(
     private service: RncService,
     private prisma: PrismaService,
+    private storage: StorageService,
   ) {}
 
   @Get()
@@ -138,15 +138,19 @@ export class RncController {
     if (!rnc) throw new NotFoundException('RNC nao encontrada');
 
     // Fotos anexadas a RNC entram no Registro Fotografico do formulario.
-    const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+    // Elas vivem no Supabase Storage, entao aqui baixamos os bytes. O
+    // formulario usa no maximo 4 fotos - so buscamos essas.
     const anexos = await this.prisma.anexo.findMany({
       where: { entidadeTipo: 'RNC', entidadeId: id },
       orderBy: { createdAt: 'asc' },
     });
-    const fotos = anexos
+    const imagens = anexos
       .filter((a) => (a.mimeType ?? '').startsWith('image/'))
-      .map((a) => join(uploadDir, a.caminho))
-      .filter((p) => existsSync(p));
+      .slice(0, 4);
+    const baixadas = await Promise.all(
+      imagens.map((a) => this.storage.baixarOuNulo(a.caminho)),
+    );
+    const fotos = baixadas.filter((b): b is Buffer => b !== null);
 
     const nomeArquivo = `RNC-${rnc.numero.replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
