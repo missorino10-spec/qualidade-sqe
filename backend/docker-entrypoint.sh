@@ -1,10 +1,15 @@
 #!/bin/sh
 set -e
 
-echo "Aguardando o banco de dados..."
-# Sincroniza o schema com o banco (cria/atualiza as tabelas) e roda o seed inicial
-npx prisma db push --skip-generate --accept-data-loss
-node dist/prisma/seed.js || echo "Seed ja aplicado ou ignorado."
+echo "Sincronizando o schema do banco..."
+# Sem --accept-data-loss de proposito: se a mudanca for destrutiva, o deploy
+# falha e avisa, em vez de apagar colunas ou tabelas silenciosamente.
+npx prisma db push --skip-generate
+
+echo "Aplicando o seed inicial..."
+# Sem "|| echo": engolir o erro faria o sistema subir sem nenhum usuario e sem
+# aviso no log. O seed usa upsert, entao rodar a cada boot e seguro.
+node dist/prisma/seed.js
 
 echo "Iniciando o backend..."
 node dist/src/main.js
