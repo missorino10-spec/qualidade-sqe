@@ -1,8 +1,11 @@
 import axios from 'axios';
 
-// O nginx (producao) e o proxy do Vite (dev) encaminham /api para o backend
+// Sem VITE_API_URL, usa o caminho relativo /api: e o caso do nginx (producao
+// on-premise) e do proxy do Vite (dev), onde front e back sao o mesmo host.
+// Na nuvem o frontend e um site estatico em outro dominio, entao a URL
+// completa do backend chega pela variavel no momento do build.
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL ?? '/api',
 });
 
 api.interceptors.request.use((config) => {
