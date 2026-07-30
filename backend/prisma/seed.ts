@@ -111,10 +111,74 @@ async function main() {
     });
   }
 
+  // ---- 3. Maquinas da Fabricacao (modulo MANUFATURA) ----
+  // Sao as 15 abas de maquina da planilha de indicadores da Qualidade: um
+  // cadastro da fabrica, nao dado operacional. As linhas de MONTAGEM nao
+  // entram aqui porque a planilha nao nomeia as linhas - a Qualidade cadastra
+  // pela propria tela de Maquinas.
+  const maquinas = [
+    'Infinity',
+    'Meccal',
+    'Dobradeira Newton',
+    'Prensa 100',
+    'Prensa 40',
+    'Roll Forming',
+    'Laser',
+    'Prensa 300',
+    'Cocho',
+    'Chapa Anel',
+    'Diversas',
+    'Puncionadeira Finn Power',
+    'Dobradeira Warcon',
+    'Puncionadeira LVD',
+    'Dobradeira Finn Power',
+  ];
+
+  for (let i = 0; i < maquinas.length; i++) {
+    const codigo = `MAQ${String(i + 1).padStart(2, '0')}`;
+    await prisma.maquina.upsert({
+      where: { codigo },
+      update: {},
+      create: { codigo, nome: maquinas[i], area: 'FABRICACAO' },
+    });
+  }
+
+  // ---- 4. Descricao do Defeito (lista oficial da Qualidade) ----
+  // Alimenta o lancamento de CNQ e o bloco de defeitos do relatorio.
+  const defeitos = [
+    'Acabamento Danificado',
+    'Marca de Solda',
+    'Furação Não Realizada',
+    'Dimensional Fora do Especificado',
+    'Setup Incorreto',
+    'Dobra Invertida',
+    'Furação Deslocada',
+    'Falha de Corte',
+    'Rebarba',
+    'Chapa Danificada',
+    'Sobra de Material',
+    'Material Deformado',
+    'Oxidação',
+    'Pico de Energia',
+    'Repuxo Invertido',
+    // Defeitos da Montagem
+    'Ruído',
+    'Vazamento',
+  ];
+
+  for (let i = 0; i < defeitos.length; i++) {
+    await prisma.tipoDefeito.upsert({
+      where: { nome: defeitos[i] },
+      update: {},
+      create: { nome: defeitos[i], ordem: i + 1 },
+    });
+  }
+
   // A senha NAO e impressa no log (o log do provedor fica visivel no painel).
   console.log(
     `Seed (nuvem) concluido. Admin: ${admin.email}. ` +
-      `${periodicidades.length} parametros de periodicidade. ` +
+      `${periodicidades.length} parametros de periodicidade, ` +
+      `${maquinas.length} maquinas e ${defeitos.length} tipos de defeito. ` +
       `Nenhum fornecedor, item, inspecao ou RNC criado.`,
   );
 }

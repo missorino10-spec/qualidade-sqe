@@ -11,21 +11,39 @@ import {
   ExperimentOutlined,
   ToolOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
+  DollarOutlined,
+  FileProtectOutlined,
+  ClusterOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 const { Header, Sider, Content } = Layout;
 
-const emDesenvolvimento = [
+// Placeholder dos modulos ainda nao construidos. A key precisa ser unica por
+// grupo, senao o antd trata os dois itens como o mesmo no de menu.
+const emDesenvolvimento = (grupo: string): ItemMenu[] => [
   {
-    key: 'em-desenvolvimento',
+    key: `em-desenvolvimento-${grupo}`,
     label: 'EM DESENVOLVIMENTO',
     disabled: true,
   },
 ];
 
-const itensMenu = [
+type ItemMenu = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  disabled?: boolean;
+};
+
+const itensMenu: {
+  key: string;
+  icon: ReactNode;
+  label: string;
+  children: ItemMenu[];
+}[] = [
   {
     key: 'sqe',
     icon: <ExperimentOutlined />,
@@ -46,15 +64,42 @@ const itensMenu = [
     key: 'manufatura',
     icon: <ToolOutlined />,
     label: 'QUALIDADE - MANUFATURA',
-    children: emDesenvolvimento,
+    children: [
+      { key: '/manufatura', icon: <DashboardOutlined />, label: 'Painel' },
+      {
+        key: '/manufatura/inspecoes/setup',
+        icon: <SettingOutlined />,
+        label: 'Inspeção de Setup',
+      },
+      {
+        key: '/manufatura/inspecoes/producao',
+        icon: <AuditOutlined />,
+        label: 'Inspeção de Produção',
+      },
+      { key: '/manufatura/cnq', icon: <DollarOutlined />, label: 'CNQ' },
+      { key: '/manufatura/8d', icon: <FileProtectOutlined />, label: '8D' },
+      {
+        key: '/manufatura/maquinas',
+        icon: <ClusterOutlined />,
+        label: 'Máquinas',
+      },
+    ],
   },
   {
     key: 'sqd',
     icon: <SafetyCertificateOutlined />,
     label: 'QUALIDADE - SQD',
-    children: emDesenvolvimento,
+    children: emDesenvolvimento('sqd'),
   },
 ];
+
+// Todas as rotas do menu, da mais especifica para a mais generica: o item
+// selecionado e o primeiro prefixo que casa com a URL atual.
+const rotasMenu = itensMenu
+  .flatMap((g) => g.children ?? [])
+  .map((c) => c.key)
+  .filter((k) => k.startsWith('/'))
+  .sort((a, b) => b.length - a.length);
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -64,7 +109,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const selecionado =
     location.pathname === '/'
       ? '/'
-      : '/' + location.pathname.split('/')[1];
+      : (rotasMenu.find(
+          (r) =>
+            r !== '/' &&
+            (location.pathname === r || location.pathname.startsWith(`${r}/`)),
+        ) ?? '/' + location.pathname.split('/')[1]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

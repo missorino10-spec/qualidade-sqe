@@ -1,0 +1,304 @@
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { semanaAno } from '../../sqe/sqe-utils';
+import { numeroManufatura, statusPorResultado } from '../manufatura-utils';
+
+const includeInspecao = {
+  maquina: { select: { id: true, codigo: true, nome: true, area: true } },
+  inspetor: { select: { id: true, nome: true } },
+  relatorios: {
+    orderBy: { tentativa: 'asc' as const },
+    include: { inspetor: { select: { id: true, nome: true } } },
+  },
+  oitoDs: { select: { id: true, numero: true, status: true } },
+  setup: { select: { id: true, numero: true } },
+};
+
+@Injectable()
+export class InspecoesManufaturaService {
+  constructor(private prisma: PrismaService) {}
+
+  listar(tipo?: string, maquinaId?: number) {
+    return this.prisma.inspecaoManufatura.findMany({
+      where: {
+        tipo: tipo ? (tipo as any) : undefined,
+        maquinaId: maquinaId ?? undefined,
+      },
+      orderBy: { dataInspecao: 'desc' },
+      include: includeInspecao,
+    });
+  }
+
+  async detalhe(id: number) {
+    const insp = await this.prisma.inspecaoManufatura.findUnique({
+      where: { id },
+      include: includeInspecao,
+    });
+    if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    return insp;
+  }
+
+  // Todo setup e inspecionado. O contador conta os setups da maquina para
+  // disparar a inspecao de PRODUCAO: 1 producao a cada N setups. Uma producao
+  // feita antes de fechar o ciclo e marcada como extra.
+  async avaliarProducao(maquinaId: number) {
+    const maquina = await this.prisma.maquina.findUnique({
+      where: { id: maquinaId },
+    });
+    if (!maquina) throw new NotFoundException('Máquina não encontrada');
+    const frequenciaN = maquina.frequenciaProducaoN || 1;
+    return {
+      maquina: {
+        id: maquina.id,
+        codigo: maquina.codigo,
+        nome: maquina.nome,
+        area: maquina.area,
+        classificacao: maquina.classificacao,
+      },
+      frequenciaN,
+      contadorAtual: maquina.contadorSetups,
+      precisaInspecionar: maquina.contadorSetups >= frequenciaN,
+    };
+  }
+
+  // Setups da maquina ainda sem inspecao de producao vinculada: e a lista que
+  // a tela de producao oferece para amarrar a producao ao setup que a liberou.
+  setupsDisponiveis(maquinaId: number) {
+    return this.prisma.inspecaoManufatura.findMany({
+      where: { tipo: 'SETUP', maquinaId },
+      orderBy: { dataInspecao: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        numero: true,
+        dataInspecao: true,
+        status: true,
+        itemCodigo: true,
+        itemDescricao: true,
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------- escrita
+
+  // Numera o relatorio na serie do tipo (SET0001/2026 ou PROD0001/2026).
+  // O retry existe porque dois inspetores podem salvar ao mesmo tempo e cair
+  // no mesmo sequencial; sem ele, um deles perderia o formulario preenchido.
+  private async criarRelatorio(
+    inspecaoId: number,
+    tipo: 'SETUP' | 'PRODUCAO',
+    tentativa: number,
+    dto: any,
+    usuarioId: number,
+  ) {
+    const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
+    const ano = data.getFullYear();
+    const prefixo = tipo === 'SETUP' ? 'SET' : 'PROD';
+
+    for (let i = 0; i < 5; i++) {
+      const ultimo = await this.prisma.relatorioDimensional.findFirst({
+        where: { tipo, ano },
+        orderBy: { sequencial: 'desc' },
+      });
+      const sequencial = (ultimo?.sequencial ?? 0) + 1;
+      try {
+        return await this.prisma.relatorioDimensional.create({
+          data: {
+            inspecaoId,
+            tipo,
+            numero: numeroManufatura(prefixo, sequencial, ano),
+            ano,
+            sequencial,
+            tentativa,
+            revisao: dto.revisao ?? '01',
+            dataInspecao: data,
+            origem: dto.origem ?? 'LIBERACAO_SETUP',
+            origemOutros: dto.origemOutros ?? null,
+            itemCodigo: dto.itemCodigo ?? null,
+            itemDescricao: dto.itemDescricao ?? null,
+            desenhoRev: dto.desenhoRev ?? null,
+            po: dto.po ?? null,
+            qtdInspecionada: dto.qtdInspecionada ?? null,
+            qtdTotal: dto.qtdTotal ?? null,
+            cotas: dto.cotas ?? [],
+            observacoesFinais: dto.observacoesFinais ?? null,
+            resultado: dto.resultado ?? 'APROVADO',
+            observacaoResultado: dto.observacaoResultado ?? null,
+            defeitos: dto.defeitos ?? undefined,
+            qtdAfetada: dto.qtdAfetada ?? null,
+            descricaoDesvio: dto.descricaoDesvio ?? null,
+            elaboradoPor: dto.elaboradoPor ?? null,
+            inspecionadoPor: dto.inspecionadoPor ?? null,
+            inspetorId: usuarioId,
+          },
+        });
+      } catch {
+        // Numero tomado por outro inspetor no mesmo instante: tenta o proximo.
+      }
+    }
+    throw new ConflictException(
+      'Não foi possível numerar o relatório. Tente salvar novamente.',
+    );
+  }
+
+  // Abre a inspecao (setup ou producao) com o primeiro relatorio dimensional.
+  async criar(tipo: 'SETUP' | 'PRODUCAO', dto: any, usuarioId: number) {
+    const maquina = await this.prisma.maquina.findUnique({
+      where: { id: dto.maquinaId },
+    });
+    if (!maquina) throw new NotFoundException('Máquina não encontrada');
+
+    const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
+    const { semana, ano } = semanaAno(data);
+
+    // Producao antes de fechar o ciclo de setups da maquina = inspecao extra.
+    const frequenciaN = maquina.frequenciaProducaoN || 1;
+    const extra =
+      tipo === 'PRODUCAO'
+        ? (dto.extra ?? maquina.contadorSetups < frequenciaN)
+        : false;
+
+    const inspecao = await this.prisma.inspecaoManufatura.create({
+      data: {
+        tipo,
+        numero: `TEMP-${Date.now()}`,
+        maquinaId: dto.maquinaId,
+        itemCodigo: dto.itemCodigo ?? null,
+        itemDescricao: dto.itemDescricao ?? null,
+        po: dto.po ?? null,
+        setupId: tipo === 'PRODUCAO' ? (dto.setupId ?? null) : null,
+        extra,
+        status: 'PENDENTE',
+        dataInspecao: data,
+        semana,
+        ano,
+        inspetorId: usuarioId,
+      },
+    });
+
+    const relatorio = await this.criarRelatorio(
+      inspecao.id,
+      tipo,
+      1,
+      dto,
+      usuarioId,
+    );
+
+    // O numero da inspecao e o do primeiro relatorio: as reinspecoes ganham
+    // numeros novos na mesma serie, mas ficam dentro desta mesma inspecao.
+    await this.prisma.inspecaoManufatura.update({
+      where: { id: inspecao.id },
+      data: {
+        numero: relatorio.numero,
+        status: statusPorResultado(relatorio.resultado),
+      },
+    });
+
+    await this.contabilizar(maquina.id, tipo, extra, relatorio.resultado);
+    return this.detalhe(inspecao.id);
+  }
+
+  // Reinspecao: novo relatorio completo, com numero proprio, dentro da mesma
+  // inspecao. Nao ha limite de tentativas; a inspecao so sai de PENDENTE
+  // quando a ULTIMA tentativa e aprovada.
+  async reinspecionar(inspecaoId: number, dto: any, usuarioId: number) {
+    const insp = await this.prisma.inspecaoManufatura.findUnique({
+      where: { id: inspecaoId },
+      include: { relatorios: { orderBy: { tentativa: 'desc' }, take: 1 } },
+    });
+    if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    const ultima = insp.relatorios[0];
+    if (ultima && ultima.resultado !== 'REPROVADO')
+      throw new ConflictException(
+        'Só é possível reinspecionar uma inspeção reprovada.',
+      );
+
+    const relatorio = await this.criarRelatorio(
+      insp.id,
+      insp.tipo,
+      (ultima?.tentativa ?? 0) + 1,
+      dto,
+      usuarioId,
+    );
+
+    await this.prisma.inspecaoManufatura.update({
+      where: { id: insp.id },
+      data: { status: statusPorResultado(relatorio.resultado) },
+    });
+
+    if (relatorio.resultado === 'REPROVADO')
+      await this.prisma.maquina.update({
+        where: { id: insp.maquinaId },
+        data: { inspecoesReprovadas: { increment: 1 } },
+      });
+
+    return this.detalhe(insp.id);
+  }
+
+  // Contadores da maquina, atualizados so na abertura da inspecao.
+  private async contabilizar(
+    maquinaId: number,
+    tipo: 'SETUP' | 'PRODUCAO',
+    extra: boolean,
+    resultado: string,
+  ) {
+    const data: any = {};
+    if (tipo === 'SETUP') {
+      data.setupsRealizados = { increment: 1 };
+      data.contadorSetups = { increment: 1 };
+    } else {
+      data.producoesRealizadas = { increment: 1 };
+      // A producao fecha o ciclo de setups, mesmo quando foi antecipada.
+      if (!extra) data.contadorSetups = 0;
+    }
+    if (resultado === 'REPROVADO') data.inspecoesReprovadas = { increment: 1 };
+    await this.prisma.maquina.update({ where: { id: maquinaId }, data });
+  }
+
+  async remover(id: number) {
+    const insp = await this.prisma.inspecaoManufatura.findUnique({
+      where: { id },
+      include: { relatorios: true, oitoDs: { select: { id: true } } },
+    });
+    if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    if (insp.oitoDs.length)
+      throw new ConflictException(
+        'Esta inspeção tem um 8D vinculado. Exclua o 8D antes.',
+      );
+
+    const reprovados = insp.relatorios.filter(
+      (r) => r.resultado === 'REPROVADO',
+    ).length;
+    const maquina = await this.prisma.maquina.findUniqueOrThrow({
+      where: { id: insp.maquinaId },
+    });
+
+    await this.prisma.inspecaoManufatura.delete({ where: { id } });
+    await this.prisma.maquina.update({
+      where: { id: maquina.id },
+      data: {
+        setupsRealizados:
+          insp.tipo === 'SETUP'
+            ? Math.max(0, maquina.setupsRealizados - 1)
+            : undefined,
+        contadorSetups:
+          insp.tipo === 'SETUP'
+            ? Math.max(0, maquina.contadorSetups - 1)
+            : undefined,
+        producoesRealizadas:
+          insp.tipo === 'PRODUCAO'
+            ? Math.max(0, maquina.producoesRealizadas - 1)
+            : undefined,
+        inspecoesReprovadas: Math.max(
+          0,
+          maquina.inspecoesReprovadas - reprovados,
+        ),
+      },
+    });
+    return { ok: true };
+  }
+}

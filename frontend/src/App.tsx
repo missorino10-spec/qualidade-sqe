@@ -9,6 +9,13 @@ import InspecaoDetalhe from './pages/InspecaoDetalhe';
 import RncLista from './pages/RncLista';
 import RncDetalhe from './pages/RncDetalhe';
 import Periodicidade from './pages/Periodicidade';
+import PainelManufatura from './pages/manufatura/PainelManufatura';
+import InspecoesManufatura from './pages/manufatura/InspecoesManufatura';
+import InspecaoManufaturaDetalhe from './pages/manufatura/InspecaoManufaturaDetalhe';
+import Cnq from './pages/manufatura/Cnq';
+import OitoD from './pages/manufatura/OitoD';
+import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
+import Maquinas from './pages/manufatura/Maquinas';
 
 function Privado({ children }: { children: JSX.Element }) {
   const { usuario } = useAuth();
@@ -27,6 +34,26 @@ export default function App() {
       <Route path="/inspecoes/:id" element={<Privado><InspecaoDetalhe /></Privado>} />
       <Route path="/rnc" element={<Privado><RncLista /></Privado>} />
       <Route path="/rnc/:id" element={<Privado><RncDetalhe /></Privado>} />
+
+      {/* Qualidade da Manufatura */}
+      <Route path="/manufatura" element={<Privado><PainelManufatura /></Privado>} />
+      <Route
+        path="/manufatura/inspecoes/setup"
+        element={<Privado><InspecoesManufatura tipo="SETUP" /></Privado>}
+      />
+      <Route
+        path="/manufatura/inspecoes/producao"
+        element={<Privado><InspecoesManufatura tipo="PRODUCAO" /></Privado>}
+      />
+      <Route
+        path="/manufatura/inspecoes/:id"
+        element={<Privado><InspecaoManufaturaDetalhe /></Privado>}
+      />
+      <Route path="/manufatura/cnq" element={<Privado><Cnq /></Privado>} />
+      <Route path="/manufatura/8d" element={<Privado><OitoD /></Privado>} />
+      <Route path="/manufatura/8d/:id" element={<Privado><OitoDDetalhe /></Privado>} />
+      <Route path="/manufatura/maquinas" element={<Privado><Maquinas /></Privado>} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

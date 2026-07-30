@@ -2,6 +2,7 @@
 // Sistema de Qualidade - Big Dutchman Brasil
 // Schema do banco de dados (PostgreSQL)
 // Nucleo compartilhado + Modulo SQE (recebimento de fornecedores)
+//                      + Modulo MANUFATURA (setup, producao, CNQ, 8D)
 // ============================================================
 
 generator client {
@@ -41,6 +42,14 @@ model Usuario {
   rncs            Rnc[]                 @relation("RncCriadoPor")
   anexos          Anexo[]
   historicos      HistoricoStatus[]
+
+  // Manufatura
+  inspecoesManufatura InspecaoManufatura[]  @relation("InspManufaturaInspetor")
+  relatoriosDimensionais RelatorioDimensional[] @relation("RelatorioInspetor")
+  producaoRegistrada  ProducaoDiaria[]      @relation("ProducaoRegistradaPor")
+  cnqs                Cnq[]                 @relation("CnqCriadoPor")
+  oitoDsCriados       OitoD[]               @relation("OitoDCriadoPor")
+  oitoDsAprovados     OitoD[]               @relation("OitoDAprovadoPor")
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
@@ -274,6 +283,7 @@ enum OrigemInspecao {
   DEVOLUCAO
   RETRABALHO
   RELATORIO_OCORRENCIA
+  LIBERACAO_SETUP
   OUTROS
 }
 
@@ -432,4 +442,339 @@ model Rnc {
   createdAt   DateTime @default(now())
 
   @@unique([ano, sequencial])
+}
+
+// ---------------------- MODULO MANUFATURA ----------------------
+
+// A planilha de indicadores cobre duas areas com naturezas diferentes:
+// FABRICACAO trabalha por maquina (Prensa 100, Laser...) e MONTAGEM por linha
+// (Linha 1, Linha 2...). As duas sao inspecionadas pelos mesmos formularios,
+// entao ficam no mesmo cadastro, separadas pelo campo area.
+enum AreaManufatura {
+  FABRICACAO
+  MONTAGEM
+}
+
+model Maquina {
+  id     Int            @id @default(autoincrement())
+  codigo String         @unique
+  nome   String
+  area   AreaManufatura @default(FABRICACAO)
+
+  // Prioridade/criticidade definida manualmente pela Qualidade (nao e
+  // recalculada pelo sistema, ao contrario da classificacao do fornecedor).
+  classificacao Classificacao @default(C)
+
+  // Todo setup e inspecionado. O contador conta os setups para cobrar a
+  // inspecao de PRODUCAO: a cada N setups, a producao precisa ser inspecionada.
+  frequenciaProducaoN Int @default(1)
+  contadorSetups      Int @default(0)
+
+  // Acumulados do trimestre corrente (zerados no fechamento)
+  setupsRealizados    Int @default(0)
+  producoesRealizadas Int @default(0)
+  inspecoesReprovadas Int @default(0)
+
+  descricao String?
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  producaoDiaria ProducaoDiaria[]
+  inspecoes      InspecaoManufatura[]
+  cnqs           Cnq[]
+  historico      HistoricoMaquina[]
+}
+
+// Apontamento diario que os operadores entregam em papel e a Qualidade digita.
+// E a base do PPM: (qtdDefeito / qtdProduzida) * 1.000.000.
+model ProducaoDiaria {
+  id        Int      @id @default(autoincrement())
+  maquinaId Int
+  maquina   Maquina  @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
+  data      DateTime @db.Date
+  qtdProduzida Float @default(0)
+  qtdDefeito   Float @default(0)
+
+  registradoPorId Int?
+  registradoPor   Usuario? @relation("ProducaoRegistradaPor", fields: [registradoPorId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([maquinaId, data])
+  @@index([data])
+}
+
+// Lista oficial de "Descricao do Defeito" (aba Defeitos e CNQ). Cadastravel
+// para a Qualidade ajustar sem depender de deploy.
+model TipoDefeito {
+  id     Int     @id @default(autoincrement())
+  nome   String  @unique
+  ordem  Int     @default(0)
+  ativo  Boolean @default(true)
+
+  cnqs Cnq[]
+}
+
+enum TipoInspecaoManufatura {
+  SETUP
+  PRODUCAO
+}
+
+// Resultado dos formularios da manufatura. Diferente do SQE, existe o
+// "aprovado com observacao": o item passa, mas com ressalva registrada.
+// Para os indicadores ele conta como aprovado.
+enum ResultadoManufatura {
+  APROVADO
+  APROVADO_COM_OBSERVACAO
+  REPROVADO
+}
+
+enum StatusInspecaoManufatura {
+  PENDENTE
+  APROVADA
+  APROVADA_COM_OBSERVACAO
+  REPROVADA
+}
+
+// A inspecao-mae. Reprovar NAO encerra: a inspecao fica PENDENTE e recebe um
+// novo RelatorioDimensional (tentativa 2, 3...) ate aprovar. Todas as
+// tentativas ficam guardadas aqui e saem juntas no PDF.
+model InspecaoManufatura {
+  id     Int                    @id @default(autoincrement())
+  tipo   TipoInspecaoManufatura
+  numero String                 @unique // SET0001/2026 ou PROD0001/2026 (numero da 1a tentativa)
+
+  maquinaId Int
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+
+  // Item digitado livre (a base interna de itens entra depois)
+  itemCodigo    String?
+  itemDescricao String?
+  po            String?
+
+  // Inspecao de producao pode referenciar o setup que a antecedeu (opcional,
+  // so como rastreabilidade - nao altera status nem indicador).
+  setupId Int?
+  setup   InspecaoManufatura?  @relation("ProducaoDoSetup", fields: [setupId], references: [id])
+  producoes InspecaoManufatura[] @relation("ProducaoDoSetup")
+
+  // Producao inspecionada antes de o contador de setups atingir o N da maquina.
+  extra Boolean @default(false)
+
+  status       StatusInspecaoManufatura @default(PENDENTE)
+  dataInspecao DateTime                 @default(now())
+  semana       String?
+  ano          Int?
+
+  inspetorId Int?
+  inspetor   Usuario? @relation("InspManufaturaInspetor", fields: [inspetorId], references: [id])
+  createdAt  DateTime @default(now())
+
+  relatorios RelatorioDimensional[]
+  oitoDs     OitoD[]
+
+  @@index([tipo, dataInspecao])
+}
+
+// RELATORIO DE INSPECAO DIMENSIONAL - Doc BDBR.QUA.FMR.011.06 (rev. 06).
+// Espelha o formulario campo a campo. Cada tentativa e um relatorio completo,
+// com numero proprio tirado da mesma serie da inspecao.
+model RelatorioDimensional {
+  id         Int                @id @default(autoincrement())
+  inspecaoId Int
+  inspecao   InspecaoManufatura @relation(fields: [inspecaoId], references: [id], onDelete: Cascade)
+
+  // tipo repetido aqui (e nao so na inspecao-mae) para que a numeracao
+  // SET/PROD possa ter unicidade garantida pelo banco.
+  tipo       TipoInspecaoManufatura
+  numero     String @unique
+  ano        Int
+  sequencial Int
+  tentativa  Int    @default(1)
+
+  // "Rev." do proprio relatorio, preenchido a mao (comeca em 01)
+  revisao String @default("01")
+
+  dataInspecao DateTime       @default(now())
+  origem       OrigemInspecao @default(LIBERACAO_SETUP)
+  origemOutros String? // texto do campo "Outros:"
+
+  itemCodigo    String?
+  itemDescricao String?
+  desenhoRev    String?
+  po            String?
+  qtdInspecionada Float?
+  qtdTotal        Float?
+
+  // Cotas do formulario. Uma coluna "Encontrado" por peca inspecionada:
+  // [{ localizacao, especificado, tolerancia, upper, lower, pecas: [n1, n2, n3],
+  //    instrumento, desvioMin, desvioMax }]
+  cotas Json
+
+  observacoesFinais   String?
+  resultado           ResultadoManufatura @default(APROVADO)
+  // Texto obrigatorio quando o resultado e APROVADO_COM_OBSERVACAO
+  observacaoResultado String?
+
+  // Bloco de desvio (aparece quando ha ressalva ou reprova):
+  // defeitos e um array com os nomes da lista oficial de tipos de defeito.
+  defeitos        Json?
+  qtdAfetada      Float?
+  descricaoDesvio String?
+
+  elaboradoPor    String?
+  inspecionadoPor String?
+  inspetorId      Int?
+  inspetor        Usuario? @relation("RelatorioInspetor", fields: [inspetorId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([tipo, ano, sequencial])
+  @@index([inspecaoId])
+}
+
+// CNQ - Custo da Nao Qualidade. Espelha a aba "Defeitos e CNQ": um lancamento
+// por apontamento de operador. Independente das inspecoes.
+model Cnq {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // CNQ0001/2026
+  ano        Int
+  sequencial Int
+
+  data      DateTime @db.Date
+  maquinaId Int
+  maquina   Maquina  @relation(fields: [maquinaId], references: [id])
+
+  itemCodigo    String
+  itemDescricao String?
+
+  tipoDefeitoId Int
+  tipoDefeito   TipoDefeito @relation(fields: [tipoDefeitoId], references: [id])
+
+  quantidade    Float
+  // Valor da peca digitado no lancamento (nao ha base de precos ainda)
+  valorUnitario Float @default(0)
+  valorTotal    Float @default(0) // = quantidade * valorUnitario
+
+  observacoes String?
+  acao        String?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("CnqCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  oitoDs OitoD[]
+
+  @@unique([ano, sequencial])
+  @@index([data])
+}
+
+// FORMULARIO 8D - Doc BDBR.QUA.FMR.007.01 (rev. 1)
+enum StatusOitoD {
+  AGUARDANDO
+  EM_ANDAMENTO
+  CONCLUIDO
+}
+
+enum OrigemOitoD {
+  RELATORIO_RO
+  PRODUCAO
+  INSPECAO_EXTRA
+  SETUP
+}
+
+enum TurnoManufatura {
+  COMERCIAL
+  SEGUNDO_TURNO
+}
+
+model OitoD {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // 8D0001/2026
+  ano        Int
+  sequencial Int
+
+  // Opcional: nasce de uma inspecao com desvio OU de um lancamento de CNQ
+  inspecaoId Int?
+  inspecao   InspecaoManufatura? @relation(fields: [inspecaoId], references: [id])
+  cnqId      Int?
+  cnq        Cnq?                @relation(fields: [cnqId], references: [id])
+
+  // 1. Dados / cabecalho
+  empresaUnidade   String      @default("Big Dutchman Brasil")
+  dataAbertura     DateTime    @default(now())
+  status           StatusOitoD @default(AGUARDANDO)
+  produtoItem      String?
+  codigoDesenho    String?
+  origem           OrigemOitoD @default(PRODUCAO)
+  local            String?
+  processoOperacao String?
+  equipamento      String?
+  turno            TurnoManufatura @default(COMERCIAL)
+  qtdAfetada       String?
+  responsavel      String?
+  equipe           String?
+  descricaoProblema String?
+
+  // 2. Analise de causa raiz
+  efeito   String?
+  // 6M: { maquina, metodo, material, maoDeObra, medicao, meioAmbiente }
+  causas6M Json?
+  // 5 Porques: ["...", "...", ...]
+  porques  Json?
+
+  // 3. Causa raiz confirmada
+  causaRaiz String?
+
+  // 4. Plano de acao corretiva
+  // [{ id, acao, tipo, responsavel, prazo, status, evidencia, observacoes }]
+  planoAcao Json?
+
+  // 5. Padronizacao
+  // [{ documento, alteracao, responsavel, prazo, treinamento, registro, status, observacoes }]
+  padronizacao Json?
+
+  // 6. Evidencias antes/depois: anexos com entidadeTipo
+  //    "OITOD_ANTES" e "OITOD_DEPOIS" (1 foto cada)
+
+  // 7. Verificacao da eficacia
+  // [{ criterio, metodo, amostra, esperado, obtido, data, responsavel, eficaz }]
+  verificacaoEficacia Json?
+
+  // Aprovacoes: so a Qualidade aprova no sistema (com registro de quem e
+  // quando). O campo da Producao continua no PDF, identico ao papel.
+  aprovadoPorId       Int?
+  aprovadoPor         Usuario?  @relation("OitoDAprovadoPor", fields: [aprovadoPorId], references: [id])
+  aprovadoEm          DateTime?
+  aprovacaoProducao   String?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("OitoDCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([ano, sequencial])
+}
+
+// Snapshot do trimestre fiscal por maquina. A classificacao NAO e recalculada
+// (e manual, definida pela Qualidade): o fechamento congela os numeros do
+// periodo e zera os contadores.
+model HistoricoMaquina {
+  id        Int     @id @default(autoincrement())
+  maquinaId Int
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+
+  trimestreFiscal String
+  periodoInicio   DateTime
+  periodoFim      DateTime
+
+  classificacao       Classificacao
+  pecasProduzidas     Float
+  pecasComDefeito     Float
+  ppm                 Float
+  cnqTotal            Float
+  setupsRealizados    Int
+  producoesRealizadas Int
+  inspecoesReprovadas Int
+
+  createdAt DateTime @default(now())
+
+  @@index([maquinaId])
 }

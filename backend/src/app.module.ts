@@ -16,6 +16,12 @@ import { EntregasModule } from './sqe/entregas/entregas.module';
 import { InspecoesModule } from './sqe/inspecoes/inspecoes.module';
 import { RncModule } from './sqe/rnc/rnc.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { MaquinasModule } from './manufatura/maquinas/maquinas.module';
+import { DefeitosModule } from './manufatura/defeitos/defeitos.module';
+import { InspecoesManufaturaModule } from './manufatura/inspecoes/inspecoes-manufatura.module';
+import { CnqModule } from './manufatura/cnq/cnq.module';
+import { OitoDModule } from './manufatura/oitod/oitod.module';
+import { PainelManufaturaModule } from './manufatura/painel/painel.module';
 
 // Pasta com o frontend ja compilado (usada no pacote portatil, onde o proprio
 // backend serve as telas numa unica porta). No modo Docker/dev o nginx serve o
@@ -48,6 +54,12 @@ const servirFrontend = existsSync(frontendDir);
     InspecoesModule,
     RncModule,
     DashboardModule,
+    MaquinasModule,
+    DefeitosModule,
+    InspecoesManufaturaModule,
+    CnqModule,
+    OitoDModule,
+    PainelManufaturaModule,
   ],
 })
 export class AppModule {}
