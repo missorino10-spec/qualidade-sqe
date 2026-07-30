@@ -672,11 +672,16 @@ export default function Inspecoes() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        // Sem scroll.x o Ant Design comprime as colunas sem largura fixa para
+        // caber no card: o texto quebra em varias linhas e a tabela estoura.
+        // Com a largura total declarada, o excedente vira rolagem horizontal.
+        scroll={{ x: 1465 }}
         columns={[
           {
             title: 'Inspeção',
             dataIndex: 'numeroInspecao',
             width: 140,
+            fixed: 'left' as const,
             render: (n: string | null, r: any) =>
               n ? (
                 <Button
@@ -705,11 +710,13 @@ export default function Inspecoes() {
             width: 90,
             render: (v?: string) => v ?? '-',
           },
-          { title: 'Ano', dataIndex: 'ano', width: 80, render: (v?: number) => v ?? '-' },
+          { title: 'Ano', dataIndex: 'ano', width: 75, render: (v?: number) => v ?? '-' },
           {
             title: 'Formulário',
             dataIndex: 'formularios',
-            width: 190,
+            // Larga o suficiente para "Visual" + "Lote / Dimensional" na mesma
+            // linha: quebrando, a altura das linhas ficava irregular.
+            width: 235,
             filters: Object.entries(labelFormulario).map(([value, text]) => ({
               text,
               value,
@@ -717,7 +724,7 @@ export default function Inspecoes() {
             onFilter: (v: any, r: any) => (r.formularios ?? []).includes(v),
             render: (fs: string[]) =>
               fs?.length ? (
-                <Space size={4}>
+                <Space size={4} wrap={false}>
                   {fs.map((f) => (
                     <Tag key={f} color={f === 'VISUAL' ? 'geekblue' : 'purple'}>
                       {labelFormulario[f] ?? f}
@@ -746,12 +753,16 @@ export default function Inspecoes() {
           },
           {
             title: 'Fornecedor',
+            width: 170,
+            ellipsis: true,
             filters: filtrosFornecedor,
             onFilter: (v: any, r: any) => r.fornecedor?.nome === v,
             render: (_: any, r: any) => r.fornecedor?.nome,
           },
           {
             title: 'Item',
+            width: 200,
+            ellipsis: true,
             filters: filtrosItem,
             onFilter: (v: any, r: any) => r.item?.descricao === v,
             render: (_: any, r: any) => r.item?.descricao ?? '-',
@@ -759,7 +770,7 @@ export default function Inspecoes() {
           {
             title: 'Resultado',
             dataIndex: 'resultado',
-            width: 200,
+            width: 190,
             filters: Object.entries(labelResultado).map(([value, text]) => ({
               text,
               value,

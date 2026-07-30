@@ -250,7 +250,10 @@ export default function Dashboard() {
             cor: '#3f8600',
           },
         ].map((c) => (
-          <Col xs={12} sm={8} lg={3} key={c.t}>
+          // Com 7 contadores, espremer todos numa fileira deixava ~100px por
+          // cartao e quebrava os titulos em varias linhas. lg={6} acomoda 4 por
+          // fileira, com largura suficiente para o titulo respirar.
+          <Col xs={12} sm={8} lg={6} key={c.t}>
             <Card size="small" style={{ height: '100%' }}>
               <Statistic
                 title={
