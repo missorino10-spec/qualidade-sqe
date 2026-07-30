@@ -41,8 +41,8 @@ import { corStatusRnc, labelStatusRnc } from './RncLista';
 
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
-  APROVADO: 'Aprovada',
-  REPROVADO: 'Reprovada',
+  APROVADO: 'Satisfatório',
+  REPROVADO: 'Não Satisfatório',
   NAO_APLICAVEL: 'Não se aplica',
 };
 const corEficacia: Record<string, string> = {
@@ -51,6 +51,24 @@ const corEficacia: Record<string, string> = {
   REPROVADO: 'red',
   NAO_APLICAVEL: 'default',
 };
+// Usadas no modal de edicao e no de finalizacao - a eficacia pode ser
+// registrada nos dois lugares, entao as opcoes precisam ser as mesmas.
+const OPCOES_EFICACIA = [
+  { value: 'PENDENTE', label: 'Pendente' },
+  { value: 'APROVADO', label: 'Satisfatório' },
+  { value: 'REPROVADO', label: 'Não Satisfatório' },
+  { value: 'NAO_APLICAVEL', label: 'Não se aplica' },
+];
+
+const labelNivelPlano: Record<string, string> = {
+  RUIM: 'Ruim',
+  SATISFATORIO: 'Satisfatório',
+  EXCELENTE: 'Excelente',
+  NAO_APLICAVEL: 'Não se aplica',
+};
+const OPCOES_NIVEL_PLANO = Object.entries(labelNivelPlano).map(
+  ([value, label]) => ({ value, label }),
+);
 
 const MAX_FOTOS = 5;
 
@@ -98,6 +116,9 @@ export default function RncDetalhe() {
       api.patch(`/rnc/${id}`, {
         ...v,
         dataRetorno: v.dataRetorno ? v.dataRetorno.toISOString() : undefined,
+        dataVerificacao: v.dataVerificacao
+          ? v.dataVerificacao.toISOString()
+          : undefined,
       }),
     onSuccess: () => {
       message.success('RNC atualizada.');
@@ -186,6 +207,9 @@ export default function RncDetalhe() {
   const fotos = (anexos ?? []).filter((a) =>
     (a.mimeType ?? '').startsWith('image/'),
   );
+  const documentos = (anexos ?? []).filter(
+    (a) => !(a.mimeType ?? '').startsWith('image/'),
+  );
 
   function abrirEdicao() {
     formEdit.setFieldsValue({
@@ -200,6 +224,10 @@ export default function RncDetalhe() {
       fornecedorAceitou: rnc.fornecedorAceitou,
       fornecedorEnviouPlano: rnc.fornecedorEnviouPlano,
       nivelPlano: rnc.nivelPlano,
+      verificacaoEficacia: rnc.verificacaoEficacia,
+      dataVerificacao: rnc.dataVerificacao
+        ? dayjs(rnc.dataVerificacao)
+        : undefined,
       observacoes: rnc.observacoes,
     });
     setEditOpen(true);
@@ -374,7 +402,7 @@ export default function RncDetalhe() {
                     : 'Não'}
               </Descriptions.Item>
               <Descriptions.Item label="Nível do plano">
-                {rnc.nivelPlano ?? '-'}
+                {rnc.nivelPlano ? labelNivelPlano[rnc.nivelPlano] : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Verificação de eficácia">
                 <Tag color={corEficacia[rnc.verificacaoEficacia]}>
@@ -438,6 +466,57 @@ export default function RncDetalhe() {
               {fotos.length === 0 && (
                 <Typography.Text type="secondary">
                   Nenhuma foto anexada.
+                </Typography.Text>
+              )}
+            </div>
+          </Card>
+
+          {/* Bloco separado das fotos: o Registro Fotografico do formulario
+              impresso so aceita imagens, entao um PDF misturado nas
+              evidencias nao apareceria no documento gerado. */}
+          <Card
+            title="Plano de ação do fornecedor (PDF / documento)"
+            style={{ marginTop: 16 }}
+          >
+            <Upload
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx"
+              showUploadList={false}
+              customRequest={async ({ file, onSuccess, onError }) => {
+                const fd = new FormData();
+                fd.append('file', file as Blob);
+                try {
+                  await api.post('/anexos', fd, {
+                    params: { entidadeTipo: 'RNC', entidadeId: id },
+                  });
+                  qc.invalidateQueries({ queryKey: ['anexos', 'RNC', id] });
+                  onSuccess?.({});
+                } catch (e) {
+                  onError?.(e as any);
+                  message.error('Falha no envio do documento.');
+                }
+              }}
+            >
+              <Button icon={<UploadOutlined />}>Anexar documento</Button>
+            </Upload>
+            <div style={{ marginTop: 12 }}>
+              {documentos.length ? (
+                <Space direction="vertical" size={4}>
+                  {documentos.map((a: any) => (
+                    <Button
+                      key={a.id}
+                      type="link"
+                      icon={<FilePdfOutlined />}
+                      style={{ padding: 0 }}
+                      onClick={() => abrirPdfEmNovaAba(`/anexos/${a.id}/download`)}
+                    >
+                      {a.nomeArquivo}
+                    </Button>
+                  ))}
+                </Space>
+              ) : (
+                <Typography.Text type="secondary">
+                  Nenhum documento anexado.
                 </Typography.Text>
               )}
             </div>
@@ -565,14 +644,22 @@ export default function RncDetalhe() {
             </Col>
             <Col span={12}>
               <Form.Item name="nivelPlano" label="Nível do plano">
-                <Select
-                  allowClear
-                  options={[
-                    { value: 'SATISFATORIO', label: 'Satisfatório' },
-                    { value: 'EXCELENTE', label: 'Excelente' },
-                    { value: 'NAO_APLICAVEL', label: 'Não se aplica' },
-                  ]}
-                />
+                <Select allowClear options={OPCOES_NIVEL_PLANO} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="verificacaoEficacia"
+                label="Verificação de eficácia"
+              >
+                <Select options={OPCOES_EFICACIA} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="dataVerificacao" label="Data da verificação">
+                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
@@ -602,11 +689,7 @@ export default function RncDetalhe() {
             rules={[{ required: true, message: 'Informe a eficácia.' }]}
           >
             <Select
-              options={[
-                { value: 'APROVADO', label: 'Aprovada' },
-                { value: 'REPROVADO', label: 'Reprovada' },
-                { value: 'NAO_APLICAVEL', label: 'Não se aplica' },
-              ]}
+              options={OPCOES_EFICACIA.filter((o) => o.value !== 'PENDENTE')}
             />
           </Form.Item>
           <Form.Item name="evidencias" label="Evidências da verificação">

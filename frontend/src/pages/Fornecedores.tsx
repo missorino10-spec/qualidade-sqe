@@ -2,35 +2,26 @@ import { useState } from 'react';
 import {
   Button,
   Card,
-  Col,
-  Divider,
   Form,
-  Input,
   Modal,
-  Row,
-  Select,
   Space,
-  Switch,
   Table,
   Tag,
-  Typography,
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import {
+  CamposFornecedor,
+  valoresIniciaisFornecedor,
+} from '../components/CamposFornecedor';
 
 const corClasse: Record<string, string> = {
   A: 'green',
   B: 'blue',
   C: 'orange',
   D: 'red',
-};
-
-const labelEsforco: Record<string, string> = {
-  BAIXO: 'Baixo',
-  MEDIO: 'Médio',
-  ALTO: 'Alto',
 };
 
 export default function Fornecedores() {
@@ -64,15 +55,7 @@ export default function Fornecedores() {
 
   function abrir(f?: any) {
     setEditando(f ?? null);
-    form.setFieldsValue(
-      f ?? {
-        esforcoQualidade: 'MEDIO',
-        classificacaoFornecimento: 'C',
-        fazVisual: true,
-        fazLote: false,
-        contatos: [],
-      },
-    );
+    form.setFieldsValue(f ?? valoresIniciaisFornecedor);
     setOpen(true);
   }
   function fechar() {
@@ -107,7 +90,12 @@ export default function Fornecedores() {
             dataIndex: 'classificacaoFornecimento',
             width: 120,
             align: 'center',
-            render: (c: string) => <Tag color={corClasse[c]}>{c}</Tag>,
+            render: (c: string, r: any) =>
+              r.eventual ? (
+                <Tag>Eventual</Tag>
+              ) : (
+                <Tag color={corClasse[c]}>{c}</Tag>
+              ),
           },
           {
             title: 'Escopo',
@@ -154,184 +142,7 @@ export default function Fornecedores() {
           onFinish={(v) => salvar.mutate(v)}
           style={{ marginTop: 12 }}
         >
-          <Divider orientation="left" plain>
-            Identificação
-          </Divider>
-          <Row gutter={12}>
-            <Col span={6}>
-              <Form.Item
-                name="codigo"
-                label="Código"
-                rules={[{ required: true, message: 'Informe o código.' }]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="nome"
-                label="Nome"
-                rules={[{ required: true, message: 'Informe o nome.' }]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item name="cnpj" label="CNPJ">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="endereco" label="Endereço">
-            <Input />
-          </Form.Item>
-
-          <Divider orientation="left" plain>
-            Escopo e Classificação
-          </Divider>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="tipoFornecimento" label="Tipo de fornecimento">
-                <Input placeholder="Ex.: Estruturas metálicas" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="categoriaInspecao" label="Categoria de inspeção">
-                <Input placeholder="Ex.: Metalurgia / Montagem" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="planoInspecao" label="Plano de inspeção (resumo)">
-            <Input />
-          </Form.Item>
-          <Form.Item name="controlesPrincipais" label="Controles principais">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="escopoTexto" label="Escopo (texto livre)">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item
-                name="classificacaoFornecimento"
-                label="Classificação de fornecimento"
-              >
-                <Select
-                  options={[
-                    { value: 'A', label: 'A — Excelente' },
-                    { value: 'B', label: 'B — Bom' },
-                    { value: 'C', label: 'C — Regular' },
-                    { value: 'D', label: 'D — Crítico' },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="esforcoQualidade" label="Esforço de qualidade">
-                <Select
-                  options={Object.entries(labelEsforco).map(([v, l]) => ({
-                    value: v,
-                    label: l,
-                  }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item
-                name="fazVisual"
-                label="Inspeção Visual"
-                valuePropName="checked"
-              >
-                <Switch checkedChildren="Sim" unCheckedChildren="Não" />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item
-                name="fazLote"
-                label="Inspeção de Lote"
-                valuePropName="checked"
-              >
-                <Switch checkedChildren="Sim" unCheckedChildren="Não" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider orientation="left" plain>
-            Contatos (até 2)
-          </Divider>
-          <Form.List name="contatos">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field) => (
-                  <Row gutter={8} key={field.key} align="middle">
-                    <Col span={6}>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'nome']}
-                        label="Nome"
-                        rules={[{ required: true, message: 'Informe o nome.' }]}
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col span={7}>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'email']}
-                        label="E-mail"
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col span={5}>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'telefone']}
-                        label="Telefone"
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col span={5}>
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'funcao']}
-                        label="Função"
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col span={1}>
-                      <Button type="link" danger onClick={() => remove(field.name)}>
-                        Remover
-                      </Button>
-                    </Col>
-                  </Row>
-                ))}
-                {fields.length < 2 && (
-                  <Button
-                    type="dashed"
-                    onClick={() => add()}
-                    block
-                    icon={<PlusOutlined />}
-                  >
-                    Adicionar contato
-                  </Button>
-                )}
-              </>
-            )}
-          </Form.List>
-
-          {editando && (
-            <Form.Item
-              name="ativo"
-              label="Fornecedor ativo"
-              valuePropName="checked"
-              style={{ marginTop: 16 }}
-            >
-              <Switch checkedChildren="Ativo" unCheckedChildren="Inativo" />
-            </Form.Item>
-          )}
+          <CamposFornecedor mostrarAtivo={!!editando} mostrarEventual />
         </Form>
       </Modal>
     </Card>

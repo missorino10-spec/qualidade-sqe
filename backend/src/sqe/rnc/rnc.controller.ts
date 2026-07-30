@@ -32,6 +32,9 @@ import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 
 class CreateRncDto {
+  // Recebimento (= inspecao) de origem: e por ele que a RNC e reaproveitada
+  // quando o mesmo recebimento tem Visual e Lote reprovados.
+  @IsOptional() @Type(() => Number) @IsInt() entregaId?: number;
   @IsOptional() @Type(() => Number) @IsInt() inspecaoVisualId?: number;
   @IsOptional() @Type(() => Number) @IsInt() inspecaoLoteId?: number;
   @Type(() => Number) @IsInt() fornecedorId: number;
@@ -62,7 +65,7 @@ class AtualizarRncDto {
   @IsOptional() @IsString() fornecedorAceitou?: string;
   @IsOptional() @IsBoolean() fornecedorEnviouPlano?: boolean;
   @IsOptional()
-  @IsIn(['SATISFATORIO', 'EXCELENTE', 'NAO_APLICAVEL'])
+  @IsIn(['RUIM', 'SATISFATORIO', 'EXCELENTE', 'NAO_APLICAVEL'])
   nivelPlano?: any;
   @IsOptional()
   @IsIn(['EM_ANDAMENTO', 'FINALIZADA', 'CANCELADA'])

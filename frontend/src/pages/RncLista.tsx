@@ -43,8 +43,8 @@ const corEficacia: Record<string, string> = {
 
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
-  APROVADO: 'Aprovada',
-  REPROVADO: 'Reprovada',
+  APROVADO: 'Satisfatório',
+  REPROVADO: 'Não Satisfatório',
   NAO_APLICAVEL: 'N/A',
 };
 

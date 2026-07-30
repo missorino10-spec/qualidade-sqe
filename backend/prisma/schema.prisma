@@ -76,6 +76,10 @@ model Fornecedor {
 
   // Classificacao de fornecimento (manual) - define periodicidade/nivel/NQA
   classificacaoFornecimento Classificacao @default(C)
+  // Cadastro pontual (ex: importacao) feito na hora de uma inspecao extra.
+  // Fica FORA do plano de periodicidade, mas os desvios contam nos indicadores.
+  // Quando um dia for homologado, basta desmarcar - o cadastro ja existe.
+  eventual Boolean @default(false)
   // Escopo de inspeicao: quais formularios o sistema deve abrir
   fazVisual Boolean @default(true)
   fazLote   Boolean @default(false)
@@ -217,6 +221,10 @@ model PlanejamentoSemanal {
   entregas EntregaPortaria[]
 }
 
+// Um recebimento. Quando ele e inspecionado, ganha um numero de inspecao
+// (INSP0001/2026) e passa a ser a UNIDADE de inspecao: os formularios Visual e
+// Lote do mesmo recebimento sao a MESMA inspecao, contam como uma so e
+// compartilham uma unica RNC.
 model EntregaPortaria {
   id              Int                  @id @default(autoincrement())
   planejamentoId  Int?
@@ -235,12 +243,24 @@ model EntregaPortaria {
   // Decisao automatica de inspecao
   numeroEntregaAcumulado Int?          // valor do contador no momento
   passivelInspecao       Boolean       @default(false) // sistema decidiu inspecionar?
+
+  // Identificacao da inspecao (nula enquanto o recebimento nao for inspecionado)
+  numeroInspecao     String? @unique   // formato INSP0001/2026
+  inspecaoAno        Int?              // ano da inspecao (sequencial reinicia por ano)
+  inspecaoSequencial Int?              // sequencial dentro do ano
+  // Inspecao fora do ciclo de periodicidade: fornecedor eventual OU fornecedor
+  // da base inspecionado dentro da janela em que o sistema nao sugeriria.
+  inspecaoExtra      Boolean @default(false)
+
   confirmadoPorId Int?
   confirmadoPor   Usuario?             @relation("EntregaConfirmadoPor", fields: [confirmadoPorId], references: [id])
   createdAt       DateTime             @default(now())
 
   inspecoesVisual InspecaoVisual[]
   inspecoesLote   InspecaoLote[]
+  rncs            Rnc[]
+
+  @@unique([inspecaoAno, inspecaoSequencial])
 }
 
 enum ResultadoInspecao {
@@ -343,6 +363,7 @@ enum VerificacaoEficacia {
 }
 
 enum NivelPlano {
+  RUIM
   SATISFATORIO
   EXCELENTE
   NAO_APLICAVEL
@@ -350,11 +371,15 @@ enum NivelPlano {
 
 model Rnc {
   id     Int    @id @default(autoincrement())
-  numero String @unique // formato {seq}/{aa} - ex: 149/26
+  numero String @unique // formato RNC0001/2026
   ano    Int    // ano da RNC (para gerar sequencial por ano)
   sequencial Int // sequencial dentro do ano
 
-  // origem (inspecao reprovada)
+  // origem (inspecao reprovada). A entrega e a inspecao a que a RNC pertence:
+  // e por ela que se garante UMA RNC por inspecao, mesmo quando Visual e Lote
+  // sao reprovados. Os dois campos abaixo dizem QUAL formulario reprovou.
+  entregaId        Int?
+  entrega          EntregaPortaria? @relation(fields: [entregaId], references: [id])
   inspecaoVisualId Int?
   inspecaoVisual   InspecaoVisual? @relation(fields: [inspecaoVisualId], references: [id])
   inspecaoLoteId   Int?

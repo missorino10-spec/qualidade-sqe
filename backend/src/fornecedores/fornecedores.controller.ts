@@ -43,6 +43,8 @@ class FornecedorDto {
   @IsOptional() @IsIn(['A', 'B', 'C', 'D']) classificacaoFornecimento?: any;
   @IsOptional() @IsBoolean() fazVisual?: boolean;
   @IsOptional() @IsBoolean() fazLote?: boolean;
+  // Cadastro pontual (ex: importacao): fica fora do plano de periodicidade.
+  @IsOptional() @IsBoolean() eventual?: boolean;
   @IsOptional() @IsBoolean() ativo?: boolean;
   @IsOptional()
   @IsArray()
@@ -91,6 +93,7 @@ export class FornecedoresController {
         classificacaoFornecimento: rest.classificacaoFornecimento ?? 'C',
         fazVisual: rest.fazVisual ?? true,
         fazLote: rest.fazLote ?? false,
+        eventual: rest.eventual ?? false,
         contatos: contatos?.length
           ? { create: contatos.slice(0, 2) }
           : undefined,

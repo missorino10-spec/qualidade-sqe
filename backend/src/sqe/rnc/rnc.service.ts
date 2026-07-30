@@ -5,13 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HistoricoService } from '../../historico/historico.service';
-import { semanaAno } from '../sqe-utils';
+import { numeroDocumento, semanaAno } from '../sqe-utils';
 
 const ENTIDADE = 'RNC';
 
 const includePadrao = {
   fornecedor: { select: { id: true, nome: true, codigo: true } },
   item: { select: { id: true, descricao: true, codigo: true } },
+  entrega: { select: { id: true, numeroInspecao: true } },
   inspecaoVisual: { select: { id: true, resultado: true } },
   inspecaoLote: { select: { id: true, resultado: true } },
   criadoPor: { select: { id: true, nome: true } },
@@ -24,7 +25,7 @@ export class RncService {
     private historico: HistoricoService,
   ) {}
 
-  // Gera numero no formato {seq}/{aa} - ex: 149/26 (sequencial por ano)
+  // Gera numero no formato RNC0001/2026 (sequencial por ano)
   private async gerarNumero(): Promise<{
     numero: string;
     ano: number;
@@ -36,8 +37,7 @@ export class RncService {
       orderBy: { sequencial: 'desc' },
     });
     const sequencial = (ultima?.sequencial ?? 0) + 1;
-    const numero = `${String(sequencial).padStart(3, '0')}/${String(ano).slice(-2)}`;
-    return { numero, ano, sequencial };
+    return { numero: numeroDocumento('RNC', sequencial, ano), ano, sequencial };
   }
 
   findAll(filtros: {
@@ -151,6 +151,7 @@ export class RncService {
         ano,
         sequencial,
         semana,
+        entregaId: data.entregaId ?? null,
         inspecaoVisualId: data.inspecaoVisualId ?? null,
         inspecaoLoteId: data.inspecaoLoteId ?? null,
         solicitante: data.solicitante ?? 'Qualidade',
@@ -180,6 +181,52 @@ export class RncService {
       usuarioId,
     });
     return rnc;
+  }
+
+  // Uma inspecao (= um recebimento) tem UMA RNC. Quando o Visual e o Lote do
+  // mesmo recebimento reprovam, a segunda reprova COMPLEMENTA a RNC ja aberta
+  // em vez de abrir uma segunda - inclusive se os formularios forem salvos em
+  // dias diferentes, porque o vinculo e a entrega, nao o momento.
+  async abrirOuComplementar(data: any, usuarioId: number) {
+    const existente = data.entregaId
+      ? await this.prisma.rnc.findFirst({
+          where: { entregaId: data.entregaId },
+          orderBy: { id: 'asc' },
+        })
+      : null;
+    if (!existente) return this.create(data, usuarioId);
+
+    // Concatena sem repetir: o texto do primeiro formulario continua la.
+    const juntar = (atual: string | null, novo?: string | null): string => {
+      const n = (novo ?? '').trim();
+      const a = (atual ?? '').trim();
+      if (!n) return a;
+      if (!a) return n;
+      return a.includes(n) ? a : `${a} | ${n}`;
+    };
+
+    const atualizada = await this.prisma.rnc.update({
+      where: { id: existente.id },
+      data: {
+        inspecaoVisualId: data.inspecaoVisualId ?? existente.inspecaoVisualId,
+        inspecaoLoteId: data.inspecaoLoteId ?? existente.inspecaoLoteId,
+        tipoDesvio: juntar(existente.tipoDesvio, data.tipoDesvio),
+        descricaoDesvio: juntar(
+          existente.descricaoDesvio,
+          data.descricaoDesvio,
+        ),
+      },
+      include: includePadrao,
+    });
+    await this.historico.registrar({
+      entidadeTipo: ENTIDADE,
+      entidadeId: existente.id,
+      statusAnterior: existente.status,
+      statusNovo: existente.status,
+      comentario: `Desvio adicionado: ${data.tipoDesvio ?? 'novo desvio'}`,
+      usuarioId,
+    });
+    return atualizada;
   }
 
   // Atualiza os campos de controle/plano de acao (planilha 3)

@@ -48,6 +48,11 @@ export class DashboardService {
 
     const cargasInspecionadas = entregas.filter(foiInspecionada);
     const recebimentosSemInspecao = entregas.length - cargasInspecionadas.length;
+    // Inspecoes fora do plano de periodicidade (fornecedor eventual ou pedido
+    // pontual da Qualidade). Contam nos demais indicadores como qualquer outra.
+    const inspecoesExtra = cargasInspecionadas.filter(
+      (e) => e.inspecaoExtra,
+    ).length;
 
     // 1 e 2 - fornecedores/itens inspecionados x recebidos (sobre o total recebido)
     const fornRecebidos = new Set(entregas.map((e) => e.fornecedorId));
@@ -109,6 +114,7 @@ export class DashboardService {
       contadores: {
         entregas: totalCargas,
         inspecoes: cargasInspecionadas.length,
+        inspecoesExtra,
         recebimentosSemInspecao,
         rncsTotal: totalRnc,
         rncsAbertas: rncs.filter((r) => r.status === 'EM_ANDAMENTO').length,

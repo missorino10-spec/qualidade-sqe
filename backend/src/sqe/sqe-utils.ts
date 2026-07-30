@@ -22,6 +22,17 @@ export function semanaAno(d: Date): { semana: string; ano: number } {
   return { semana, ano: Number(ano) };
 }
 
+// Numeracao dos documentos: prefixo + sequencial de 4 digitos + ano completo.
+// Ex: INSP0001/2026 (inspecao) e RNC0001/2026 (nao conformidade). O prefixo
+// deixa claro de que documento se trata; o sequencial reinicia a cada ano.
+export function numeroDocumento(
+  prefixo: 'INSP' | 'RNC',
+  sequencial: number,
+  ano: number,
+): string {
+  return `${prefixo}${String(sequencial).padStart(4, '0')}/${ano}`;
+}
+
 // Trimestre fiscal da empresa: ano fiscal comeca em outubro.
 // Out-Dez=Q1, Jan-Mar=Q2, Abr-Jun=Q3, Jul-Set=Q4.
 export function trimestreFiscal(d: Date): {

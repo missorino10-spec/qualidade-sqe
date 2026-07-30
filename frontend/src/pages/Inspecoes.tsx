@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Col,
   Descriptions,
   Divider,
@@ -15,6 +16,7 @@ import {
   Select,
   Space,
   Steps,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -26,14 +28,19 @@ import {
   DeleteOutlined,
   FileTextOutlined,
   UploadOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
+import {
+  CamposFornecedor,
+  valoresIniciaisFornecedor,
+} from '../components/CamposFornecedor';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
@@ -49,10 +56,9 @@ const labelResultado: Record<string, string> = {
   SEM_INSPECAO: 'Sem Inspeção Recomendada',
 };
 
-const labelTipo: Record<string, string> = {
+const labelFormulario: Record<string, string> = {
   VISUAL: 'Visual',
   LOTE: 'Lote / Dimensional',
-  RECEBIMENTO: 'Recebimento',
 };
 
 function ChecklistVisual({
@@ -276,14 +282,35 @@ export default function Inspecoes() {
   const [form] = Form.useForm();
   const [grupos, setGrupos] = useState<any[]>([]);
   const [cotas, setCotas] = useState<any[]>([]);
-  const [fotosReprova, setFotosReprova] = useState<any[]>([]);
   const [passoIdx, setPassoIdx] = useState(0);
-  const [rncsGeradas, setRncsGeradas] = useState<any[]>([]);
-  // Entrega (carga) criada no passo Visual, reaproveitada no Lote encadeado:
-  // uma unica carga por recebimento, mesmo fazendo Visual + Lote.
-  const [entregaEncadeada, setEntregaEncadeada] = useState<number | undefined>();
+  // Uma inspecao = um recebimento. A entrega criada no primeiro formulario e
+  // reaproveitada no seguinte, para Visual e Lote serem a MESMA inspecao,
+  // com o mesmo numero e uma unica RNC.
+  const [entregaAtual, setEntregaAtual] = useState<number | undefined>();
+  const [numeroInspecao, setNumeroInspecao] = useState<string | undefined>();
+  const [desvioAnterior, setDesvioAnterior] = useState(false);
+  const [rncDaInspecao, setRncDaInspecao] = useState<any | null>(null);
   const [salvando, setSalvando] = useState(false);
+
+  // Cadastro pontual de fornecedor, sem sair da inspecao
+  const [openFornecedor, setOpenFornecedor] = useState(false);
+  const [formFornecedor] = Form.useForm();
+  const [salvandoFornecedor, setSalvandoFornecedor] = useState(false);
+
+  // Preenchimento obrigatorio da RNC ao concluir a inspecao
+  const [rncObrigatoria, setRncObrigatoria] = useState<any | null>(null);
+  const [formRnc] = Form.useForm();
+  const [fotosRnc, setFotosRnc] = useState<any[]>([]);
+  const [salvandoRnc, setSalvandoRnc] = useState(false);
+  const qtdPecasRnc = Form.useWatch('quantidadePecas', formRnc);
+  const valorUnitRnc = Form.useWatch('valorUnitario', formRnc);
+
   const fornecedorId = Form.useWatch('fornecedorId', form);
+  const extra = Form.useWatch('extra', form);
+  const formulariosExtra: string[] | undefined = Form.useWatch(
+    'formulariosExtra',
+    form,
+  );
 
   const hoje = dayjs();
   const { semana: semanaHoje, ano: anoHoje } = semanaAno(hoje.toDate());
@@ -309,25 +336,35 @@ export default function Inspecoes() {
   });
 
   const precisaInspecionar = avaliacao?.precisaInspecionar ?? true;
+  // Inspecao extra: fora da janela do ciclo ou fornecedor eventual. Aqui a
+  // Qualidade escolhe os formularios na mao, ignorando o cadastro.
+  const extraAtivo = !precisaInspecionar && !!extra;
 
   const fornecedorSel = useMemo(
     () => (fornecedores ?? []).find((f: any) => f.id === fornecedorId),
     [fornecedores, fornecedorId],
   );
 
-  // Sequencia de etapas conforme escopo do fornecedor (ordem fixa Visual -> Lote)
+  // Sequencia de etapas (ordem fixa Visual -> Lote). Na inspecao regular vem
+  // do cadastro do fornecedor; na extra, da escolha manual.
   const passos = useMemo<('VISUAL' | 'LOTE')[]>(() => {
+    const seq: ('VISUAL' | 'LOTE')[] = [];
+    if (extraAtivo) {
+      if (formulariosExtra?.includes('VISUAL')) seq.push('VISUAL');
+      if (formulariosExtra?.includes('LOTE')) seq.push('LOTE');
+      return seq;
+    }
     if (!precisaInspecionar) return [];
     const fazVisual = !fornecedorSel || fornecedorSel.fazVisual;
-    const fazLote = fornecedorSel?.fazLote;
-    const seq: ('VISUAL' | 'LOTE')[] = [];
     if (fazVisual) seq.push('VISUAL');
-    if (fazLote) seq.push('LOTE');
+    if (fornecedorSel?.fazLote) seq.push('LOTE');
     return seq.length ? seq : ['VISUAL'];
-  }, [precisaInspecionar, fornecedorSel]);
+  }, [extraAtivo, formulariosExtra, precisaInspecionar, fornecedorSel]);
 
   const tipo = passos[passoIdx] ?? 'VISUAL';
   const encadeado = passos.length > 1;
+  const preencheFormulario = passos.length > 0;
+  const ultimoPasso = passoIdx >= passos.length - 1;
 
   function limparEtapa() {
     setGrupos(
@@ -339,7 +376,6 @@ export default function Inspecoes() {
         : [],
     );
     setCotas([]);
-    setFotosReprova([]);
     form.setFieldsValue({
       itemDescricao: undefined,
       itemCodigo: undefined,
@@ -349,19 +385,19 @@ export default function Inspecoes() {
       qtdTotal: undefined,
       desenhoRev: undefined,
       toleranciasNorm: undefined,
-      relatorioNumero: undefined,
       observacoes: undefined,
-      disposicao: undefined,
     });
   }
 
   function novaInspecao() {
     form.resetFields();
     setPassoIdx(0);
-    setRncsGeradas([]);
-    setEntregaEncadeada(undefined);
+    setEntregaAtual(undefined);
+    setNumeroInspecao(undefined);
+    setDesvioAnterior(false);
+    setRncDaInspecao(null);
     limparEtapa();
-    form.setFieldsValue({ origem: 'PLANO_INSPECAO' });
+    form.setFieldsValue({ origem: 'PLANO_INSPECAO', extra: false });
     setOpen(true);
   }
 
@@ -377,59 +413,112 @@ export default function Inspecoes() {
     return reprovou ? 'REPROVADO' : 'APROVADO';
   }, [tipo, grupos, cotas]);
 
-  async function enviarFotos(rncId: number) {
-    for (const f of fotosReprova) {
-      const arquivo = f.originFileObj ?? f;
-      const fd = new FormData();
-      fd.append('file', arquivo as Blob);
-      try {
-        await api.post('/anexos', fd, {
-          params: { entidadeTipo: 'RNC', entidadeId: rncId },
-        });
-      } catch {
-        message.warning('Uma foto não pôde ser enviada.');
-      }
-    }
-  }
-
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['inspecoes'] });
     qc.invalidateQueries({ queryKey: ['entregas'] });
     qc.invalidateQueries({ queryKey: ['avaliar'] });
     qc.invalidateQueries({ queryKey: ['fornecedores'] });
+    qc.invalidateQueries({ queryKey: ['rnc'] });
+    qc.invalidateQueries({ queryKey: ['kpis'] });
   }
 
-  function finalizarFluxo(rncs: any[]) {
-    setOpen(false);
-    invalidar();
-    if (rncs.length) {
+  // Cadastro pontual do fornecedor que nao esta na base (ex: importacao).
+  // Nasce como eventual: fica fora do plano de periodicidade, mas com o
+  // cadastro completo, pronto para quando for classificado.
+  async function salvarFornecedorPontual(v: any) {
+    setSalvandoFornecedor(true);
+    try {
+      const payload = {
+        ...v,
+        eventual: true,
+        contatos: (v.contatos ?? []).filter((c: any) => c && c.nome),
+      };
+      const novo = (await api.post('/fornecedores', payload)).data;
+      await qc.invalidateQueries({ queryKey: ['fornecedores'] });
+      setOpenFornecedor(false);
+      formFornecedor.resetFields();
+      // Ja seleciona o fornecedor novo e liga a inspecao extra.
+      form.setFieldsValue({
+        fornecedorId: novo.id,
+        extra: true,
+        formulariosExtra: [
+          ...(novo.fazVisual ? ['VISUAL'] : []),
+          ...(novo.fazLote ? ['LOTE'] : []),
+        ],
+      });
+      message.success(
+        `Fornecedor ${novo.nome} cadastrado. Escolha os formulários da inspeção extra.`,
+      );
+    } catch {
+      message.error('Não foi possível cadastrar o fornecedor.');
+    } finally {
+      setSalvandoFornecedor(false);
+    }
+  }
+
+  function abrirRncObrigatoria(rnc: any) {
+    setRncObrigatoria(rnc);
+    setFotosRnc([]);
+    formRnc.setFieldsValue({
+      tipoDesvio: rnc.tipoDesvio,
+      descricaoDesvio: rnc.descricaoDesvio,
+      reincidencia: rnc.reincidencia ?? false,
+      quantidadePecas: rnc.quantidadePecas ?? undefined,
+      valorUnitario: rnc.valorUnitario ?? undefined,
+      disposicao: rnc.disposicao ?? undefined,
+    });
+  }
+
+  async function salvarRncObrigatoria(v: any) {
+    if (!rncObrigatoria) return;
+    setSalvandoRnc(true);
+    try {
+      await api.patch(`/rnc/${rncObrigatoria.id}`, {
+        tipoDesvio: v.tipoDesvio,
+        descricaoDesvio: v.descricaoDesvio,
+        reincidencia: v.reincidencia,
+        quantidadePecas: v.quantidadePecas,
+        valorUnitario: v.valorUnitario,
+        disposicao: v.disposicao,
+        comentario: 'Desvios preenchidos no encerramento da inspeção',
+      });
+      for (const f of fotosRnc) {
+        const arquivo = f.originFileObj ?? f;
+        const fd = new FormData();
+        fd.append('file', arquivo as Blob);
+        try {
+          await api.post('/anexos', fd, {
+            params: { entidadeTipo: 'RNC', entidadeId: rncObrigatoria.id },
+          });
+        } catch {
+          message.warning('Uma evidência não pôde ser enviada.');
+        }
+      }
+      const rnc = rncObrigatoria;
+      setRncObrigatoria(null);
+      formRnc.resetFields();
+      setFotosRnc([]);
+      invalidar();
       Modal.confirm({
-        title:
-          rncs.length > 1
-            ? 'Inspeções reprovadas — RNCs geradas'
-            : 'Inspeção reprovada — RNC gerada',
-        content: (
-          <div>
-            {rncs.map((r) => (
-              <div key={r.id}>RNC {r.numero}</div>
-            ))}
-            <p style={{ marginTop: 8 }}>Deseja abrir a primeira agora?</p>
-          </div>
-        ),
+        title: `Inspeção concluída — RNC ${rnc.numero} registrada`,
+        content:
+          'O restante da RNC (causa raiz, plano do fornecedor e eficácia) pode ser preenchido depois. Deseja abri-la agora?',
         okText: 'Abrir RNC',
         cancelText: 'Depois',
-        onOk: () => navigate(`/rnc/${rncs[0].id}`),
+        onOk: () => navigate(`/rnc/${rnc.id}`),
       });
-    } else {
-      message.success('Inspeção registrada. Recebimento aprovado.');
+    } catch {
+      message.error('Não foi possível salvar a RNC.');
+    } finally {
+      setSalvandoRnc(false);
     }
   }
 
   async function onFinish(v: any) {
     setSalvando(true);
     try {
-      // Fora do ciclo de periodicidade: registra apenas o recebimento
-      if (!precisaInspecionar) {
+      // Fora do ciclo e sem inspecao extra: registra apenas o recebimento
+      if (!preencheFormulario) {
         await api.post('/inspecoes/recebimento', {
           fornecedorId: v.fornecedorId,
           notaFiscal: v.notaFiscal,
@@ -444,7 +533,6 @@ export default function Inspecoes() {
         return;
       }
 
-      const reprovado = resultadoAuto === 'REPROVADO';
       const rota = tipo === 'VISUAL' ? '/inspecoes/visual' : '/inspecoes/lote';
       const payload: any = {
         fornecedorId: v.fornecedorId,
@@ -456,45 +544,47 @@ export default function Inspecoes() {
         qtdTotal: v.qtdTotal,
         desenhoRev: v.desenhoRev,
         toleranciasNorm: v.toleranciasNorm,
-        relatorioNumero: v.relatorioNumero,
         observacoes: v.observacoes,
-        disposicao: reprovado ? v.disposicao : undefined,
         dataInspecao: hoje.toISOString(),
         resultado: resultadoAuto,
+        extra: extraAtivo,
+        // Reaproveita a carga do formulario anterior: 1 recebimento = 1 inspecao
+        entregaId: entregaAtual,
       };
       if (tipo === 'VISUAL') payload.checklist = grupos;
-      else {
-        payload.cotas = cotas;
-        payload.encadeadoAposVisual = passoIdx > 0;
-        // Reaproveita a carga criada no Visual: 1 recebimento apenas.
-        if (passoIdx > 0 && entregaEncadeada) payload.entregaId = entregaEncadeada;
-      }
+      else payload.cotas = cotas;
 
       const res = (await api.post(rota, payload)).data;
 
-      let rncs = rncsGeradas;
-      if (res.rnc) {
-        await enviarFotos(res.rnc.id);
-        rncs = [...rncs, res.rnc];
-        setRncsGeradas(rncs);
-      }
+      const rnc = res.rnc ?? rncDaInspecao;
+      if (res.rnc) setRncDaInspecao(res.rnc);
+      if (res.inspecao?.entregaId) setEntregaAtual(res.inspecao.entregaId);
+      if (res.numeroInspecao) setNumeroInspecao(res.numeroInspecao);
+      if (resultadoAuto === 'REPROVADO') setDesvioAnterior(true);
 
-      // Ha proxima etapa (encadeamento Visual -> Lote)?
-      if (passoIdx < passos.length - 1) {
+      // Ha proxima etapa (Visual -> Lote da MESMA inspecao)?
+      if (!ultimoPasso) {
         const proximo = passos[passoIdx + 1];
-        // Guarda a entrega do Visual para o Lote usar a MESMA carga.
-        if (res.inspecao?.entregaId) setEntregaEncadeada(res.inspecao.entregaId);
         setPassoIdx(passoIdx + 1);
         limparEtapa();
         message.success(
-          `${tipo === 'VISUAL' ? 'Visual' : 'Lote'} registrado. Prossiga com a inspeção de ${
-            proximo === 'LOTE' ? 'Lote' : 'Visual'
-          }.`,
+          `${labelFormulario[tipo]} registrado na inspeção ${
+            res.numeroInspecao ?? ''
+          }. Prossiga com a inspeção de ${labelFormulario[proximo]}.`,
         );
         return;
       }
 
-      finalizarFluxo(rncs);
+      setOpen(false);
+      invalidar();
+      if (rnc) {
+        // RNC obrigatoria: a inspecao so se encerra com os desvios preenchidos.
+        abrirRncObrigatoria(rnc);
+      } else {
+        message.success(
+          `Inspeção ${res.numeroInspecao ?? ''} registrada. Recebimento aprovado.`,
+        );
+      }
     } catch {
       message.error('Não foi possível registrar o recebimento.');
     } finally {
@@ -502,12 +592,13 @@ export default function Inspecoes() {
     }
   }
 
+  // Exclui a inspecao inteira (os formularios do recebimento).
   async function excluirInspecao(r: any, cascade = false) {
-    const rota = r.tipoFormulario === 'VISUAL' ? 'visual' : 'lote';
+    const params = cascade ? { cascade: 'true' } : {};
     try {
-      await api.delete(`/inspecoes/${rota}/${r.id}`, {
-        params: cascade ? { cascade: 'true' } : {},
-      });
+      if (r.loteId) await api.delete(`/inspecoes/lote/${r.loteId}`, { params });
+      if (r.visualId)
+        await api.delete(`/inspecoes/visual/${r.visualId}`, { params });
       message.success('Inspeção excluída.');
       invalidar();
     } catch (e: any) {
@@ -541,9 +632,10 @@ export default function Inspecoes() {
 
   function confirmarExclusao(r: any) {
     Modal.confirm({
-      title: `Excluir esta inspeção ${labelTipo[r.tipoFormulario]}?`,
+      title: `Excluir a inspeção ${r.numeroInspecao ?? ''}?`,
       icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
-      content: 'A remoção é permanente e não pode ser desfeita.',
+      content:
+        'Todos os formulários desta inspeção serão removidos. A remoção é permanente e não pode ser desfeita.',
       okText: 'Excluir',
       okButtonProps: { danger: true },
       cancelText: 'Cancelar',
@@ -577,10 +669,27 @@ export default function Inspecoes() {
       }
     >
       <Table
-        rowKey={(r) => `${r.tipoFormulario}-${r.id}`}
+        rowKey="id"
         loading={isLoading}
         dataSource={data}
         columns={[
+          {
+            title: 'Inspeção',
+            dataIndex: 'numeroInspecao',
+            width: 140,
+            render: (n: string | null, r: any) =>
+              n ? (
+                <Button
+                  type="link"
+                  style={{ padding: 0 }}
+                  onClick={() => navigate(`/inspecoes/${r.id}`)}
+                >
+                  {n}
+                </Button>
+              ) : (
+                <Typography.Text type="secondary">-</Typography.Text>
+              ),
+          },
           {
             title: 'Data',
             dataIndex: 'dataInspecao',
@@ -599,14 +708,41 @@ export default function Inspecoes() {
           { title: 'Ano', dataIndex: 'ano', width: 80, render: (v?: number) => v ?? '-' },
           {
             title: 'Formulário',
-            dataIndex: 'tipoFormulario',
-            width: 150,
-            filters: Object.entries(labelTipo).map(([value, text]) => ({
+            dataIndex: 'formularios',
+            width: 190,
+            filters: Object.entries(labelFormulario).map(([value, text]) => ({
               text,
               value,
             })),
-            onFilter: (v: any, r: any) => r.tipoFormulario === v,
-            render: (t: string) => <Tag>{labelTipo[t] ?? t}</Tag>,
+            onFilter: (v: any, r: any) => (r.formularios ?? []).includes(v),
+            render: (fs: string[]) =>
+              fs?.length ? (
+                <Space size={4}>
+                  {fs.map((f) => (
+                    <Tag key={f} color={f === 'VISUAL' ? 'geekblue' : 'purple'}>
+                      {labelFormulario[f] ?? f}
+                    </Tag>
+                  ))}
+                </Space>
+              ) : (
+                <Tag>Recebimento</Tag>
+              ),
+          },
+          {
+            title: 'Tipo',
+            dataIndex: 'inspecaoExtra',
+            width: 90,
+            filters: [
+              { text: 'Extra', value: true },
+              { text: 'Ciclo', value: false },
+            ],
+            onFilter: (v: any, r: any) => !!r.inspecaoExtra === v,
+            render: (e: boolean, r: any) =>
+              !r.formularios?.length ? '-' : e ? (
+                <Tag color="orange">Extra</Tag>
+              ) : (
+                <Tag color="default">Ciclo</Tag>
+              ),
           },
           {
             title: 'Fornecedor',
@@ -656,7 +792,7 @@ export default function Inspecoes() {
                   title: '',
                   width: 50,
                   render: (_: any, r: any) =>
-                    r.tipoFormulario === 'RECEBIMENTO' ? null : (
+                    !r.formularios?.length ? null : (
                       <Button
                         type="text"
                         danger
@@ -671,17 +807,21 @@ export default function Inspecoes() {
       />
 
       <Modal
-        title="Nova Inspeção de Recebimento"
+        title={
+          numeroInspecao
+            ? `Inspeção ${numeroInspecao}`
+            : 'Nova Inspeção de Recebimento'
+        }
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
         confirmLoading={salvando}
         okText={
-          fornecedorId && !precisaInspecionar
+          !preencheFormulario
             ? 'Registrar recebimento sem inspeção'
-            : passoIdx < passos.length - 1
-              ? `Registrar ${tipo === 'VISUAL' ? 'Visual' : 'Lote'} e continuar`
-              : 'Registrar Inspeção'
+            : !ultimoPasso
+              ? `Registrar ${labelFormulario[tipo]} e continuar`
+              : 'Concluir Inspeção'
         }
         cancelText="Cancelar"
         width={900}
@@ -693,7 +833,7 @@ export default function Inspecoes() {
           style={{ marginTop: 8 }}
         >
           <Row gutter={12}>
-            <Col span={12}>
+            <Col span={11}>
               <Form.Item
                 name="fornecedorId"
                 label="Fornecedor"
@@ -705,6 +845,29 @@ export default function Inspecoes() {
                   disabled={passoIdx > 0}
                   options={opcoesFornecedor(fornecedores)}
                 />
+              </Form.Item>
+            </Col>
+            {/* Fornecedor que nao esta na base (ex: importacao): cadastro
+                pontual aqui mesmo, sem abandonar a inspecao. */}
+            <Col span={6}>
+              <Form.Item label=" " colon={false}>
+                <Button
+                  block
+                  icon={<UserAddOutlined />}
+                  disabled={passoIdx > 0}
+                  onClick={() => {
+                    formFornecedor.resetFields();
+                    formFornecedor.setFieldsValue(valoresIniciaisFornecedor);
+                    setOpenFornecedor(true);
+                  }}
+                >
+                  Novo Fornecedor
+                </Button>
+              </Form.Item>
+            </Col>
+            <Col span={7}>
+              <Form.Item label="Nº da inspeção">
+                <Input value={numeroInspecao ?? 'gerado ao salvar'} disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -737,16 +900,24 @@ export default function Inspecoes() {
               style={{ marginBottom: 12 }}
             >
               <Descriptions.Item label="Classificação">
-                <Tag color="blue">
-                  {avaliacao.fornecedor?.classificacaoFornecimento}
-                </Tag>
+                {avaliacao.eventual ? (
+                  <Tag>Eventual</Tag>
+                ) : (
+                  <Tag color="blue">
+                    {avaliacao.fornecedor?.classificacaoFornecimento}
+                  </Tag>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Periodicidade">
-                {avaliacao.periodicidade?.periodicidadeTexto ??
-                  `1 a cada ${avaliacao.frequenciaN} entregas`}
+                {avaliacao.eventual
+                  ? 'Fora do plano de periodicidade'
+                  : (avaliacao.periodicidade?.periodicidadeTexto ??
+                    `1 a cada ${avaliacao.frequenciaN} entregas`)}
               </Descriptions.Item>
               <Descriptions.Item label="Entregas no ciclo">
-                {avaliacao.proximoContador} de {avaliacao.frequenciaN}
+                {avaliacao.eventual
+                  ? '-'
+                  : `${avaliacao.proximoContador} de ${avaliacao.frequenciaN}`}
               </Descriptions.Item>
               <Descriptions.Item label="Escopo">
                 {avaliacao.fornecedor?.fazVisual && (
@@ -759,6 +930,10 @@ export default function Inspecoes() {
               <Descriptions.Item label="Decisão" span={2}>
                 {precisaInspecionar ? (
                   <Tag color="orange">Esta entrega DEVE ser inspecionada</Tag>
+                ) : extraAtivo ? (
+                  <Tag color="volcano">
+                    Inspeção EXTRA — fora do ciclo, por decisão da Qualidade
+                  </Tag>
                 ) : (
                   <Tag color="green">
                     Fora do ciclo — recebimento sem inspeção
@@ -768,8 +943,48 @@ export default function Inspecoes() {
             </Descriptions>
           )}
 
+          {/* Fora da janela do ciclo: a Qualidade pode inspecionar do mesmo
+              jeito, escolhendo os formularios independente do cadastro. */}
+          {fornecedorId && !precisaInspecionar && (
+            <Card size="small" style={{ marginBottom: 12 }}>
+              <Form.Item
+                name="extra"
+                label="Realizar inspeção extra"
+                valuePropName="checked"
+                extra="A inspeção extra conta nos indicadores e reinicia o ciclo de periodicidade do fornecedor."
+                style={{ marginBottom: extraAtivo ? 12 : 0 }}
+              >
+                <Switch
+                  checkedChildren="Sim"
+                  unCheckedChildren="Não"
+                  disabled={passoIdx > 0}
+                />
+              </Form.Item>
+              {extraAtivo && (
+                <Form.Item
+                  name="formulariosExtra"
+                  label="Formulários desta inspeção"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Escolha ao menos um formulário.',
+                    },
+                  ]}
+                >
+                  <Checkbox.Group
+                    disabled={passoIdx > 0}
+                    options={[
+                      { value: 'VISUAL', label: 'Inspeção Visual' },
+                      { value: 'LOTE', label: 'Inspeção de Lote / Dimensional' },
+                    ]}
+                  />
+                </Form.Item>
+              )}
+            </Card>
+          )}
+
           {/* Recebimento sem inspecao: apenas NF / PO (data/semana/ano acima) */}
-          {precisaInspecionar === false && fornecedorId && (
+          {fornecedorId && !preencheFormulario && (
             <Row gutter={12}>
               <Col span={12}>
                 <Form.Item name="notaFiscal" label="Nota Fiscal">
@@ -784,7 +999,7 @@ export default function Inspecoes() {
             </Row>
           )}
 
-          {precisaInspecionar && (
+          {preencheFormulario && (
             <>
               {encadeado && (
                 <Steps
@@ -792,8 +1007,19 @@ export default function Inspecoes() {
                   current={passoIdx}
                   style={{ marginBottom: 16 }}
                   items={passos.map((p) => ({
-                    title: p === 'VISUAL' ? 'Inspeção Visual' : 'Inspeção de Lote',
+                    title:
+                      p === 'VISUAL' ? 'Inspeção Visual' : 'Inspeção de Lote',
                   }))}
+                />
+              )}
+
+              {desvioAnterior && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="Esta inspeção já tem desvio registrado."
+                  description="Ao concluir a inspeção completa será aberta UMA RNC, reunindo os desvios de todos os formulários."
                 />
               )}
 
@@ -838,18 +1064,13 @@ export default function Inspecoes() {
               </Row>
 
               <Row gutter={12}>
-                <Col span={8}>
+                <Col span={12}>
                   <Form.Item name="desenhoRev" label="Desenho / Revisão">
                     <Input />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={12}>
                   <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
-                    <Input />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item name="relatorioNumero" label="Nº do relatório">
                     <Input />
                   </Form.Item>
                 </Col>
@@ -879,43 +1100,143 @@ export default function Inspecoes() {
                 type={resultadoAuto === 'REPROVADO' ? 'error' : 'success'}
                 showIcon
                 message={
-                  resultadoAuto === 'REPROVADO'
-                    ? 'Resultado: REPROVADO — será aberta uma RNC automaticamente.'
-                    : 'Resultado: APROVADO — recebimento liberado.'
+                  resultadoAuto === 'APROVADO'
+                    ? `Resultado: APROVADO — ${labelFormulario[tipo]} sem desvios.`
+                    : ultimoPasso
+                      ? 'Resultado: REPROVADO — ao concluir será aberta a RNC desta inspeção, de preenchimento obrigatório.'
+                      : 'Resultado: REPROVADO — será aberta UMA RNC ao término da inspeção completa.'
                 }
               />
-
-              {/* Reprovado: capturar disposicao + fotos, que nascem vinculadas a RNC */}
-              {resultadoAuto === 'REPROVADO' && (
-                <div style={{ marginTop: 12 }}>
-                  <Form.Item
-                    name="disposicao"
-                    label="Disposição"
-                    rules={[
-                      { required: true, message: 'Informe a disposição.' },
-                    ]}
-                  >
-                    <Input.TextArea
-                      rows={2}
-                      placeholder="Ex.: Devolver ao fornecedor / Retrabalho / Uso sob concessão"
-                    />
-                  </Form.Item>
-                  <Form.Item label="Fotos da não conformidade">
-                    <Upload
-                      multiple
-                      accept="image/*"
-                      listType="picture"
-                      fileList={fotosReprova}
-                      beforeUpload={() => false}
-                      onChange={({ fileList }) => setFotosReprova(fileList)}
-                    >
-                      <Button icon={<UploadOutlined />}>Adicionar fotos</Button>
-                    </Upload>
-                  </Form.Item>
-                </div>
-              )}
             </>
           )}
+        </Form>
+      </Modal>
+
+      {/* Cadastro pontual do fornecedor, sem sair da inspecao */}
+      <Modal
+        title="Novo Fornecedor (cadastro pontual)"
+        open={openFornecedor}
+        onCancel={() => setOpenFornecedor(false)}
+        onOk={() => formFornecedor.submit()}
+        confirmLoading={salvandoFornecedor}
+        okText="Cadastrar e usar nesta inspeção"
+        cancelText="Cancelar"
+        width={760}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Fornecedor eventual"
+          description="Ele nasce fora do plano de periodicidade: toda inspeção dele é EXTRA. O cadastro fica completo, então basta desmarcar 'eventual' em Fornecedores quando ele for classificado."
+        />
+        <Form
+          form={formFornecedor}
+          layout="vertical"
+          onFinish={salvarFornecedorPontual}
+        >
+          <CamposFornecedor />
+        </Form>
+      </Modal>
+
+      {/* RNC obrigatoria para encerrar a inspecao. Sem cancelar: se a tela
+          cair, a RNC ja esta aberta e continua no menu RNC pelo numero. */}
+      <Modal
+        title={
+          rncObrigatoria
+            ? `RNC ${rncObrigatoria.numero} — desvios da inspeção`
+            : 'RNC'
+        }
+        open={!!rncObrigatoria}
+        onOk={() => formRnc.submit()}
+        confirmLoading={salvandoRnc}
+        okText="Registrar RNC e encerrar inspeção"
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        width={800}
+      >
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Preenchimento obrigatório para encerrar a inspeção"
+          description="Causa raiz, plano do fornecedor e verificação de eficácia são preenchidos depois, na tela da RNC."
+        />
+        <Form form={formRnc} layout="vertical" onFinish={salvarRncObrigatoria}>
+          <Row gutter={12}>
+            <Col span={16}>
+              <Form.Item
+                name="tipoDesvio"
+                label="Tipo de desvio"
+                rules={[{ required: true, message: 'Informe o tipo de desvio.' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="reincidencia" label="Reincidência">
+                <Radio.Group optionType="button" buttonStyle="solid">
+                  <Radio.Button value={true}>Sim</Radio.Button>
+                  <Radio.Button value={false}>Não</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item
+            name="descricaoDesvio"
+            label="Descrição do desvio"
+            rules={[{ required: true, message: 'Descreva o desvio.' }]}
+          >
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="quantidadePecas" label="Quantidade de peças">
+                <InputNumber style={{ width: '100%' }} min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="valorUnitario" label="Valor unitário (R$)">
+                <InputNumber style={{ width: '100%' }} min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Valor total (R$)">
+                <Input
+                  disabled
+                  value={
+                    qtdPecasRnc && valorUnitRnc
+                      ? (qtdPecasRnc * valorUnitRnc).toFixed(2)
+                      : '-'
+                  }
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item
+            name="disposicao"
+            label="Disposição"
+            rules={[{ required: true, message: 'Informe a disposição.' }]}
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="Ex.: Devolver ao fornecedor / Retrabalho / Uso sob concessão"
+            />
+          </Form.Item>
+          <Form.Item label="Evidências / Fotos">
+            <Upload
+              multiple
+              accept="image/*"
+              listType="picture"
+              fileList={fotosRnc}
+              beforeUpload={() => false}
+              onChange={({ fileList }) => setFotosRnc(fileList)}
+            >
+              <Button icon={<UploadOutlined />}>Adicionar fotos</Button>
+            </Upload>
+          </Form.Item>
         </Form>
       </Modal>
     </Card>

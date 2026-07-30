@@ -227,6 +227,13 @@ export default function Dashboard() {
           { t: 'Entregas', v: cont.entregas },
           { t: 'Inspeções', v: cont.inspecoes },
           {
+            // Fora do plano de periodicidade: fornecedor eventual ou pedido
+            // pontual da Qualidade. Os desvios contam nos demais indicadores.
+            t: 'Qtde de Inspeção Extra',
+            v: cont.inspecoesExtra,
+            cor: '#d46b08',
+          },
+          {
             t: 'Recebimentos s/ inspeção',
             v: cont.recebimentosSemInspecao,
             cor: '#8c8c8c',
@@ -243,7 +250,7 @@ export default function Dashboard() {
             cor: '#3f8600',
           },
         ].map((c) => (
-          <Col xs={12} sm={8} lg={4} key={c.t}>
+          <Col xs={12} sm={8} lg={3} key={c.t}>
             <Card size="small" style={{ height: '100%' }}>
               <Statistic
                 title={

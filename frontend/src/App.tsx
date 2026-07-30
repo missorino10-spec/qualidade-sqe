@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Fornecedores from './pages/Fornecedores';
 import Inspecoes from './pages/Inspecoes';
+import InspecaoDetalhe from './pages/InspecaoDetalhe';
 import RncLista from './pages/RncLista';
 import RncDetalhe from './pages/RncDetalhe';
 import Periodicidade from './pages/Periodicidade';
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/periodicidade" element={<Privado><Periodicidade /></Privado>} />
       <Route path="/fornecedores" element={<Privado><Fornecedores /></Privado>} />
       <Route path="/inspecoes" element={<Privado><Inspecoes /></Privado>} />
+      <Route path="/inspecoes/:id" element={<Privado><InspecaoDetalhe /></Privado>} />
       <Route path="/rnc" element={<Privado><RncLista /></Privado>} />
       <Route path="/rnc/:id" element={<Privado><RncDetalhe /></Privado>} />
       <Route path="*" element={<Navigate to="/" replace />} />

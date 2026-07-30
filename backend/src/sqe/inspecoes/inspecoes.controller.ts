@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Res,
   UseGuards,
   NotFoundException,
 } from '@nestjs/common';
@@ -20,7 +21,9 @@ import {
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { Response } from 'express';
 import { InspecoesService } from './inspecoes.service';
+import { gerarPdfInspecao } from './inspecao-pdf';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -48,7 +51,10 @@ class CabecalhoDto {
   @IsOptional() @IsString() po?: string;
   @IsOptional() @Type(() => Number) @IsNumber() qtdInspecionada?: number;
   @IsOptional() @Type(() => Number) @IsNumber() qtdTotal?: number;
-  @IsOptional() @IsString() relatorioNumero?: string;
+  // Inspecao fora do plano de periodicidade (fornecedor eventual ou pedido
+  // pontual da Qualidade). O numero do relatorio nao vem do formulario: e o
+  // proprio numero da inspecao (INSP0001/2026), atribuido no servico.
+  @IsOptional() @IsBoolean() extra?: boolean;
   @IsOptional() @IsIn(ORIGENS) origem?: any;
   @IsOptional() @IsString() observacoes?: string;
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultado?: any;
@@ -62,7 +68,6 @@ class CreateVisualDto extends CabecalhoDto {
 
 class CreateLoteDto extends CabecalhoDto {
   @IsOptional() @IsArray() cotas?: any[];
-  @IsOptional() @IsBoolean() encadeadoAposVisual?: boolean;
 }
 
 class RecebimentoDto {
@@ -136,6 +141,27 @@ export class InspecoesController {
     });
     if (!insp) throw new NotFoundException('Inspeção não encontrada');
     return { ...insp, tipoFormulario: 'LOTE' };
+  }
+
+  // Detalhe da inspecao (um recebimento) com os formularios como foram
+  // preenchidos. Declarado depois das rotas literais para nao captura-las.
+  @Get(':id')
+  detalhe(@Param('id', ParseIntPipe) id: number) {
+    return this.service.detalhe(id);
+  }
+
+  // Relatorio de inspecao em PDF - vale para aprovada ou reprovada, e o
+  // mesmo documento.
+  @Get(':id/pdf')
+  async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const insp = await this.service.detalhe(id);
+    const numero = insp.numeroInspecao ?? `recebimento-${id}`;
+    const nomeArquivo = `${numero.replace('/', '-')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
+    const doc = gerarPdfInspecao(insp);
+    doc.pipe(res);
+    doc.end();
   }
 
   @Roles('QUALIDADE', 'ADMIN')
