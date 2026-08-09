@@ -53,7 +53,9 @@ model Usuario {
   oitoDsAprovados        OitoD[]                @relation("OitoDAprovadoPor")
 
   // SQD
-  homologacoes HomologacaoFornecedor[] @relation("HomologacaoCriadoPor")
+  homologacoes        HomologacaoFornecedor[]  @relation("HomologacaoCriadoPor")
+  homologacoesItem    HomologacaoItem[]        @relation("HomologacaoItemCriadoPor")
+  relatoriosInspecaoItem RelatorioInspecaoItem[] @relation("RelatorioItemCriadoPor")
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
@@ -825,6 +827,7 @@ enum SolicitanteSqd {
   COMPRAS
   ENGENHARIA
   NC
+  FORNECEDOR // so aparece na homologacao de itens (FMR.025.01, coluna F)
 }
 
 model HomologacaoFornecedor {
@@ -889,4 +892,126 @@ model HomologacaoFornecedor {
 
   @@unique([ano, sequencial])
   @@index([dataSolicitacao])
+}
+
+// ---------------------------------------------------------------------------
+// SQD - HOMOLOGACAO DE ITENS - Doc BDBR.QUA.FMR.025.01 (aba "Lista")
+//
+// Mesmo fluxo da homologacao de fornecedores, com uma troca: no lugar da
+// autoavaliacao do fornecedor entra o relatorio de inspecao (abas AMOSTRAS e
+// VISUAL do modelo de relatorios). O item so e aprovado quando as duas abas
+// sao aprovadas.
+//
+// Cada tentativa e um relatorio novo sob o MESMO numero do registro; a revisao
+// do relatorio e o proprio numero da tentativa (01, 02...).
+
+enum MotivoHomologacaoItem {
+  PRIMEIRO_FORNECIMENTO
+  ALTERACAO_MATERIAL
+  ALTERACAO_PROCESSO
+}
+
+// Aqui nao existe "Aprovado Condicionalmente" (que so faz sentido para o
+// fornecedor) e "Cancelado" e um resultado, alem de ser um status.
+enum ResultadoHomologacaoItem {
+  APROVADO
+  REPROVADO
+  CANCELADO
+}
+
+model HomologacaoItem {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // HITE0001/2026
+  ano        Int
+  sequencial Int
+  semana     String // W28 - mesma regra de semana do resto do sistema
+
+  // --- Informacoes do item e do fornecedor ---
+  fornecedorNome   String
+  codigoFornecedor String?
+  itemCodigo       String?
+  itemDescricao    String?
+
+  // --- Informacoes do documento ---
+  solicitante SolicitanteSqd?
+  motivo      MotivoHomologacaoItem?
+  // "Custo potencial evitado" (coluna K): entra no savings do painel.
+  custoEvitado Float?
+
+  // Abre o registro e serve de marco zero dos tres relogios.
+  dataSolicitacao        DateTime?
+  dataEnvioRelatorio     DateTime?
+  leadTimeDiasUteis      Int?
+  dataRetornoFornecedor  DateTime?
+  tempoRespostaDiasUteis Int?
+  dataFinalizacao        DateTime?
+  tempoTotalDiasUteis    Int?
+
+  // --- Analise ---
+  // Sai do relatorio de inspecao da ultima tentativa (ou CANCELADO na mao).
+  resultado            ResultadoHomologacaoItem?
+  statusHomologacao    StatusHomologacao         @default(EM_ANDAMENTO)
+  statusPlanoAcao      StatusPlanoAcaoSqd?
+  dataReavaliacao      DateTime?
+  efetividadePlanoAcao EfetividadePlanoAcao?
+  acao                 String?
+  observacoes          String?
+
+  // Anexos (tabela polimorfica Anexo):
+  //   "HOMOLOGACAO_ITEM_RELATORIO"  - relatorio final escrito pela Qualidade
+  //   "HOMOLOGACAO_ITEM_PLANO_ACAO" - plano de acao enviado pelo fornecedor
+
+  relatorios RelatorioInspecaoItem[]
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("HomologacaoItemCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ano, sequencial])
+  @@index([dataSolicitacao])
+}
+
+// Relatorio de inspecao da homologacao de itens. Nao tem numero proprio:
+// carrega o numero do registro mais a revisao (ex.: HITE0001/2026 - Rev. 02).
+model RelatorioInspecaoItem {
+  id            Int             @id @default(autoincrement())
+  homologacaoId Int
+  homologacao   HomologacaoItem @relation(fields: [homologacaoId], references: [id], onDelete: Cascade)
+
+  tentativa Int    @default(1)
+  revisao   String @default("01") // sempre igual a tentativa, com dois digitos
+
+  // --- CABECALHO do modelo de relatorios ---
+  dataInspecao    DateTime?
+  origem          OrigemInspecao @default(HOMOLOGACAO)
+  desenhoRev      String?
+  tolerancias     String?
+  nf              String?
+  po              String?
+  qtdInspecionada Float?
+  qtdTotal        Float?
+  elaboradoPor    String?
+  inspecionadoPor String?
+
+  // --- Aba AMOSTRAS (FMR.011.06 rev. 06) ---
+  // [{ localizacao, especificado, tolerancia, upper, lower, pecas: [...],
+  //    instrumento, desvioMin, desvioMax }]
+  cotas               Json?
+  observacoesAmostras String?
+  resultadoAmostras   ResultadoInspecao?
+
+  // --- Aba VISUAL (FMR.06.07 rev. 07) ---
+  // [{ grupo, itens: [{ texto, status: APROVADO|REPROVADO|NAO_APLICAVEL }] }]
+  checklistVisual   Json?
+  evidenciasVisual  String?
+  observacoesVisual String?
+  resultadoVisual   ResultadoInspecao?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("RelatorioItemCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([homologacaoId, tentativa])
 }

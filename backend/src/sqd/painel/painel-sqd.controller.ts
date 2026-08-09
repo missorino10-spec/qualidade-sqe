@@ -17,4 +17,14 @@ export class PainelSqdController {
   ultimas() {
     return this.service.ultimas();
   }
+
+  @Get('itens/kpis')
+  kpisItens(@Query('de') de?: string, @Query('ate') ate?: string) {
+    return this.service.kpisItens(de, ate);
+  }
+
+  @Get('itens/ultimas')
+  ultimasItens() {
+    return this.service.ultimasItens();
+  }
 }

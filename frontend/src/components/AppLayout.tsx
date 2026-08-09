@@ -86,6 +86,11 @@ const itensMenu: {
         icon: <SafetyCertificateOutlined />,
         label: 'Homologação de Fornecedores',
       },
+      {
+        key: '/sqd/homologacoes-itens',
+        icon: <FileProtectOutlined />,
+        label: 'Homologação de Itens',
+      },
     ],
   },
 ];

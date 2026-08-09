@@ -19,6 +19,8 @@ import Maquinas from './pages/manufatura/Maquinas';
 import PainelSqd from './pages/sqd/PainelSqd';
 import Homologacoes from './pages/sqd/Homologacoes';
 import HomologacaoDetalhe from './pages/sqd/HomologacaoDetalhe';
+import HomologacoesItens from './pages/sqd/HomologacoesItens';
+import HomologacaoItemDetalhe from './pages/sqd/HomologacaoItemDetalhe';
 
 function Privado({ children }: { children: JSX.Element }) {
   const { usuario } = useAuth();
@@ -63,6 +65,14 @@ export default function App() {
       <Route
         path="/sqd/homologacoes/:id"
         element={<Privado><HomologacaoDetalhe /></Privado>}
+      />
+      <Route
+        path="/sqd/homologacoes-itens"
+        element={<Privado><HomologacoesItens /></Privado>}
+      />
+      <Route
+        path="/sqd/homologacoes-itens/:id"
+        element={<Privado><HomologacaoItemDetalhe /></Privado>}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

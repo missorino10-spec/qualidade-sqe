@@ -64,6 +64,72 @@ export const labelResposta: Record<string, string> = {
   NA: 'N/A',
 };
 
+// ---------------------------------------------------------------------------
+// Homologacao de Itens (BDBR.QUA.FMR.025.01). Aqui nao ha nota nem faixa: o
+// item e homologado pelo relatorio de inspecao (abas Amostra e Visual).
+
+export const labelResultadoItem: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  REPROVADO: 'Reprovado',
+  CANCELADO: 'Cancelado',
+};
+export const corResultadoItem: Record<string, string> = {
+  APROVADO: 'green',
+  REPROVADO: 'red',
+  CANCELADO: 'default',
+};
+
+export const labelMotivoItem: Record<string, string> = {
+  PRIMEIRO_FORNECIMENTO: 'Primeiro fornecimento',
+  ALTERACAO_MATERIAL: 'Alteração de material',
+  ALTERACAO_PROCESSO: 'Alteração de processo',
+};
+
+// Mesma lista do fornecedor, mais "Fornecedor" — que so aparece no FMR.025.01.
+export const labelSolicitanteItem: Record<string, string> = {
+  COMPRAS: 'Compras',
+  ENGENHARIA: 'Engenharia',
+  NC: 'N/C',
+  FORNECEDOR: 'Fornecedor',
+};
+
+// Lista de validacao da coluna "Ação" do FMR.025.01 (aba "Base de Dados").
+export const labelAcaoItem: Record<string, string> = {
+  FORNECEDOR_NOTIFICADO_REPROVA:
+    'Fornecedor notificado sobre a reprova; Aguardando retorno.',
+  AGUARDANDO_NOVAS_AMOSTRAS: 'Aguardando envio de novas amostras.',
+  ACAO_INTERNA_NECESSARIA:
+    'Ação interna necessária; Aguardando retorno do setor responsável.',
+  AGUARDANDO_DOCUMENTOS: 'Aguardando envio dos documentos para análise.',
+  RELATORIO_SUBMETIDO_ENGENHARIA:
+    'Relatório submetido à engenharia; Aguardando definição.',
+  RELATORIO_SUBMETIDO_COMPRAS:
+    'Relatório submetido à compras; Aguardando definição.',
+  FORNECEDOR_NOTIFICADO_APROVACAO:
+    'Fornecedor notificado sobre aprovação e que pode seguir com a fabricação do lote.',
+};
+
+export const labelStatusVisual: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  REPROVADO: 'Reprovado',
+  NAO_APLICAVEL: 'N/A',
+};
+export const corStatusVisual: Record<string, string> = {
+  APROVADO: 'green',
+  REPROVADO: 'red',
+  NAO_APLICAVEL: 'default',
+};
+
+export const labelOrigemInspecao: Record<string, string> = {
+  PLANO_INSPECAO: 'Plano de Inspeção',
+  HOMOLOGACAO: 'Homologação',
+  DEVOLUCAO: 'Devolução',
+  RETRABALHO: 'Retrabalho',
+  RELATORIO_OCORRENCIA: 'Relatório de Ocorrência',
+  LIBERACAO_SETUP: 'Liberação de Setup',
+  OUTROS: 'Outros',
+};
+
 export function opcoes(mapa: Record<string, string>) {
   return Object.entries(mapa).map(([value, label]) => ({ value, label }));
 }

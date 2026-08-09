@@ -3,6 +3,7 @@ import {
   Card,
   Col,
   DatePicker,
+  Divider,
   Row,
   Space,
   Statistic,
@@ -13,8 +14,10 @@ import {
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DollarOutlined,
   FieldTimeOutlined,
   HourglassOutlined,
+  RetweetOutlined,
   TrophyOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -24,8 +27,10 @@ import { api } from '../../api';
 import { dataBR, separadoresBR } from '../../formatos';
 import {
   corResultado,
+  corResultadoItem,
   corStatusHomologacao,
   labelResultado,
+  labelResultadoItem,
   labelStatusHomologacao,
   nota,
 } from './comum';
@@ -54,8 +59,24 @@ export default function PainelSqd() {
     queryFn: async () => (await api.get('/sqd/painel/ultimas')).data,
   });
 
+  // Aba "KPI's" do FMR.025.01: o mesmo painel, aplicado a homologacao de itens.
+  const { data: kpisItens, isLoading: loadingItens } = useQuery<any>({
+    queryKey: ['sqd-kpis-itens', de, ate],
+    queryFn: async () =>
+      (await api.get('/sqd/painel/itens/kpis', { params: { de, ate } })).data,
+  });
+
+  const { data: ultimasItens, isLoading: loadingUltimasItens } = useQuery<any[]>(
+    {
+      queryKey: ['sqd-ultimas-itens'],
+      queryFn: async () => (await api.get('/sqd/painel/itens/ultimas')).data,
+    },
+  );
+
   const sla = kpis?.slaDias ?? 3;
   const slaResposta = kpis?.slaRespostaDias ?? 3;
+  const slaItem = kpisItens?.slaDias ?? 3;
+  const slaRespostaItem = kpisItens?.slaRespostaDias ?? 3;
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -69,6 +90,10 @@ export default function PainelSqd() {
           onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
         />
       </Row>
+
+      <Divider orientation="left" plain>
+        Homologação de Fornecedores — Doc. BDBR.QUA.FMR.029.01
+      </Divider>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
@@ -254,6 +279,225 @@ export default function PainelSqd() {
                   '-'
                 ) : (
                   <Tag>Aguardando retorno do fornecedor</Tag>
+                ),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'statusHomologacao',
+              width: 130,
+              render: (s: string) => (
+                <Tag color={corStatusHomologacao[s]}>
+                  {labelStatusHomologacao[s]}
+                </Tag>
+              ),
+            },
+          ]}
+        />
+      </Card>
+
+      <Divider orientation="left" plain>
+        Homologação de Itens — Doc. BDBR.QUA.FMR.025.01
+      </Divider>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Aprovação de itens"
+              value={kpisItens?.pctAprovacao ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={loadingItens}
+              prefix={<CheckCircleOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Aprovados na 1ª tentativa"
+              value={kpisItens?.pctPrimeiraTentativa ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={loadingItens}
+              prefix={<RetweetOutlined />}
+              valueStyle={{ color: '#D37119' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Lead time médio (dias úteis)"
+              value={kpisItens?.leadTimeMedio ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={loadingItens}
+              prefix={<FieldTimeOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title={`Dentro do prazo (até ${slaItem} dias úteis)`}
+              value={kpisItens?.pctNoPrazo ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={loadingItens}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Resposta do fornecedor (dias úteis)"
+              value={kpisItens?.tempoRespostaMedio ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={loadingItens}
+              prefix={<FieldTimeOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title={`Amostras no prazo (até ${slaRespostaItem} dias úteis)`}
+              value={kpisItens?.pctRespostaNoPrazo ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={loadingItens}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Tempo total do ciclo (dias úteis)"
+              value={kpisItens?.tempoTotalMedio ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={loadingItens}
+              prefix={<HourglassOutlined />}
+            />
+          </Card>
+        </Col>
+        {/* Savings do FMR.025.01: so conta o que ja foi validado, ou seja, as
+            homologacoes com o ciclo encerrado. */}
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Savings (homologações finalizadas)"
+              value={kpisItens?.savings ?? 0}
+              {...separadoresBR}
+              precision={2}
+              prefix={<DollarOutlined />}
+              loading={loadingItens}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} align="stretch">
+        {[
+          { t: 'Itens registrados', v: kpisItens?.total },
+          {
+            t: 'Aguardando amostras',
+            v: kpisItens?.aguardandoAmostras,
+            cor: '#0958d9',
+          },
+          { t: 'Itens inspecionados', v: kpisItens?.analisados },
+          { t: 'Aprovados', v: kpisItens?.aprovados, cor: '#3f8600' },
+          { t: 'Reprovados', v: kpisItens?.reprovados, cor: '#cf1322' },
+          { t: 'Em andamento', v: kpisItens?.emAndamento },
+          { t: 'Finalizadas', v: kpisItens?.finalizadas, cor: '#3f8600' },
+          { t: 'Canceladas', v: kpisItens?.canceladas },
+          {
+            t: 'Planos de ação em andamento',
+            v: kpisItens?.planosEmAndamento,
+            cor: '#d46b08',
+          },
+        ].map((c) => (
+          <Col xs={12} sm={8} lg={6} key={c.t}>
+            <Card size="small" style={{ height: '100%' }}>
+              <Statistic
+                title={
+                  <span
+                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
+                  >
+                    {c.t}
+                  </span>
+                }
+                value={c.v ?? 0}
+                {...separadoresBR}
+                loading={loadingItens}
+                valueStyle={c.cor ? { color: c.cor } : undefined}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card title="Últimas homologações de itens">
+        <Table
+          rowKey="id"
+          size="small"
+          loading={loadingUltimasItens}
+          dataSource={ultimasItens}
+          pagination={false}
+          scroll={{ x: 1000 }}
+          locale={{ emptyText: 'Nenhuma homologação de item registrada' }}
+          onRow={(r) => ({
+            onClick: () => navigate(`/sqd/homologacoes-itens/${r.id}`),
+            style: { cursor: 'pointer' },
+          })}
+          columns={[
+            { title: 'Número', dataIndex: 'numero', width: 120 },
+            {
+              title: 'Solicitação',
+              dataIndex: 'dataSolicitacao',
+              width: 110,
+              render: (d: string) => dataBR(d),
+            },
+            { title: 'Fornecedor', dataIndex: 'fornecedorNome' },
+            {
+              title: 'Item',
+              dataIndex: 'itemCodigo',
+              width: 220,
+              render: (c: string, h: any) =>
+                `${c ?? '-'}${h.itemDescricao ? ` — ${h.itemDescricao}` : ''}`,
+            },
+            {
+              title: 'Tentativas',
+              dataIndex: 'tentativas',
+              width: 100,
+              align: 'right',
+            },
+            {
+              title: 'Resultado',
+              dataIndex: 'resultado',
+              width: 230,
+              render: (r: string | null, h: any) =>
+                r ? (
+                  <Tag color={corResultadoItem[r]}>{labelResultadoItem[r]}</Tag>
+                ) : h.statusHomologacao === 'CANCELADO' ? (
+                  '-'
+                ) : (
+                  <Tag>Aguardando amostras do fornecedor</Tag>
                 ),
             },
             {

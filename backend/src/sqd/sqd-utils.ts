@@ -4,9 +4,10 @@
 
 export type RespostaSqd = 'SIM' | 'NAO' | 'NA';
 
-// Numeracao dos documentos do SQD: HFOR0001/2026 (homologacao de fornecedor).
+// Numeracao dos documentos do SQD: HFOR0001/2026 (homologacao de fornecedor)
+// e HITE0001/2026 (homologacao de item).
 export function numeroSqd(
-  prefixo: 'HFOR',
+  prefixo: 'HFOR' | 'HITE',
   sequencial: number,
   ano: number,
 ): string {

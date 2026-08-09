@@ -7,19 +7,20 @@ import {
   SLA_RESPOSTA_FORNECEDOR_DIAS,
 } from '../sqd-utils';
 
-// Mesma identidade visual dos PDFs da RNC, da inspecao e do 8D.
-const LARANJA = '#E8792B';
-const PRETO = '#000000';
-const CINZA = '#555555';
-const VERDE = '#237804';
-const VERMELHO = '#A8071A';
+// Mesma identidade visual dos PDFs da RNC, da inspecao e do 8D. Exportados
+// porque a homologacao de itens usa exatamente o mesmo desenho.
+export const LARANJA = '#E8792B';
+export const PRETO = '#000000';
+export const CINZA = '#555555';
+export const VERDE = '#237804';
+export const VERMELHO = '#A8071A';
 const LOGO_PATH = join(process.cwd(), 'assets', 'logo-big-dutchman.png');
 
-const M = 40;
-const X0 = M;
-const X1 = 555;
-const W = X1 - X0;
-const RODAPE = 55;
+export const M = 40;
+export const X0 = M;
+export const X1 = 555;
+export const W = X1 - X0;
+export const RODAPE = 55;
 
 const LABEL_RESULTADO: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -27,20 +28,20 @@ const LABEL_RESULTADO: Record<string, string> = {
   REPROVADO: 'Reprovado',
 };
 
-const LABEL_STATUS: Record<string, string> = {
+export const LABEL_STATUS: Record<string, string> = {
   EM_ANDAMENTO: 'Em andamento',
   FINALIZADO: 'Finalizado',
   CANCELADO: 'Cancelado',
 };
 
-const LABEL_PLANO: Record<string, string> = {
+export const LABEL_PLANO: Record<string, string> = {
   EM_ANDAMENTO: 'Em andamento',
   FINALIZADO: 'Finalizado',
   CANCELADO: 'Cancelado',
   NAO_APLICAVEL: 'Não aplicável',
 };
 
-const LABEL_EFETIVIDADE: Record<string, string> = {
+export const LABEL_EFETIVIDADE: Record<string, string> = {
   NAO_APLICAVEL_CANCELADO: 'Não aplicável / Cancelado',
   NAO_IMPLEMENTADO_ATRASADO: 'Não implementado / Atrasado',
   EFETIVO: 'Efetivo',
@@ -62,7 +63,7 @@ const LABEL_RESPOSTA: Record<string, string> = {
 
 // Datas do registro sao datas puras (sem hora), gravadas como meia-noite UTC:
 // formatar no fuso do servidor faria 08/08 virar 07/08 a oeste de Greenwich.
-function fmtData(d?: Date | string | null): string {
+export function fmtData(d?: Date | string | null): string {
   if (!d) return '';
   return new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
@@ -74,7 +75,7 @@ function hojeNoBrasil(): string {
   });
 }
 
-function txt(v: any): string {
+export function txt(v: any): string {
   return v == null || v === '' ? '' : String(v);
 }
 
@@ -89,7 +90,7 @@ function fmtNota(v?: number | null): string {
 }
 
 // Relogio do PDF: "3 (dentro do SLA)" — a mesma leitura da tela.
-function fmtPrazo(dias?: number | null, sla?: number): string {
+export function fmtPrazo(dias?: number | null, sla?: number): string {
   if (dias == null) return '';
   if (sla == null) return String(dias);
   return `${dias} (${dias <= sla ? 'dentro do SLA' : 'fora do SLA'})`;
@@ -104,7 +105,7 @@ function corResultado(resultado?: string | null): string {
 
 // Ferramentas de desenho compartilhadas pelos dois documentos. Cada uma devolve
 // o "y" atualizado, porque o layout e sequencial de cima para baixo.
-function ferramentas(doc: PDFKit.PDFDocument) {
+export function ferramentas(doc: PDFKit.PDFDocument) {
   const estado = { y: 0 };
 
   const espaco = (altura: number) => {
