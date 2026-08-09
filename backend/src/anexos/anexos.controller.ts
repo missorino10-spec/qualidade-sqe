@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { StorageService } from './storage.service';
+import { corrigirNomeArquivo, disposicaoAnexo } from './nome-arquivo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('anexos')
@@ -47,9 +48,12 @@ export class AnexosController {
       throw new BadRequestException('entidadeTipo e entidadeId obrigatorios');
     }
 
+    // O nome vem do multipart em latin-1; sem isso todo acento fica torto.
+    const nomeArquivo = corrigirNomeArquivo(file.originalname);
+
     // Mesmo formato de nome de antes, para a coluna "caminho" nao mudar.
     const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const nomeNoStorage = `${unico}${extname(file.originalname)}`;
+    const nomeNoStorage = `${unico}${extname(nomeArquivo)}`;
 
     // Grava o arquivo primeiro: se o Storage falhar, nao fica registro orfao
     // no banco apontando para um anexo que nao existe.
@@ -59,7 +63,7 @@ export class AnexosController {
       data: {
         entidadeTipo,
         entidadeId: Number(entidadeId),
-        nomeArquivo: file.originalname,
+        nomeArquivo,
         caminho: nomeNoStorage,
         mimeType: file.mimetype,
         tamanho: file.size,
@@ -89,7 +93,7 @@ export class AnexosController {
     const bytes = await this.storage.baixar(anexo.caminho);
     res.set({
       'Content-Type': anexo.mimeType || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${anexo.nomeArquivo}"`,
+      'Content-Disposition': disposicaoAnexo(anexo.nomeArquivo),
       'Content-Length': String(bytes.length),
     });
     res.send(bytes);
