@@ -16,6 +16,9 @@ import Cnq from './pages/manufatura/Cnq';
 import OitoD from './pages/manufatura/OitoD';
 import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
 import Maquinas from './pages/manufatura/Maquinas';
+import PainelSqd from './pages/sqd/PainelSqd';
+import Homologacoes from './pages/sqd/Homologacoes';
+import HomologacaoDetalhe from './pages/sqd/HomologacaoDetalhe';
 
 function Privado({ children }: { children: JSX.Element }) {
   const { usuario } = useAuth();
@@ -53,6 +56,14 @@ export default function App() {
       <Route path="/manufatura/8d" element={<Privado><OitoD /></Privado>} />
       <Route path="/manufatura/8d/:id" element={<Privado><OitoDDetalhe /></Privado>} />
       <Route path="/manufatura/maquinas" element={<Privado><Maquinas /></Privado>} />
+
+      {/* SQD - Desenvolvimento de Fornecedores */}
+      <Route path="/sqd" element={<Privado><PainelSqd /></Privado>} />
+      <Route path="/sqd/homologacoes" element={<Privado><Homologacoes /></Privado>} />
+      <Route
+        path="/sqd/homologacoes/:id"
+        element={<Privado><HomologacaoDetalhe /></Privado>}
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -22,6 +22,8 @@ import { InspecoesManufaturaModule } from './manufatura/inspecoes/inspecoes-manu
 import { CnqModule } from './manufatura/cnq/cnq.module';
 import { OitoDModule } from './manufatura/oitod/oitod.module';
 import { PainelManufaturaModule } from './manufatura/painel/painel.module';
+import { HomologacoesModule } from './sqd/homologacoes/homologacoes.module';
+import { PainelSqdModule } from './sqd/painel/painel-sqd.module';
 
 // Pasta com o frontend ja compilado (usada no pacote portatil, onde o proprio
 // backend serve as telas numa unica porta). No modo Docker/dev o nginx serve o
@@ -60,6 +62,8 @@ const servirFrontend = existsSync(frontendDir);
     CnqModule,
     OitoDModule,
     PainelManufaturaModule,
+    HomologacoesModule,
+    PainelSqdModule,
   ],
 })
 export class AppModule {}

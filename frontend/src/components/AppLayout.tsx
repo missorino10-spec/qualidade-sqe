@@ -21,16 +21,6 @@ import { useAuth } from '../auth';
 
 const { Header, Sider, Content } = Layout;
 
-// Placeholder dos modulos ainda nao construidos. A key precisa ser unica por
-// grupo, senao o antd trata os dois itens como o mesmo no de menu.
-const emDesenvolvimento = (grupo: string): ItemMenu[] => [
-  {
-    key: `em-desenvolvimento-${grupo}`,
-    label: 'EM DESENVOLVIMENTO',
-    disabled: true,
-  },
-];
-
 type ItemMenu = {
   key: string;
   label: string;
@@ -89,7 +79,14 @@ const itensMenu: {
     key: 'sqd',
     icon: <SafetyCertificateOutlined />,
     label: 'QUALIDADE - SQD',
-    children: emDesenvolvimento('sqd'),
+    children: [
+      { key: '/sqd', icon: <DashboardOutlined />, label: 'Painel' },
+      {
+        key: '/sqd/homologacoes',
+        icon: <SafetyCertificateOutlined />,
+        label: 'Homologação de Fornecedores',
+      },
+    ],
   },
 ];
 

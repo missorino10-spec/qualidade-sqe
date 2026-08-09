@@ -3,6 +3,7 @@
 // Schema do banco de dados (PostgreSQL)
 // Nucleo compartilhado + Modulo SQE (recebimento de fornecedores)
 //                      + Modulo MANUFATURA (setup, producao, CNQ, 8D)
+//                      + Modulo SQD (homologacao de fornecedores e itens)
 // ============================================================
 
 generator client {
@@ -10,8 +11,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   // DIRECT_URL: conexao direta (porta 5432), usada SOMENTE para criar/alterar
   // tabelas. A DATABASE_URL aponta para o pooler em modo transaction (6543),
   // otimo para a aplicacao mas incapaz de executar DDL e advisory locks.
@@ -44,12 +45,15 @@ model Usuario {
   historicos      HistoricoStatus[]
 
   // Manufatura
-  inspecoesManufatura InspecaoManufatura[]  @relation("InspManufaturaInspetor")
+  inspecoesManufatura    InspecaoManufatura[]   @relation("InspManufaturaInspetor")
   relatoriosDimensionais RelatorioDimensional[] @relation("RelatorioInspetor")
-  producaoRegistrada  ProducaoDiaria[]      @relation("ProducaoRegistradaPor")
-  cnqs                Cnq[]                 @relation("CnqCriadoPor")
-  oitoDsCriados       OitoD[]               @relation("OitoDCriadoPor")
-  oitoDsAprovados     OitoD[]               @relation("OitoDAprovadoPor")
+  producaoRegistrada     ProducaoDiaria[]       @relation("ProducaoRegistradaPor")
+  cnqs                   Cnq[]                  @relation("CnqCriadoPor")
+  oitoDsCriados          OitoD[]                @relation("OitoDCriadoPor")
+  oitoDsAprovados        OitoD[]                @relation("OitoDAprovadoPor")
+
+  // SQD
+  homologacoes HomologacaoFornecedor[] @relation("HomologacaoCriadoPor")
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
@@ -67,8 +71,8 @@ enum EsforcoQualidade {
 }
 
 model Fornecedor {
-  id     Int    @id @default(autoincrement())
-  codigo String @unique
+  id     Int     @id @default(autoincrement())
+  codigo String  @unique
   nome   String
   cnpj   String?
 
@@ -88,17 +92,17 @@ model Fornecedor {
   // Cadastro pontual (ex: importacao) feito na hora de uma inspecao extra.
   // Fica FORA do plano de periodicidade, mas os desvios contam nos indicadores.
   // Quando um dia for homologado, basta desmarcar - o cadastro ja existe.
-  eventual Boolean @default(false)
+  eventual                  Boolean       @default(false)
   // Escopo de inspeicao: quais formularios o sistema deve abrir
-  fazVisual Boolean @default(true)
-  fazLote   Boolean @default(false)
+  fazVisual                 Boolean       @default(true)
+  fazLote                   Boolean       @default(false)
 
   // Contadores
-  contadorEntregas    Int @default(0) // ciclico: zera quando dispara inspecao
-  totalEntregas       Int @default(0) // acumulado historico (dashboard)
-  totalInspecoes      Int @default(0) // acumulado historico (dashboard)
-  lotesInspecionados  Int @default(0) // trimestre corrente
-  lotesReprovados     Int @default(0) // trimestre corrente
+  contadorEntregas   Int @default(0) // ciclico: zera quando dispara inspecao
+  totalEntregas      Int @default(0) // acumulado historico (dashboard)
+  totalInspecoes     Int @default(0) // acumulado historico (dashboard)
+  lotesInspecionados Int @default(0) // trimestre corrente
+  lotesReprovados    Int @default(0) // trimestre corrente
 
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -144,18 +148,18 @@ model Item {
 
 // Tabela de referencia de periodicidade por classificacao (pre-setada e editavel)
 model PeriodicidadeConfig {
-  id                Int           @id @default(autoincrement())
-  classificacao     Classificacao @unique
-  periodicidadeTexto String       // ex: "1 a cada 5 entregas"
-  frequenciaN       Int           // 5, 3, 1
-  tipoInspecao      String        @default("Amostragem")
-  nivelInspecaoTexto String       // ex: "Inspecao Reduzida (30% itens)"
-  nivelRomano       String        // I, II, III
-  percentualAmostra Int           // 30, 50, 100
-  nqa               Float         // 4.0, 2.5, 1.0
+  id                 Int           @id @default(autoincrement())
+  classificacao      Classificacao @unique
+  periodicidadeTexto String // ex: "1 a cada 5 entregas"
+  frequenciaN        Int // 5, 3, 1
+  tipoInspecao       String        @default("Amostragem")
+  nivelInspecaoTexto String // ex: "Inspecao Reduzida (30% itens)"
+  nivelRomano        String // I, II, III
+  percentualAmostra  Int // 30, 50, 100
+  nqa                Float // 4.0, 2.5, 1.0
   // bandas de conformidade para reclassificacao
-  conformidadeMin   Float         // A>=98, B>=90, C>=80, D>=0
-  updatedAt         DateTime      @updatedAt
+  conformidadeMin    Float // A>=98, B>=90, C>=80, D>=0
+  updatedAt          DateTime      @updatedAt
 }
 
 // Anexo polimorfico: serve para qualquer entidade (Inspecao, RNC, modulos futuros)
@@ -191,18 +195,18 @@ model HistoricoStatus {
 
 // Historico de classificacao por trimestre fiscal (out->set)
 model HistoricoClassificacao {
-  id                    Int           @id @default(autoincrement())
-  fornecedorId          Int
-  fornecedor            Fornecedor    @relation(fields: [fornecedorId], references: [id])
-  trimestreFiscal       String        // ex: "FY26-Q3"
-  periodoInicio         DateTime
-  periodoFim            DateTime
-  classificacaoInicial  Classificacao // classificacao de fornecimento do periodo
-  lotesInspecionados    Int
-  lotesReprovados       Int
-  pctConformidade       Float
-  classificacaoApurada  Classificacao // calculada pela conformidade
-  createdAt             DateTime      @default(now())
+  id                   Int           @id @default(autoincrement())
+  fornecedorId         Int
+  fornecedor           Fornecedor    @relation(fields: [fornecedorId], references: [id])
+  trimestreFiscal      String // ex: "FY26-Q3"
+  periodoInicio        DateTime
+  periodoFim           DateTime
+  classificacaoInicial Classificacao // classificacao de fornecimento do periodo
+  lotesInspecionados   Int
+  lotesReprovados      Int
+  pctConformidade      Float
+  classificacaoApurada Classificacao // calculada pela conformidade
+  createdAt            DateTime      @default(now())
 
   @@index([fornecedorId])
 }
@@ -235,35 +239,35 @@ model PlanejamentoSemanal {
 // Lote do mesmo recebimento sao a MESMA inspecao, contam como uma so e
 // compartilham uma unica RNC.
 model EntregaPortaria {
-  id              Int                  @id @default(autoincrement())
-  planejamentoId  Int?
-  planejamento    PlanejamentoSemanal? @relation(fields: [planejamentoId], references: [id])
-  fornecedorId    Int
-  fornecedor      Fornecedor           @relation(fields: [fornecedorId], references: [id])
-  itemId          Int?
-  item            Item?                @relation(fields: [itemId], references: [id])
-  dataEntrega     DateTime             @default(now())
-  semanaReferencia String?             // W do recebimento (domingo->sabado)
-  semana          String?              // semana no formato W## (ex: W28)
-  ano             Int?                 // ano do recebimento
-  notaFiscal      String?
-  po              String?
-  quantidade      Float?
+  id                     Int                  @id @default(autoincrement())
+  planejamentoId         Int?
+  planejamento           PlanejamentoSemanal? @relation(fields: [planejamentoId], references: [id])
+  fornecedorId           Int
+  fornecedor             Fornecedor           @relation(fields: [fornecedorId], references: [id])
+  itemId                 Int?
+  item                   Item?                @relation(fields: [itemId], references: [id])
+  dataEntrega            DateTime             @default(now())
+  semanaReferencia       String? // W do recebimento (domingo->sabado)
+  semana                 String? // semana no formato W## (ex: W28)
+  ano                    Int? // ano do recebimento
+  notaFiscal             String?
+  po                     String?
+  quantidade             Float?
   // Decisao automatica de inspecao
-  numeroEntregaAcumulado Int?          // valor do contador no momento
-  passivelInspecao       Boolean       @default(false) // sistema decidiu inspecionar?
+  numeroEntregaAcumulado Int? // valor do contador no momento
+  passivelInspecao       Boolean              @default(false) // sistema decidiu inspecionar?
 
   // Identificacao da inspecao (nula enquanto o recebimento nao for inspecionado)
-  numeroInspecao     String? @unique   // formato INSP0001/2026
-  inspecaoAno        Int?              // ano da inspecao (sequencial reinicia por ano)
-  inspecaoSequencial Int?              // sequencial dentro do ano
+  numeroInspecao     String? @unique // formato INSP0001/2026
+  inspecaoAno        Int? // ano da inspecao (sequencial reinicia por ano)
+  inspecaoSequencial Int? // sequencial dentro do ano
   // Inspecao fora do ciclo de periodicidade: fornecedor eventual OU fornecedor
   // da base inspecionado dentro da janela em que o sistema nao sugeriria.
   inspecaoExtra      Boolean @default(false)
 
   confirmadoPorId Int?
-  confirmadoPor   Usuario?             @relation("EntregaConfirmadoPor", fields: [confirmadoPorId], references: [id])
-  createdAt       DateTime             @default(now())
+  confirmadoPor   Usuario? @relation("EntregaConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  createdAt       DateTime @default(now())
 
   inspecoesVisual InspecaoVisual[]
   inspecoesLote   InspecaoLote[]
@@ -311,14 +315,14 @@ model InspecaoVisual {
   // Checklist (12 grupos) - JSON: [{ grupo, itens: [{ texto, status }] }]
   checklist Json
 
-  observacoes String?
-  resultado   ResultadoInspecao @default(APROVADO)
-  dataInspecao DateTime         @default(now())
-  semana       String?          // semana da inspecao no formato W## (ex: W28)
-  ano          Int?             // ano da inspecao
+  observacoes  String?
+  resultado    ResultadoInspecao @default(APROVADO)
+  dataInspecao DateTime          @default(now())
+  semana       String? // semana da inspecao no formato W## (ex: W28)
+  ano          Int? // ano da inspecao
   inspetorId   Int?
-  inspetor     Usuario?         @relation("InspVisualInspetor", fields: [inspetorId], references: [id])
-  createdAt    DateTime         @default(now())
+  inspetor     Usuario?          @relation("InspVisualInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime          @default(now())
 
   rncs Rnc[]
 }
@@ -346,14 +350,14 @@ model InspecaoLote {
   // Tabela de cotas - JSON: [{ localizacao, especificado, tolUpper, tolLower, pecas:[..], instrumento, desvioMin, desvioMax }]
   cotas Json
 
-  observacoes String?
-  resultado   ResultadoInspecao @default(APROVADO)
-  dataInspecao DateTime         @default(now())
-  semana       String?          // semana da inspecao no formato W## (ex: W28)
-  ano          Int?             // ano da inspecao
+  observacoes  String?
+  resultado    ResultadoInspecao @default(APROVADO)
+  dataInspecao DateTime          @default(now())
+  semana       String? // semana da inspecao no formato W## (ex: W28)
+  ano          Int? // ano da inspecao
   inspetorId   Int?
-  inspetor     Usuario?         @relation("InspLoteInspetor", fields: [inspetorId], references: [id])
-  createdAt    DateTime         @default(now())
+  inspetor     Usuario?          @relation("InspLoteInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime          @default(now())
 
   rncs Rnc[]
 }
@@ -380,9 +384,9 @@ enum NivelPlano {
 }
 
 model Rnc {
-  id     Int    @id @default(autoincrement())
-  numero String @unique // formato RNC0001/2026
-  ano    Int    // ano da RNC (para gerar sequencial por ano)
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // formato RNC0001/2026
+  ano        Int // ano da RNC (para gerar sequencial por ano)
   sequencial Int // sequencial dentro do ano
 
   // origem (inspecao reprovada). A entrega e a inspecao a que a RNC pertence:
@@ -391,48 +395,48 @@ model Rnc {
   entregaId        Int?
   entrega          EntregaPortaria? @relation(fields: [entregaId], references: [id])
   inspecaoVisualId Int?
-  inspecaoVisual   InspecaoVisual? @relation(fields: [inspecaoVisualId], references: [id])
+  inspecaoVisual   InspecaoVisual?  @relation(fields: [inspecaoVisualId], references: [id])
   inspecaoLoteId   Int?
-  inspecaoLote     InspecaoLote?   @relation(fields: [inspecaoLoteId], references: [id])
+  inspecaoLote     InspecaoLote?    @relation(fields: [inspecaoLoteId], references: [id])
 
   // Informacoes do documento
   dataAbertura DateTime @default(now())
-  semana       String?  // semana da abertura no formato W## (ex: W28)
+  semana       String? // semana da abertura no formato W## (ex: W28)
   solicitante  String   @default("Qualidade")
 
   // Informacoes do item
-  itemId       Int
-  item         Item       @relation(fields: [itemId], references: [id])
+  itemId         Int
+  item           Item    @relation(fields: [itemId], references: [id])
   quantidadeLote Float?
-  po           String?
-  notaFiscal   String?
+  po             String?
+  notaFiscal     String?
 
   // Informacoes do fornecedor
   fornecedorId Int
   fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id])
 
   // Informacoes sobre o desvio
-  tipoDesvio      String  // texto livre
+  tipoDesvio      String // texto livre
   reincidencia    Boolean @default(false)
   descricaoDesvio String
 
   // Custos RNC
   quantidadePecas Float?
   valorUnitario   Float?
-  valorTotal      Float?  // = quantidadePecas * valorUnitario
+  valorTotal      Float? // = quantidadePecas * valorUnitario
 
   // Plano de acao
-  disposicao         String? // texto livre
-  houveRetorno       Boolean?
-  dataRetorno        DateTime?
-  tempoRetornoDias   Int?     // = dataRetorno - dataAbertura
-  fornecedorAceitou  String?  // "Sim" / "Nao (Ver observacoes)"
+  disposicao            String? // texto livre
+  houveRetorno          Boolean?
+  dataRetorno           DateTime?
+  tempoRetornoDias      Int? // = dataRetorno - dataAbertura
+  fornecedorAceitou     String? // "Sim" / "Nao (Ver observacoes)"
   fornecedorEnviouPlano Boolean?
-  nivelPlano         NivelPlano?
-  status             StatusRnc @default(EM_ANDAMENTO)
-  motivoCancelamento String?  // motivo quando status = CANCELADA
-  verificacaoEficacia VerificacaoEficacia @default(PENDENTE)
-  dataVerificacao    DateTime?
+  nivelPlano            NivelPlano?
+  status                StatusRnc           @default(EM_ANDAMENTO)
+  motivoCancelamento    String? // motivo quando status = CANCELADA
+  verificacaoEficacia   VerificacaoEficacia @default(PENDENTE)
+  dataVerificacao       DateTime?
 
   evidencias  String?
   observacoes String?
@@ -488,12 +492,12 @@ model Maquina {
 // Apontamento diario que os operadores entregam em papel e a Qualidade digita.
 // E a base do PPM: (qtdDefeito / qtdProduzida) * 1.000.000.
 model ProducaoDiaria {
-  id        Int      @id @default(autoincrement())
-  maquinaId Int
-  maquina   Maquina  @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
-  data      DateTime @db.Date
-  qtdProduzida Float @default(0)
-  qtdDefeito   Float @default(0)
+  id           Int      @id @default(autoincrement())
+  maquinaId    Int
+  maquina      Maquina  @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
+  data         DateTime @db.Date
+  qtdProduzida Float    @default(0)
+  qtdDefeito   Float    @default(0)
 
   registradoPorId Int?
   registradoPor   Usuario? @relation("ProducaoRegistradaPor", fields: [registradoPorId], references: [id])
@@ -506,10 +510,10 @@ model ProducaoDiaria {
 // Lista oficial de "Descricao do Defeito" (aba Defeitos e CNQ). Cadastravel
 // para a Qualidade ajustar sem depender de deploy.
 model TipoDefeito {
-  id     Int     @id @default(autoincrement())
-  nome   String  @unique
-  ordem  Int     @default(0)
-  ativo  Boolean @default(true)
+  id    Int     @id @default(autoincrement())
+  nome  String  @unique
+  ordem Int     @default(0)
+  ativo Boolean @default(true)
 
   cnqs Cnq[]
 }
@@ -553,8 +557,8 @@ model InspecaoManufatura {
 
   // Inspecao de producao pode referenciar o setup que a antecedeu (opcional,
   // so como rastreabilidade - nao altera status nem indicador).
-  setupId Int?
-  setup   InspecaoManufatura?  @relation("ProducaoDoSetup", fields: [setupId], references: [id])
+  setupId   Int?
+  setup     InspecaoManufatura?  @relation("ProducaoDoSetup", fields: [setupId], references: [id])
   producoes InspecaoManufatura[] @relation("ProducaoDoSetup")
 
   // Producao inspecionada antes de o contador de setups atingir o N da maquina.
@@ -586,10 +590,10 @@ model RelatorioDimensional {
   // tipo repetido aqui (e nao so na inspecao-mae) para que a numeracao
   // SET/PROD possa ter unicidade garantida pelo banco.
   tipo       TipoInspecaoManufatura
-  numero     String @unique
+  numero     String                 @unique
   ano        Int
   sequencial Int
-  tentativa  Int    @default(1)
+  tentativa  Int                    @default(1)
 
   // "Rev." do proprio relatorio, preenchido a mao (comeca em 01)
   revisao String @default("01")
@@ -598,10 +602,10 @@ model RelatorioDimensional {
   origem       OrigemInspecao @default(LIBERACAO_SETUP)
   origemOutros String? // texto do campo "Outros:"
 
-  itemCodigo    String?
-  itemDescricao String?
-  desenhoRev    String?
-  po            String?
+  itemCodigo      String?
+  itemDescricao   String?
+  desenhoRev      String?
+  po              String?
   qtdInspecionada Float?
   qtdTotal        Float?
 
@@ -699,19 +703,19 @@ model OitoD {
   cnq        Cnq?                @relation(fields: [cnqId], references: [id])
 
   // 1. Dados / cabecalho
-  empresaUnidade   String      @default("Big Dutchman Brasil")
-  dataAbertura     DateTime    @default(now())
-  status           StatusOitoD @default(AGUARDANDO)
-  produtoItem      String?
-  codigoDesenho    String?
-  origem           OrigemOitoD @default(PRODUCAO)
-  local            String?
-  processoOperacao String?
-  equipamento      String?
-  turno            TurnoManufatura @default(COMERCIAL)
-  qtdAfetada       String?
-  responsavel      String?
-  equipe           String?
+  empresaUnidade    String          @default("Big Dutchman Brasil")
+  dataAbertura      DateTime        @default(now())
+  status            StatusOitoD     @default(AGUARDANDO)
+  produtoItem       String?
+  codigoDesenho     String?
+  origem            OrigemOitoD     @default(PRODUCAO)
+  local             String?
+  processoOperacao  String?
+  equipamento       String?
+  turno             TurnoManufatura @default(COMERCIAL)
+  qtdAfetada        String?
+  responsavel       String?
+  equipe            String?
   descricaoProblema String?
 
   // 2. Analise de causa raiz
@@ -741,10 +745,10 @@ model OitoD {
 
   // Aprovacoes: so a Qualidade aprova no sistema (com registro de quem e
   // quando). O campo da Producao continua no PDF, identico ao papel.
-  aprovadoPorId       Int?
-  aprovadoPor         Usuario?  @relation("OitoDAprovadoPor", fields: [aprovadoPorId], references: [id])
-  aprovadoEm          DateTime?
-  aprovacaoProducao   String?
+  aprovadoPorId     Int?
+  aprovadoPor       Usuario?  @relation("OitoDAprovadoPor", fields: [aprovadoPorId], references: [id])
+  aprovadoEm        DateTime?
+  aprovacaoProducao String?
 
   criadoPorId Int?
   criadoPor   Usuario? @relation("OitoDCriadoPor", fields: [criadoPorId], references: [id])
@@ -777,4 +781,96 @@ model HistoricoMaquina {
   createdAt DateTime @default(now())
 
   @@index([maquinaId])
+}
+
+// ---------------------- MODULO SQD ----------------------
+// Homologacao de fornecedores: a autoavaliacao (self audit) do documento
+// BDBR.QUA.FMR.024.03 e o controle do BDBR.QUA.FMR.029.01 sao o MESMO
+// registro, aberto pelo mesmo numero (AUT0001/2026).
+
+enum ResultadoHomologacao {
+  APROVADO
+  APROVADO_CONDICIONALMENTE
+  REPROVADO
+}
+
+enum StatusHomologacao {
+  EM_ANDAMENTO
+  FINALIZADO
+  CANCELADO
+}
+
+enum StatusPlanoAcaoSqd {
+  EM_ANDAMENTO
+  FINALIZADO
+  CANCELADO
+  NAO_APLICAVEL
+}
+
+// Criterios de efetividade descritos na aba "Base de Dados" do FMR.029.01
+enum EfetividadePlanoAcao {
+  NAO_APLICAVEL_CANCELADO
+  NAO_IMPLEMENTADO_ATRASADO
+  EFETIVO
+  PARCIALMENTE_EFETIVO
+  INEFICAZ
+}
+
+enum SolicitanteSqd {
+  COMPRAS
+  ENGENHARIA
+  NC
+}
+
+model HomologacaoFornecedor {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // AUT0001/2026
+  ano        Int
+  sequencial Int
+  semana     String // W28 - mesma regra de semana do SQE e da Manufatura
+
+  // --- Cabecalho da autoavaliacao (FMR.024.03, pagina 01 de 03) ---
+  fornecedorNome    String
+  cnpj              String?
+  inscricaoEstadual String?
+  responsavelInfo   String?
+  setor             String?
+  dataAvaliacao     DateTime
+
+  // Respostas do fornecedor: [{ codigo: "A1", resposta: "SIM"|"NAO"|"NA" }]
+  respostas Json
+
+  // Resultado calculado (abas "Criterios" e "Resultados"):
+  // [{ bloco, nome, peso, pontuacao, ponderada, critico, reprovadas: [...] }]
+  blocos    Json
+  nota      Float // nota ponderada final, 0 a 100
+  resultado ResultadoHomologacao
+
+  // --- Registro de homologacao (FMR.029.01, aba "2026") ---
+  codigoFornecedor       String?
+  solicitante            SolicitanteSqd?
+  segmento               String?
+  escopoFornecedor       String?
+  processosTerceirizados String?
+  dataSolicitacao        DateTime?
+  dataEnvioRelatorio     DateTime?
+  leadTimeDiasUteis      Int? // calculado: dias uteis entre solicitacao e envio
+  statusHomologacao      StatusHomologacao     @default(EM_ANDAMENTO)
+  statusPlanoAcao        StatusPlanoAcaoSqd?
+  dataReavaliacao        DateTime?
+  efetividadePlanoAcao   EfetividadePlanoAcao?
+  acao                   String?
+  observacoes            String?
+
+  // Anexos (tabela polimorfica Anexo):
+  //   "HOMOLOGACAO_RELATORIO"   - relatorio final escrito pela Qualidade
+  //   "HOMOLOGACAO_PLANO_ACAO"  - plano de acao enviado pelo fornecedor
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("HomologacaoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ano, sequencial])
+  @@index([dataAvaliacao])
 }
