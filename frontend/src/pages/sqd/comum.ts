@@ -45,6 +45,19 @@ export const labelSolicitante: Record<string, string> = {
   NC: 'N/C',
 };
 
+// Lista de validacao da coluna "Ação" do FMR.029.01 (mesmos codigos do backend,
+// em sqd-utils.ts). No banco fica o codigo; aqui, o texto da planilha.
+export const labelAcao: Record<string, string> = {
+  FORNECEDOR_NOTIFICADO_DECISAO:
+    'Fornecedor notificado sobre decisão; Aguardando retorno.',
+  FORNECEDOR_NOTIFICADO_APROVACAO: 'Fornecedor notificado sobre aprovação.',
+  ACAO_INTERNA_NECESSARIA:
+    'Ação interna necessária; Aguardando retorno do setor responsável.',
+  AGUARDANDO_DOCUMENTOS: 'Aguardando envio dos documentos para análise.',
+  RELATORIO_SUBMETIDO_COMPRAS:
+    'Relatório submetido a compras; Aguardando definição.',
+};
+
 export const labelResposta: Record<string, string> = {
   SIM: 'Sim',
   NAO: 'Não',

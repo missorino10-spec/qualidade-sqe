@@ -20,10 +20,13 @@ import {
 } from 'antd';
 import {
   ArrowLeftOutlined,
+  CheckCircleOutlined,
   DeleteOutlined,
   EditOutlined,
   FileTextOutlined,
+  FilePdfOutlined,
   FormOutlined,
+  UndoOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +43,7 @@ import {
 import {
   corResultado,
   corStatusHomologacao,
+  labelAcao,
   labelEfetividade,
   labelResposta,
   labelResultado,
@@ -181,7 +185,36 @@ export default function HomologacaoDetalhe() {
       setRegistroOpen(false);
       invalidar();
     },
-    onError: () => message.error('Não foi possível salvar o registro.'),
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível salvar o registro.',
+      ),
+  });
+
+  // A trava do ciclo mora aqui, fora do salvar: o registro pode ser editado a
+  // qualquer momento; encerrar e que exige tudo no lugar.
+  const finalizar = useMutation({
+    mutationFn: async () => api.post(`/sqd/homologacoes/${id}/finalizar`),
+    onSuccess: () => {
+      message.success('Homologação finalizada.');
+      invalidar();
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível finalizar a homologação.',
+      ),
+  });
+
+  const reabrir = useMutation({
+    mutationFn: async () => api.post(`/sqd/homologacoes/${id}/reabrir`),
+    onSuccess: () => {
+      message.success('Homologação reaberta.');
+      invalidar();
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível reabrir a homologação.',
+      ),
   });
 
   // A autoavaliacao tem rota propria: e ela que calcula a nota, o resultado e o
@@ -224,6 +257,7 @@ export default function HomologacaoDetalhe() {
   const avaliado = !!h.resultado;
   const aguardando = !avaliado && h.statusHomologacao === 'EM_ANDAMENTO';
   const pendencias: string[] = h.pendenciasFinalizacao ?? [];
+  const finalizado = h.statusHomologacao === 'FINALIZADO';
 
   function abrirRegistro() {
     formRegistro.setFieldsValue({
@@ -284,8 +318,25 @@ export default function HomologacaoDetalhe() {
             {labelStatusHomologacao[h.statusHomologacao]}
           </Tag>
         </Space>
-        {podeEditar && (
-          <Space wrap>
+        <Space wrap>
+          <Button
+            icon={<FilePdfOutlined />}
+            onClick={() => abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/pdf`)}
+          >
+            PDF do registro
+          </Button>
+          {avaliado && (
+            <Button
+              icon={<FilePdfOutlined />}
+              onClick={() =>
+                abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/autoavaliacao/pdf`)
+              }
+            >
+              PDF da autoavaliação
+            </Button>
+          )}
+          {podeEditar && (
+            <>
             <Button
               type={avaliado ? 'default' : 'primary'}
               icon={<FormOutlined />}
@@ -296,12 +347,41 @@ export default function HomologacaoDetalhe() {
                 : 'Lançar autoavaliação do fornecedor'}
             </Button>
             <Button
-              type={avaliado ? 'primary' : 'default'}
               icon={<EditOutlined />}
               onClick={abrirRegistro}
             >
               Editar registro
             </Button>
+            {/* A trava do ciclo: salvar o registro nunca e bloqueado, mas
+                encerrar so passa com tudo o que a planilha pede. */}
+            {finalizado ? (
+              <Button
+                icon={<UndoOutlined />}
+                loading={reabrir.isPending}
+                onClick={() =>
+                  Modal.confirm({
+                    title: `Reabrir a homologação ${h.numero}?`,
+                    content:
+                      'A data de finalização e o tempo total do ciclo serão apagados, e o registro volta para "Em andamento".',
+                    okText: 'Reabrir',
+                    cancelText: 'Cancelar',
+                    onOk: () => reabrir.mutateAsync(),
+                  })
+                }
+              >
+                Reabrir homologação
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                loading={finalizar.isPending}
+                disabled={h.statusHomologacao === 'CANCELADO'}
+                onClick={() => finalizar.mutate()}
+              >
+                Finalizar homologação
+              </Button>
+            )}
             <Button
               icon={<DeleteOutlined />}
               danger
@@ -320,8 +400,9 @@ export default function HomologacaoDetalhe() {
             >
               Excluir
             </Button>
-          </Space>
-        )}
+            </>
+          )}
+        </Space>
       </Row>
 
       {aguardando && (
@@ -649,7 +730,9 @@ export default function HomologacaoDetalhe() {
                   ? labelEfetividade[h.efetividadePlanoAcao]
                   : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Ação">{h.acao ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="Ação">
+                {h.acao ? labelAcao[h.acao] ?? h.acao : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="Observações">
                 {h.observacoes ?? '-'}
               </Descriptions.Item>
@@ -744,9 +827,14 @@ export default function HomologacaoDetalhe() {
               <Form.Item
                 name="statusHomologacao"
                 label="Status da homologação"
-                extra="Só é possível finalizar depois de fechar o ciclo: autoavaliação lançada, relatório final anexado, ação preenchida e plano de ação resolvido."
+                extra='Para encerrar, use o botão "Finalizar homologação" — ele confere se o ciclo está completo.'
               >
-                <Select options={opcoes(labelStatusHomologacao)} />
+                <Select
+                  options={opcoes(labelStatusHomologacao).map((o) => ({
+                    ...o,
+                    disabled: o.value === 'FINALIZADO',
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -768,8 +856,12 @@ export default function HomologacaoDetalhe() {
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Form.Item name="acao" label="Ação">
-                <Input.TextArea rows={2} />
+              <Form.Item
+                name="acao"
+                label="Ação"
+                extra="Lista de validação da coluna “Ação” do FMR.029.01."
+              >
+                <Select options={opcoes(labelAcao)} />
               </Form.Item>
             </Col>
             <Col span={24}>

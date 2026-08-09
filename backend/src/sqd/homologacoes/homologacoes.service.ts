@@ -78,7 +78,13 @@ export class HomologacoesService {
   }
 
   // O ciclo so fecha quando a homologacao esta completa: fornecedor avaliado,
-  // relatorio final anexado, acao registrada e plano de acao resolvido.
+  // relatorio final anexado e acao registrada.
+  //
+  // O plano de acao so e cobrado no aprovado condicionalmente, que e o unico
+  // caso em que a homologacao depende do fornecedor corrigir alguma coisa. No
+  // aprovado ele e opcional (entra se o fornecedor mandar alguma melhoria) e no
+  // reprovado a conclusao e a recomendacao de troca, entao o registro precisa
+  // poder ser encerrado sem plano nenhum.
   private async pendenciasFinalizacao(h: {
     id: number;
     resultado: string | null;
@@ -100,15 +106,20 @@ export class HomologacoesService {
     if (!tem(TIPO_ANEXO_RELATORIO)) faltas.push('o relatório final anexado');
     if (!h.acao?.trim()) faltas.push('o campo Ação preenchido');
 
-    if (
-      h.statusPlanoAcao !== 'FINALIZADO' &&
-      h.statusPlanoAcao !== 'NAO_APLICAVEL'
-    ) {
-      faltas.push(
-        'o plano de ação em "Finalizado" ou marcado como "Não aplicável"',
-      );
-    } else if (h.statusPlanoAcao === 'FINALIZADO' && !tem(TIPO_ANEXO_PLANO_ACAO)) {
-      faltas.push('o plano de ação do fornecedor anexado');
+    if (h.resultado === 'APROVADO_CONDICIONALMENTE') {
+      if (
+        h.statusPlanoAcao !== 'FINALIZADO' &&
+        h.statusPlanoAcao !== 'NAO_APLICAVEL'
+      ) {
+        faltas.push(
+          'o plano de ação em "Finalizado" ou marcado como "Não aplicável"',
+        );
+      } else if (
+        h.statusPlanoAcao === 'FINALIZADO' &&
+        !tem(TIPO_ANEXO_PLANO_ACAO)
+      ) {
+        faltas.push('o plano de ação do fornecedor anexado');
+      }
     }
     return faltas;
   }
@@ -229,28 +240,12 @@ export class HomologacoesService {
         ? dataPura(dto.dataRetornoFornecedor)
         : atual.dataRetornoFornecedor;
 
-    // O status da homologacao e o do resultado sao coisas diferentes: o ciclo
-    // so pode ser fechado depois que tudo o que a planilha pede esta no lugar.
+    // Editar o registro nunca e bloqueado: a Qualidade preenche o que tem, no
+    // ritmo que consegue. Quem fecha (e cobra o que falta) e a rota finalizar.
+    // Por isso o status daqui so vai ate "Em andamento" / "Cancelado".
     const status = dto.statusHomologacao ?? atual.statusHomologacao;
-    const fechando = status === 'FINALIZADO';
-    if (fechando) {
-      const faltas = await this.pendenciasFinalizacao({
-        id,
-        resultado: dto.resultado ?? atual.resultado,
-        acao: dto.acao !== undefined ? dto.acao : atual.acao,
-        statusPlanoAcao: dto.statusPlanoAcao ?? atual.statusPlanoAcao,
-      });
-      if (faltas.length) {
-        throw new BadRequestException(
-          `Ainda falta ${faltas.join(', ')} para finalizar a homologação.`,
-        );
-      }
-    }
-
-    // Carimbo do fechamento: entra quando o ciclo fecha e sai se for reaberto.
-    const dataFinalizacao = fechando
-      ? (atual.dataFinalizacao ?? new Date())
-      : null;
+    const dataFinalizacao =
+      status === 'FINALIZADO' ? atual.dataFinalizacao : null;
 
     await this.prisma.homologacaoFornecedor.update({
       where: { id },
@@ -285,6 +280,55 @@ export class HomologacoesService {
         efetividadePlanoAcao: dto.efetividadePlanoAcao ?? undefined,
         acao: dto.acao ?? undefined,
         observacoes: dto.observacoes ?? undefined,
+      },
+    });
+    return this.detalhe(id);
+  }
+
+  // Encerramento do ciclo. E aqui que mora a trava: se faltar alguma frente, a
+  // homologacao nao fecha e a mensagem diz o que falta.
+  async finalizar(id: number) {
+    const atual = await this.prisma.homologacaoFornecedor.findUnique({
+      where: { id },
+    });
+    if (!atual) throw new NotFoundException('Homologação não encontrada');
+    if (atual.statusHomologacao === 'CANCELADO') {
+      throw new BadRequestException(
+        'Esta homologação está cancelada. Reabra o registro antes de finalizar.',
+      );
+    }
+
+    const faltas = await this.pendenciasFinalizacao(atual);
+    if (faltas.length) {
+      throw new BadRequestException(
+        `Ainda falta ${faltas.join(', ')} para finalizar a homologação.`,
+      );
+    }
+
+    const dataFinalizacao = atual.dataFinalizacao ?? new Date();
+    await this.prisma.homologacaoFornecedor.update({
+      where: { id },
+      data: {
+        statusHomologacao: 'FINALIZADO',
+        dataFinalizacao,
+        tempoTotalDiasUteis: this.dias(atual.dataSolicitacao, dataFinalizacao),
+      },
+    });
+    return this.detalhe(id);
+  }
+
+  // Reabre um ciclo fechado por engano: o carimbo do fechamento sai junto.
+  async reabrir(id: number) {
+    const atual = await this.prisma.homologacaoFornecedor.findUnique({
+      where: { id },
+    });
+    if (!atual) throw new NotFoundException('Homologação não encontrada');
+    await this.prisma.homologacaoFornecedor.update({
+      where: { id },
+      data: {
+        statusHomologacao: 'EM_ANDAMENTO',
+        dataFinalizacao: null,
+        tempoTotalDiasUteis: null,
       },
     });
     return this.detalhe(id);

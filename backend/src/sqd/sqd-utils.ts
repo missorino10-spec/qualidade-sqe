@@ -472,3 +472,18 @@ export const SLA_HOMOLOGACAO_DIAS = 3;
 // Prazo dado ao fornecedor para devolver a autoavaliacao, contado da abertura
 // do registro (a data da solicitacao e a mesma em que o formulario e enviado).
 export const SLA_RESPOSTA_FORNECEDOR_DIAS = 3;
+
+// Lista de validacao da coluna "Ação" do FMR.029.01. O texto e o da planilha;
+// no banco fica o codigo, para a redacao poder mudar sem mexer nos registros.
+export const ACOES_HOMOLOGACAO: Record<string, string> = {
+  FORNECEDOR_NOTIFICADO_DECISAO:
+    'Fornecedor notificado sobre decisão; Aguardando retorno.',
+  FORNECEDOR_NOTIFICADO_APROVACAO: 'Fornecedor notificado sobre aprovação.',
+  ACAO_INTERNA_NECESSARIA:
+    'Ação interna necessária; Aguardando retorno do setor responsável.',
+  AGUARDANDO_DOCUMENTOS: 'Aguardando envio dos documentos para análise.',
+  RELATORIO_SUBMETIDO_COMPRAS:
+    'Relatório submetido a compras; Aguardando definição.',
+};
+
+export const CODIGOS_ACAO = Object.keys(ACOES_HOMOLOGACAO);

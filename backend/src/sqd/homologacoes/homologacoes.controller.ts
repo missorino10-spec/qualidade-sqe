@@ -8,14 +8,21 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { IsIn, IsObject, IsOptional, IsString } from 'class-validator';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
+import { CODIGOS_ACAO } from '../sqd-utils';
 import { HomologacoesService } from './homologacoes.service';
+import {
+  gerarPdfAutoavaliacao,
+  gerarPdfRegistroHomologacao,
+} from './homologacao-pdf';
 
 // Cabecalho do FMR.024.03 + controle do FMR.029.01. O registro nasce so com o
 // controle; a autoavaliacao entra depois, pela rota /autoavaliacao.
@@ -36,8 +43,10 @@ class HomologacaoDto {
   @IsOptional() @IsString() dataSolicitacao?: string;
   @IsOptional() @IsString() dataEnvioRelatorio?: string;
   @IsOptional() @IsString() dataRetornoFornecedor?: string;
+  // "Finalizado" nao entra por aqui: salvar o registro nunca e bloqueado, quem
+  // fecha o ciclo (e cobra o que falta) e a rota /finalizar.
   @IsOptional()
-  @IsIn(['EM_ANDAMENTO', 'FINALIZADO', 'CANCELADO'])
+  @IsIn(['EM_ANDAMENTO', 'CANCELADO'])
   statusHomologacao?: string;
   @IsOptional()
   @IsIn(['EM_ANDAMENTO', 'FINALIZADO', 'CANCELADO', 'NAO_APLICAVEL'])
@@ -52,7 +61,8 @@ class HomologacaoDto {
     'INEFICAZ',
   ])
   efetividadePlanoAcao?: string;
-  @IsOptional() @IsString() acao?: string;
+  // Lista de validacao da coluna "Ação" da planilha.
+  @IsOptional() @IsIn(CODIGOS_ACAO) acao?: string;
   @IsOptional() @IsString() observacoes?: string;
 }
 
@@ -89,6 +99,34 @@ export class HomologacoesController {
     return this.service.detalhe(id);
   }
 
+  // Registro de Homologação em PDF, para controles internos e evidências.
+  @Get(':id/pdf')
+  async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const h = await this.service.detalhe(id);
+    this.enviarPdf(res, `${h.numero.replace('/', '-')}-registro.pdf`);
+    const doc = gerarPdfRegistroHomologacao(h);
+    doc.pipe(res);
+    doc.end();
+  }
+
+  // Autoavaliação preenchida pelo fornecedor, com a apuração dos 10 blocos.
+  @Get(':id/autoavaliacao/pdf')
+  async pdfAutoavaliacao(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const h = await this.service.detalhe(id);
+    this.enviarPdf(res, `${h.numero.replace('/', '-')}-autoavaliacao.pdf`);
+    const doc = gerarPdfAutoavaliacao(h);
+    doc.pipe(res);
+    doc.end();
+  }
+
+  private enviarPdf(res: Response, nomeArquivo: string) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
+  }
+
   @Roles('QUALIDADE', 'ADMIN')
   @Post()
   criar(@Body() dto: HomologacaoDto, @CurrentUser() user: AuthUser) {
@@ -103,6 +141,19 @@ export class HomologacoesController {
     @Body() dto: AutoavaliacaoDto,
   ) {
     return this.service.lancarAutoavaliacao(id, dto);
+  }
+
+  // Encerramento do ciclo: e aqui que a trava do "Finalizado" e aplicada.
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/finalizar')
+  finalizar(@Param('id', ParseIntPipe) id: number) {
+    return this.service.finalizar(id);
+  }
+
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/reabrir')
+  reabrir(@Param('id', ParseIntPipe) id: number) {
+    return this.service.reabrir(id);
   }
 
   @Roles('QUALIDADE', 'ADMIN')
