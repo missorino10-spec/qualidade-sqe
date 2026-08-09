@@ -1,18 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SLA_HOMOLOGACAO_DIAS } from '../sqd-utils';
+import {
+  SLA_HOMOLOGACAO_DIAS,
+  SLA_RESPOSTA_FORNECEDOR_DIAS,
+} from '../sqd-utils';
+
+// Media com uma casa decimal; devolve 0 quando nao ha o que medir.
+function media(valores: number[]) {
+  if (!valores.length) return 0;
+  return Math.round((valores.reduce((s, v) => s + v, 0) / valores.length) * 10) / 10;
+}
+
+function percentual(parte: number, total: number) {
+  return total ? Math.round((parte / total) * 1000) / 10 : 0;
+}
 
 @Injectable()
 export class PainelSqdService {
   constructor(private prisma: PrismaService) {}
 
   // KPIs do processo SQD (aba "KPI's" do FMR.029.01 + slide do fluxo):
-  // % de aprovacao, lead time medio e % dentro do SLA de 3 dias uteis.
+  // % de aprovacao, lead time medio e % dentro do SLA de 3 dias uteis, mais os
+  // dois relogios novos: a resposta do fornecedor e o tempo total do ciclo.
   async kpis(de?: string, ate?: string) {
     const where =
       de || ate
         ? {
-            dataAvaliacao: {
+            dataSolicitacao: {
               gte: de ? new Date(`${de}T00:00:00.000Z`) : undefined,
               lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
             },
@@ -27,56 +41,60 @@ export class PainelSqdService {
         statusPlanoAcao: true,
         nota: true,
         leadTimeDiasUteis: true,
+        tempoRespostaDiasUteis: true,
+        tempoTotalDiasUteis: true,
       },
     });
 
     const total = homologacoes.length;
-    const aprovados = homologacoes.filter(
-      (h) => h.resultado === 'APROVADO',
-    ).length;
-    const condicionais = homologacoes.filter(
+    // So entram na conta de aprovacao as que ja foram avaliadas.
+    const avaliadas = homologacoes.filter((h) => h.resultado != null);
+    const aprovados = avaliadas.filter((h) => h.resultado === 'APROVADO').length;
+    const condicionais = avaliadas.filter(
       (h) => h.resultado === 'APROVADO_CONDICIONALMENTE',
     ).length;
-    const reprovados = homologacoes.filter(
+    const reprovados = avaliadas.filter(
       (h) => h.resultado === 'REPROVADO',
     ).length;
 
-    // A planilha conta "Aprovado" + "Aprovado Condicionalmente" como aprovacao.
-    const pctAprovacao = total
-      ? Math.round(((aprovados + condicionais) / total) * 1000) / 10
-      : 0;
+    // Lead time da planilha: da solicitacao ate o envio do relatorio.
+    const leadTimes = homologacoes
+      .map((h) => h.leadTimeDiasUteis)
+      .filter((v): v is number => v != null);
+    const noPrazo = leadTimes.filter((v) => v <= SLA_HOMOLOGACAO_DIAS).length;
 
-    const comLeadTime = homologacoes.filter((h) => h.leadTimeDiasUteis != null);
-    const leadTimeMedio = comLeadTime.length
-      ? Math.round(
-          (comLeadTime.reduce((s, h) => s + (h.leadTimeDiasUteis ?? 0), 0) /
-            comLeadTime.length) *
-            10,
-        ) / 10
-      : 0;
-
-    const noPrazo = comLeadTime.filter(
-      (h) => (h.leadTimeDiasUteis ?? 0) <= SLA_HOMOLOGACAO_DIAS,
+    // Resposta do fornecedor: da abertura do registro ate o retorno.
+    const respostas = homologacoes
+      .map((h) => h.tempoRespostaDiasUteis)
+      .filter((v): v is number => v != null);
+    const respondeuNoPrazo = respostas.filter(
+      (v) => v <= SLA_RESPOSTA_FORNECEDOR_DIAS,
     ).length;
-    const pctNoPrazo = comLeadTime.length
-      ? Math.round((noPrazo / comLeadTime.length) * 1000) / 10
-      : 0;
 
-    const notaMedia = total
-      ? Math.round((homologacoes.reduce((s, h) => s + h.nota, 0) / total) * 10) /
-        10
-      : 0;
+    // Ciclo completo: da abertura ate o fechamento da homologacao.
+    const totais = homologacoes
+      .map((h) => h.tempoTotalDiasUteis)
+      .filter((v): v is number => v != null);
 
     return {
       total,
+      avaliadas: avaliadas.length,
+      aguardandoFornecedor: homologacoes.filter(
+        (h) => h.resultado == null && h.statusHomologacao === 'EM_ANDAMENTO',
+      ).length,
       aprovados,
       condicionais,
       reprovados,
-      pctAprovacao,
-      notaMedia,
-      leadTimeMedio,
-      pctNoPrazo,
+      // A planilha conta "Aprovado" + "Aprovado Condicionalmente" como aprovacao.
+      pctAprovacao: percentual(aprovados + condicionais, avaliadas.length),
+      notaMedia: media(avaliadas.map((h) => h.nota ?? 0)),
+      leadTimeMedio: media(leadTimes),
+      pctNoPrazo: percentual(noPrazo, leadTimes.length),
       slaDias: SLA_HOMOLOGACAO_DIAS,
+      tempoRespostaMedio: media(respostas),
+      pctRespostaNoPrazo: percentual(respondeuNoPrazo, respostas.length),
+      slaRespostaDias: SLA_RESPOSTA_FORNECEDOR_DIAS,
+      tempoTotalMedio: media(totais),
       emAndamento: homologacoes.filter(
         (h) => h.statusHomologacao === 'EM_ANDAMENTO',
       ).length,
@@ -101,7 +119,7 @@ export class PainelSqdService {
         id: true,
         numero: true,
         fornecedorNome: true,
-        dataAvaliacao: true,
+        dataSolicitacao: true,
         nota: true,
         resultado: true,
         statusHomologacao: true,

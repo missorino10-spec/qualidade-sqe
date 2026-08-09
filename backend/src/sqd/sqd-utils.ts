@@ -4,9 +4,9 @@
 
 export type RespostaSqd = 'SIM' | 'NAO' | 'NA';
 
-// Numeracao dos documentos do SQD: AUT0001/2026 (autoavaliacao / homologacao).
+// Numeracao dos documentos do SQD: HFOR0001/2026 (homologacao de fornecedor).
 export function numeroSqd(
-  prefixo: 'AUT',
+  prefixo: 'HFOR',
   sequencial: number,
   ano: number,
 ): string {
@@ -445,8 +445,9 @@ export function calcularAutoavaliacao(
   return { blocos, nota, resultado: classificarNota(nota) };
 }
 
-// Lead time em DIAS UTEIS (segunda a sexta) entre a data da solicitacao e a
-// data de envio do relatorio. Mesmo dia = 0; o SLA do processo e de 3 dias.
+// Contagem em DIAS UTEIS (segunda a sexta) entre duas datas. Mesmo dia = 0.
+// Serve para os tres relogios da homologacao: a resposta do fornecedor, o lead
+// time da planilha e o tempo total ate o fechamento.
 export function diasUteisEntre(inicio: Date, fim: Date): number {
   const a = new Date(
     Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate()),
@@ -466,4 +467,8 @@ export function diasUteisEntre(inicio: Date, fim: Date): number {
   return dias;
 }
 
+// Prazo da planilha (aba "KPI's"): da solicitacao ate o envio do relatorio.
 export const SLA_HOMOLOGACAO_DIAS = 3;
+// Prazo dado ao fornecedor para devolver a autoavaliacao, contado da abertura
+// do registro (a data da solicitacao e a mesma em que o formulario e enviado).
+export const SLA_RESPOSTA_FORNECEDOR_DIAS = 3;

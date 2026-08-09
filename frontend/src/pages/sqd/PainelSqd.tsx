@@ -14,6 +14,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FieldTimeOutlined,
+  HourglassOutlined,
   TrophyOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -32,8 +33,9 @@ import {
 const { RangePicker } = DatePicker;
 
 // Painel do SQD. Os indicadores sao os mesmos da aba "KPI's" do
-// BDBR.QUA.FMR.029.01: % de aprovacao de fornecedores, lead time medio em dias
-// uteis e % de homologacoes dentro do prazo (3 dias uteis).
+// BDBR.QUA.FMR.029.01 (% de aprovacao, lead time medio e % dentro do prazo),
+// mais os dois relogios do fluxo: o tempo de resposta do fornecedor e o tempo
+// total ate o fechamento da homologacao.
 export default function PainelSqd() {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState<[Dayjs, Dayjs] | null>(null);
@@ -53,6 +55,7 @@ export default function PainelSqd() {
   });
 
   const sla = kpis?.slaDias ?? 3;
+  const slaResposta = kpis?.slaRespostaDias ?? 3;
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -123,9 +126,58 @@ export default function PainelSqd() {
         </Col>
       </Row>
 
+      {/* Os relogios do fluxo: quanto o fornecedor demora para devolver o
+          formulario e quanto demora o ciclo inteiro ate o fechamento. */}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={8}>
+          <Card>
+            <Statistic
+              title="Resposta do fornecedor (dias úteis)"
+              value={kpis?.tempoRespostaMedio ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={isLoading}
+              prefix={<FieldTimeOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <Card>
+            <Statistic
+              title={`Fornecedores no prazo (até ${slaResposta} dias úteis)`}
+              value={kpis?.pctRespostaNoPrazo ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={isLoading}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <Card>
+            <Statistic
+              title="Tempo total do ciclo (dias úteis)"
+              value={kpis?.tempoTotalMedio ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={isLoading}
+              prefix={<HourglassOutlined />}
+            />
+          </Card>
+        </Col>
+      </Row>
+
       <Row gutter={[16, 16]} align="stretch">
         {[
           { t: 'Homologações registradas', v: kpis?.total },
+          {
+            t: 'Aguardando fornecedor',
+            v: kpis?.aguardandoFornecedor,
+            cor: '#0958d9',
+          },
+          { t: 'Autoavaliações lançadas', v: kpis?.avaliadas },
           { t: 'Aprovados', v: kpis?.aprovados, cor: '#3f8600' },
           {
             t: 'Aprovados condicionalmente',
@@ -178,8 +230,8 @@ export default function PainelSqd() {
           columns={[
             { title: 'Número', dataIndex: 'numero', width: 120 },
             {
-              title: 'Data',
-              dataIndex: 'dataAvaliacao',
+              title: 'Solicitação',
+              dataIndex: 'dataSolicitacao',
               width: 110,
               render: (d: string) => dataBR(d),
             },
@@ -189,15 +241,20 @@ export default function PainelSqd() {
               dataIndex: 'nota',
               width: 90,
               align: 'right',
-              render: (v: number) => <strong>{nota(v)}</strong>,
+              render: (v: number | null) => <strong>{nota(v)}</strong>,
             },
             {
               title: 'Resultado',
               dataIndex: 'resultado',
-              width: 210,
-              render: (r: string) => (
-                <Tag color={corResultado[r]}>{labelResultado[r]}</Tag>
-              ),
+              width: 230,
+              render: (r: string | null, h: any) =>
+                r ? (
+                  <Tag color={corResultado[r]}>{labelResultado[r]}</Tag>
+                ) : h.statusHomologacao === 'CANCELADO' ? (
+                  '-'
+                ) : (
+                  <Tag>Aguardando retorno do fornecedor</Tag>
+                ),
             },
             {
               title: 'Status',

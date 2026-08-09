@@ -27,11 +27,16 @@ import {
   UploadOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR, dataInput, separadoresBR } from '../../formatos';
-import { Bloco, CamposAutoavaliacao } from './FormularioAutoavaliacao';
+import {
+  Bloco,
+  CamposAutoavaliacao,
+  respostasIniciais,
+} from './FormularioAutoavaliacao';
 import {
   corResultado,
   corStatusHomologacao,
@@ -47,6 +52,24 @@ import {
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_PLANO_ACAO';
+
+// Mesmos prazos usados pelo backend (sqd-utils): 3 dias uteis para o retorno do
+// fornecedor e 3 dias uteis da solicitacao ate o envio do relatorio.
+const SLA_RESPOSTA_DIAS = 3;
+const SLA_RELATORIO_DIAS = 3;
+
+// Relogio da tela: o numero em dias uteis com a etiqueta do prazo ao lado.
+function Prazo({ dias, sla }: { dias: number | null; sla: number }) {
+  if (dias == null) return <>-</>;
+  return (
+    <Space>
+      <strong>{dias}</strong>
+      <Tag color={dias <= sla ? 'green' : 'orange'}>
+        {dias <= sla ? 'Dentro do SLA' : 'Fora do SLA'}
+      </Tag>
+    </Space>
+  );
+}
 
 // Cartao de anexos reaproveitado pelos dois tipos de documento do registro.
 function CardAnexos({
@@ -161,15 +184,21 @@ export default function HomologacaoDetalhe() {
     onError: () => message.error('Não foi possível salvar o registro.'),
   });
 
+  // A autoavaliacao tem rota propria: e ela que calcula a nota, o resultado e o
+  // tempo de resposta do fornecedor.
   const salvarAvaliacao = useMutation({
     mutationFn: async (v: any) =>
-      api.patch(`/sqd/homologacoes/${id}`, { ...v, respostas }),
+      api.post(`/sqd/homologacoes/${id}/autoavaliacao`, { ...v, respostas }),
     onSuccess: (res: any) => {
-      message.success(`Resultado recalculado — nota ${nota(res.data.nota)}.`);
+      message.success(`Autoavaliação lançada — nota ${nota(res.data.nota)}.`);
       setAvaliacaoOpen(false);
       invalidar();
     },
-    onError: () => message.error('Não foi possível salvar a autoavaliação.'),
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ??
+          'Não foi possível salvar a autoavaliação.',
+      ),
   });
 
   const remover = useMutation({
@@ -190,6 +219,12 @@ export default function HomologacaoDetalhe() {
     (b.reprovadas ?? []).map((r: any) => ({ ...r, bloco: `${b.letra}. ${b.nome}` })),
   );
 
+  // O resultado da autoavaliacao e um status; o do registro e outro. Enquanto o
+  // fornecedor nao devolve o formulario nao existe nota nem resultado.
+  const avaliado = !!h.resultado;
+  const aguardando = !avaliado && h.statusHomologacao === 'EM_ANDAMENTO';
+  const pendencias: string[] = h.pendenciasFinalizacao ?? [];
+
   function abrirRegistro() {
     formRegistro.setFieldsValue({
       codigoFornecedor: h.codigoFornecedor,
@@ -198,6 +233,7 @@ export default function HomologacaoDetalhe() {
       escopoFornecedor: h.escopoFornecedor,
       processosTerceirizados: h.processosTerceirizados,
       dataSolicitacao: dataInput(h.dataSolicitacao),
+      dataRetornoFornecedor: dataInput(h.dataRetornoFornecedor),
       dataEnvioRelatorio: dataInput(h.dataEnvioRelatorio),
       statusHomologacao: h.statusHomologacao,
       statusPlanoAcao: h.statusPlanoAcao,
@@ -216,9 +252,11 @@ export default function HomologacaoDetalhe() {
       inscricaoEstadual: h.inscricaoEstadual,
       responsavelInfo: h.responsavelInfo,
       setor: h.setor,
-      dataAvaliacao: dataInput(h.dataAvaliacao),
+      // Por padrao, o lancamento e o retorno acontecem hoje.
+      dataAvaliacao: dataInput(h.dataAvaliacao) || dayjs().format('YYYY-MM-DD'),
+      dataRetornoFornecedor: dataInput(h.dataRetornoFornecedor) || dayjs().format('YYYY-MM-DD'),
     });
-    setRespostas({ ...(h.respostas ?? {}) });
+    setRespostas(h.respostas ?? respostasIniciais(perguntas));
     setAvaliacaoOpen(true);
   }
 
@@ -235,20 +273,30 @@ export default function HomologacaoDetalhe() {
           <Typography.Title level={4} style={{ margin: 0 }}>
             Homologação {h.numero}
           </Typography.Title>
-          <Tag color={corResultado[h.resultado]}>
-            {labelResultado[h.resultado]}
-          </Tag>
+          {avaliado ? (
+            <Tag color={corResultado[h.resultado]}>
+              {labelResultado[h.resultado]}
+            </Tag>
+          ) : (
+            aguardando && <Tag>Aguardando retorno do fornecedor</Tag>
+          )}
           <Tag color={corStatusHomologacao[h.statusHomologacao]}>
             {labelStatusHomologacao[h.statusHomologacao]}
           </Tag>
         </Space>
         {podeEditar && (
           <Space wrap>
-            <Button icon={<FormOutlined />} onClick={abrirAvaliacao}>
-              Editar autoavaliação
+            <Button
+              type={avaliado ? 'default' : 'primary'}
+              icon={<FormOutlined />}
+              onClick={abrirAvaliacao}
+            >
+              {avaliado
+                ? 'Editar autoavaliação'
+                : 'Lançar autoavaliação do fornecedor'}
             </Button>
             <Button
-              type="primary"
+              type={avaliado ? 'primary' : 'default'}
               icon={<EditOutlined />}
               onClick={abrirRegistro}
             >
@@ -276,6 +324,17 @@ export default function HomologacaoDetalhe() {
         )}
       </Row>
 
+      {aguardando && (
+        <Alert
+          type="info"
+          showIcon
+          message="Aguardando o retorno do fornecedor"
+          description={`O formulário de autoavaliação foi enviado em ${dataBR(
+            h.dataSolicitacao,
+          )}. O fornecedor tem ${SLA_RESPOSTA_DIAS} dias úteis para devolver. Quando a resposta chegar, use "Lançar autoavaliação do fornecedor" para registrar as respostas e apurar o resultado.`}
+        />
+      )}
+
       {h.resultado === 'APROVADO' && h.nota < 100 && (
         <Alert
           type="success"
@@ -301,8 +360,50 @@ export default function HomologacaoDetalhe() {
         />
       )}
 
+      {/* O ciclo so fecha quando tudo o que a planilha pede esta no lugar. */}
+      {!aguardando &&
+        h.statusHomologacao !== 'FINALIZADO' &&
+        h.statusHomologacao !== 'CANCELADO' &&
+        pendencias.length > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            message="Falta para finalizar a homologação"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {pendencias.map((p) => (
+                  <li key={p}>{p[0].toUpperCase() + p.slice(1)}</li>
+                ))}
+              </ul>
+            }
+          />
+        )}
+
       <Row gutter={16}>
         <Col xs={24} lg={15}>
+          {/* Sem resposta do fornecedor nao ha nota nem resultado: no lugar do
+              cartao de resultado fica o atalho para lancar a autoavaliacao. */}
+          {!avaliado && (
+            <Card title="Autoavaliação do fornecedor">
+              <Typography.Paragraph type="secondary">
+                {h.statusHomologacao === 'CANCELADO'
+                  ? 'Este registro foi cancelado e não recebe autoavaliação.'
+                  : 'O fornecedor ainda não devolveu o formulário BDBR.QUA.FMR.024.03. Assim que a resposta chegar, lance as respostas aqui: o sistema calcula a pontuação de cada bloco, a nota ponderada e o tempo de resposta do fornecedor.'}
+              </Typography.Paragraph>
+              {podeEditar && h.statusHomologacao !== 'CANCELADO' && (
+                <Button
+                  type="primary"
+                  icon={<FormOutlined />}
+                  onClick={abrirAvaliacao}
+                >
+                  Lançar autoavaliação do fornecedor
+                </Button>
+              )}
+            </Card>
+          )}
+
+          {avaliado && (
+            <>
           <Card title="Resultado da Autoavaliação">
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={8}>
@@ -473,6 +574,8 @@ export default function HomologacaoDetalhe() {
               );
             })}
           </Card>
+            </>
+          )}
         </Col>
 
         <Col xs={24} lg={9}>
@@ -496,25 +599,39 @@ export default function HomologacaoDetalhe() {
               <Descriptions.Item label="Data da solicitação">
                 {dataBR(h.dataSolicitacao)}
               </Descriptions.Item>
+              <Descriptions.Item label="Data de retorno do fornecedor">
+                {dataBR(h.dataRetornoFornecedor)}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={`Resposta do fornecedor (dias úteis, SLA ${SLA_RESPOSTA_DIAS})`}
+              >
+                <Prazo
+                  dias={h.tempoRespostaDiasUteis}
+                  sla={SLA_RESPOSTA_DIAS}
+                />
+              </Descriptions.Item>
               <Descriptions.Item label="Data de envio do relatório">
                 {dataBR(h.dataEnvioRelatorio)}
               </Descriptions.Item>
-              <Descriptions.Item label="Lead time (dias úteis)">
-                {h.leadTimeDiasUteis == null ? (
-                  '-'
-                ) : (
-                  <Space>
-                    <strong>{h.leadTimeDiasUteis}</strong>
-                    <Tag color={h.leadTimeDiasUteis <= 3 ? 'green' : 'orange'}>
-                      {h.leadTimeDiasUteis <= 3 ? 'Dentro do SLA' : 'Fora do SLA'}
-                    </Tag>
-                  </Space>
-                )}
+              <Descriptions.Item
+                label={`Lead time (dias úteis, SLA ${SLA_RELATORIO_DIAS})`}
+              >
+                <Prazo dias={h.leadTimeDiasUteis} sla={SLA_RELATORIO_DIAS} />
               </Descriptions.Item>
-              <Descriptions.Item label="Resultado">
-                <Tag color={corResultado[h.resultado]}>
-                  {labelResultado[h.resultado]}
-                </Tag>
+              <Descriptions.Item label="Data de finalização">
+                {dataBR(h.dataFinalizacao)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tempo total do ciclo (dias úteis)">
+                {h.tempoTotalDiasUteis ?? '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Resultado da autoavaliação">
+                {avaliado ? (
+                  <Tag color={corResultado[h.resultado]}>
+                    {labelResultado[h.resultado]}
+                  </Tag>
+                ) : (
+                  <Tag>Aguardando retorno do fornecedor</Tag>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Status da homologação">
                 <Tag color={corStatusHomologacao[h.statusHomologacao]}>
@@ -602,12 +719,20 @@ export default function HomologacaoDetalhe() {
                 <Input.TextArea rows={2} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="dataSolicitacao" label="Data da solicitação">
                 <Input type="date" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item
+                name="dataRetornoFornecedor"
+                label="Data de retorno do fornecedor"
+              >
+                <Input type="date" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item
                 name="dataEnvioRelatorio"
                 label="Data de envio do relatório"
@@ -616,7 +741,11 @@ export default function HomologacaoDetalhe() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="statusHomologacao" label="Status da homologação">
+              <Form.Item
+                name="statusHomologacao"
+                label="Status da homologação"
+                extra="Só é possível finalizar depois de fechar o ciclo: autoavaliação lançada, relatório final anexado, ação preenchida e plano de ação resolvido."
+              >
                 <Select options={opcoes(labelStatusHomologacao)} />
               </Form.Item>
             </Col>
@@ -656,7 +785,7 @@ export default function HomologacaoDetalhe() {
         open={avaliacaoOpen}
         title={`Autoavaliação ${h.numero} — Doc. BDBR.QUA.FMR.024.03`}
         width={1100}
-        okText="Salvar e recalcular"
+        okText={avaliado ? 'Salvar e recalcular' : 'Lançar e apurar resultado'}
         cancelText="Cancelar"
         confirmLoading={salvarAvaliacao.isPending}
         onOk={async () =>
@@ -666,6 +795,24 @@ export default function HomologacaoDetalhe() {
         destroyOnClose
       >
         <Form form={formAvaliacao} layout="vertical">
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            Lance aqui as respostas enviadas pelo fornecedor. A data de retorno
+            é a data em que o fornecedor devolveu o formulário — é ela que mede
+            se o prazo de {SLA_RESPOSTA_DIAS} dias úteis foi cumprido.
+          </Typography.Paragraph>
+          <Row gutter={12}>
+            <Col xs={24} md={6}>
+              <Form.Item
+                name="dataRetornoFornecedor"
+                label="Data de retorno do fornecedor"
+                rules={[
+                  { required: true, message: 'Informe a data de retorno' },
+                ]}
+              >
+                <Input type="date" />
+              </Form.Item>
+            </Col>
+          </Row>
           <CamposAutoavaliacao
             blocos={perguntas}
             respostas={respostas}

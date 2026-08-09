@@ -786,7 +786,12 @@ model HistoricoMaquina {
 // ---------------------- MODULO SQD ----------------------
 // Homologacao de fornecedores: a autoavaliacao (self audit) do documento
 // BDBR.QUA.FMR.024.03 e o controle do BDBR.QUA.FMR.029.01 sao o MESMO
-// registro, aberto pelo mesmo numero (AUT0001/2026).
+// registro, aberto pelo mesmo numero (HFOR0001/2026).
+//
+// O registro nasce sem avaliacao: a Qualidade abre com os dados do fornecedor
+// e a data da solicitacao (a mesma em que o formulario segue para o
+// fornecedor) e fica aguardando o retorno. So quando o fornecedor responde a
+// autoavaliacao e lancada e passam a existir nota e resultado.
 
 enum ResultadoHomologacao {
   APROVADO
@@ -824,7 +829,7 @@ enum SolicitanteSqd {
 
 model HomologacaoFornecedor {
   id         Int    @id @default(autoincrement())
-  numero     String @unique // AUT0001/2026
+  numero     String @unique // HFOR0001/2026
   ano        Int
   sequencial Int
   semana     String // W28 - mesma regra de semana do SQE e da Manufatura
@@ -835,16 +840,18 @@ model HomologacaoFornecedor {
   inscricaoEstadual String?
   responsavelInfo   String?
   setor             String?
-  dataAvaliacao     DateTime
+  // Data em que a Qualidade lancou as respostas do fornecedor. Vazia enquanto
+  // o registro esta aguardando o retorno.
+  dataAvaliacao     DateTime?
 
   // Respostas do fornecedor: [{ codigo: "A1", resposta: "SIM"|"NAO"|"NA" }]
-  respostas Json
+  respostas Json?
 
   // Resultado calculado (abas "Criterios" e "Resultados"):
   // [{ bloco, nome, peso, pontuacao, ponderada, critico, reprovadas: [...] }]
-  blocos    Json
-  nota      Float // nota ponderada final, 0 a 100
-  resultado ResultadoHomologacao
+  blocos    Json?
+  nota      Float? // nota ponderada final, 0 a 100
+  resultado ResultadoHomologacao?
 
   // --- Registro de homologacao (FMR.029.01, aba "2026") ---
   codigoFornecedor       String?
@@ -852,9 +859,18 @@ model HomologacaoFornecedor {
   segmento               String?
   escopoFornecedor       String?
   processosTerceirizados String?
+  // Abre o registro e serve de marco zero dos tres relogios. A tela exige a
+  // data; no banco a coluna segue opcional por causa dos registros abertos
+  // antes da inversao do fluxo.
   dataSolicitacao        DateTime?
   dataEnvioRelatorio     DateTime?
-  leadTimeDiasUteis      Int? // calculado: dias uteis entre solicitacao e envio
+  leadTimeDiasUteis      Int? // dias uteis entre a solicitacao e o envio do relatorio
+  // Resposta do fornecedor: prazo de 3 dias uteis a partir da solicitacao.
+  dataRetornoFornecedor  DateTime?
+  tempoRespostaDiasUteis Int?
+  // Fechamento do ciclo: carimbado quando o status vai para FINALIZADO.
+  dataFinalizacao        DateTime?
+  tempoTotalDiasUteis    Int?
   statusHomologacao      StatusHomologacao     @default(EM_ANDAMENTO)
   statusPlanoAcao        StatusPlanoAcaoSqd?
   dataReavaliacao        DateTime?
@@ -872,5 +888,5 @@ model HomologacaoFornecedor {
   updatedAt   DateTime @updatedAt
 
   @@unique([ano, sequencial])
-  @@index([dataAvaliacao])
+  @@index([dataSolicitacao])
 }

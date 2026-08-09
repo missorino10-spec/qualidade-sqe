@@ -17,19 +17,14 @@ import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { HomologacoesService } from './homologacoes.service';
 
-// Cabecalho do FMR.024.03 + questionario + controle do FMR.029.01.
-// Todos os campos do controle sao opcionais: a homologacao nasce com a
-// autoavaliacao e o controle vai sendo preenchido depois.
+// Cabecalho do FMR.024.03 + controle do FMR.029.01. O registro nasce so com o
+// controle; a autoavaliacao entra depois, pela rota /autoavaliacao.
 class HomologacaoDto {
   @IsOptional() @IsString() fornecedorNome?: string;
   @IsOptional() @IsString() cnpj?: string;
   @IsOptional() @IsString() inscricaoEstadual?: string;
   @IsOptional() @IsString() responsavelInfo?: string;
   @IsOptional() @IsString() setor?: string;
-  @IsOptional() @IsString() dataAvaliacao?: string;
-
-  // { "A1": "SIM", "A2": "NAO", ... }
-  @IsOptional() @IsObject() respostas?: Record<string, string>;
 
   @IsOptional() @IsString() codigoFornecedor?: string;
   @IsOptional()
@@ -40,6 +35,7 @@ class HomologacaoDto {
   @IsOptional() @IsString() processosTerceirizados?: string;
   @IsOptional() @IsString() dataSolicitacao?: string;
   @IsOptional() @IsString() dataEnvioRelatorio?: string;
+  @IsOptional() @IsString() dataRetornoFornecedor?: string;
   @IsOptional()
   @IsIn(['EM_ANDAMENTO', 'FINALIZADO', 'CANCELADO'])
   statusHomologacao?: string;
@@ -58,6 +54,18 @@ class HomologacaoDto {
   efetividadePlanoAcao?: string;
   @IsOptional() @IsString() acao?: string;
   @IsOptional() @IsString() observacoes?: string;
+}
+
+// Respostas devolvidas pelo fornecedor: { "A1": "SIM", "A2": "NAO", ... }
+class AutoavaliacaoDto {
+  @IsObject() respostas!: Record<string, string>;
+  @IsOptional() @IsString() dataAvaliacao?: string;
+  @IsOptional() @IsString() dataRetornoFornecedor?: string;
+  @IsOptional() @IsString() fornecedorNome?: string;
+  @IsOptional() @IsString() cnpj?: string;
+  @IsOptional() @IsString() inscricaoEstadual?: string;
+  @IsOptional() @IsString() responsavelInfo?: string;
+  @IsOptional() @IsString() setor?: string;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -85,6 +93,16 @@ export class HomologacoesController {
   @Post()
   criar(@Body() dto: HomologacaoDto, @CurrentUser() user: AuthUser) {
     return this.service.criar(dto, user.id);
+  }
+
+  // Lancamento (ou correcao) da autoavaliacao devolvida pelo fornecedor.
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/autoavaliacao')
+  lancarAutoavaliacao(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AutoavaliacaoDto,
+  ) {
+    return this.service.lancarAutoavaliacao(id, dto);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

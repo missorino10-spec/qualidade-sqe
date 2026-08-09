@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -17,6 +18,9 @@ import {
 const includeHomologacao = {
   criadoPor: { select: { id: true, nome: true } },
 };
+
+export const TIPO_ANEXO_RELATORIO = 'HOMOLOGACAO_RELATORIO';
+export const TIPO_ANEXO_PLANO_ACAO = 'HOMOLOGACAO_PLANO_ACAO';
 
 // Data "pura" (sem hora): o formulario manda "2026-08-08" e o registro precisa
 // guardar meia-noite UTC, senao o fuso do servidor joga o dia para tras.
@@ -48,7 +52,11 @@ export class HomologacoesService {
       include: includeHomologacao,
     });
     if (!h) throw new NotFoundException('Homologação não encontrada');
-    return { ...h, perguntas: BLOCOS_AUTOAVALIACAO };
+    return {
+      ...h,
+      perguntas: BLOCOS_AUTOAVALIACAO,
+      pendenciasFinalizacao: await this.pendenciasFinalizacao(h),
+    };
   }
 
   // Normaliza as respostas: toda pergunta do catalogo entra no registro, o que
@@ -64,23 +72,59 @@ export class HomologacoesService {
     return saida;
   }
 
-  private leadTime(solicitacao: Date | null, envio: Date | null) {
-    if (!solicitacao || !envio) return null;
-    return diasUteisEntre(solicitacao, envio);
+  private dias(inicio: Date | null, fim: Date | null) {
+    if (!inicio || !fim) return null;
+    return diasUteisEntre(inicio, fim);
   }
 
+  // O ciclo so fecha quando a homologacao esta completa: fornecedor avaliado,
+  // relatorio final anexado, acao registrada e plano de acao resolvido.
+  private async pendenciasFinalizacao(h: {
+    id: number;
+    resultado: string | null;
+    acao: string | null;
+    statusPlanoAcao: string | null;
+  }): Promise<string[]> {
+    const faltas: string[] = [];
+    if (!h.resultado) faltas.push('a autoavaliação do fornecedor');
+
+    const anexos = await this.prisma.anexo.findMany({
+      where: {
+        entidadeId: h.id,
+        entidadeTipo: { in: [TIPO_ANEXO_RELATORIO, TIPO_ANEXO_PLANO_ACAO] },
+      },
+      select: { entidadeTipo: true },
+    });
+    const tem = (tipo: string) => anexos.some((a) => a.entidadeTipo === tipo);
+
+    if (!tem(TIPO_ANEXO_RELATORIO)) faltas.push('o relatório final anexado');
+    if (!h.acao?.trim()) faltas.push('o campo Ação preenchido');
+
+    if (
+      h.statusPlanoAcao !== 'FINALIZADO' &&
+      h.statusPlanoAcao !== 'NAO_APLICAVEL'
+    ) {
+      faltas.push(
+        'o plano de ação em "Finalizado" ou marcado como "Não aplicável"',
+      );
+    } else if (h.statusPlanoAcao === 'FINALIZADO' && !tem(TIPO_ANEXO_PLANO_ACAO)) {
+      faltas.push('o plano de ação do fornecedor anexado');
+    }
+    return faltas;
+  }
+
+  // Abertura do registro (FMR.029.01). Ainda nao ha avaliacao: o fornecedor
+  // acabou de receber o formulario e o registro fica aguardando o retorno.
   async criar(dto: any, usuarioId: number) {
-    const dataAvaliacao = dataPura(dto.dataAvaliacao) ?? new Date();
-    const ano = dataAvaliacao.getUTCFullYear();
-    const { semana } = semanaAno(dataAvaliacao);
-
-    const respostas = this.normalizarRespostas(dto.respostas);
-    const calculo = calcularAutoavaliacao(respostas);
-
     const dataSolicitacao = dataPura(dto.dataSolicitacao);
+    if (!dataSolicitacao) {
+      throw new BadRequestException('Informe a data da solicitação.');
+    }
+    const ano = dataSolicitacao.getUTCFullYear();
+    const { semana } = semanaAno(dataSolicitacao);
     const dataEnvioRelatorio = dataPura(dto.dataEnvioRelatorio);
 
-    // Retry: duas homologacoes salvas ao mesmo tempo cairiam no mesmo numero.
+    // Retry: dois registros abertos ao mesmo tempo cairiam no mesmo numero.
     for (let i = 0; i < 5; i++) {
       const ultimo = await this.prisma.homologacaoFornecedor.findFirst({
         where: { ano },
@@ -90,7 +134,7 @@ export class HomologacoesService {
       try {
         const criado = await this.prisma.homologacaoFornecedor.create({
           data: {
-            numero: numeroSqd('AUT', sequencial, ano),
+            numero: numeroSqd('HFOR', sequencial, ano),
             ano,
             sequencial,
             semana,
@@ -99,11 +143,6 @@ export class HomologacoesService {
             inscricaoEstadual: dto.inscricaoEstadual ?? null,
             responsavelInfo: dto.responsavelInfo ?? null,
             setor: dto.setor ?? null,
-            dataAvaliacao,
-            respostas,
-            blocos: calculo.blocos,
-            nota: calculo.nota,
-            resultado: calculo.resultado,
             codigoFornecedor: dto.codigoFornecedor ?? null,
             solicitante: dto.solicitante ?? null,
             segmento: dto.segmento ?? null,
@@ -111,7 +150,8 @@ export class HomologacoesService {
             processosTerceirizados: dto.processosTerceirizados ?? null,
             dataSolicitacao,
             dataEnvioRelatorio,
-            leadTimeDiasUteis: this.leadTime(dataSolicitacao, dataEnvioRelatorio),
+            leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+            observacoes: dto.observacoes ?? null,
             criadoPorId: usuarioId,
           },
         });
@@ -125,28 +165,27 @@ export class HomologacoesService {
     );
   }
 
-  async atualizar(id: number, dto: any) {
+  // Lancamento da autoavaliacao devolvida pelo fornecedor (FMR.024.03). E aqui
+  // que sai a nota, o resultado e o tempo de resposta do fornecedor.
+  async lancarAutoavaliacao(id: number, dto: any) {
     const atual = await this.prisma.homologacaoFornecedor.findUnique({
       where: { id },
     });
     if (!atual) throw new NotFoundException('Homologação não encontrada');
+    if (atual.statusHomologacao === 'CANCELADO') {
+      throw new BadRequestException(
+        'Esta homologação está cancelada e não aceita avaliação.',
+      );
+    }
 
-    // As respostas so sao recalculadas quando a tela reenvia o questionario.
-    const recalcular = dto.respostas !== undefined;
-    const respostas = recalcular
-      ? this.normalizarRespostas(dto.respostas)
-      : undefined;
-    const calculo = respostas ? calcularAutoavaliacao(respostas) : undefined;
+    const respostas = this.normalizarRespostas(dto.respostas);
+    const calculo = calcularAutoavaliacao(respostas);
 
-    const dataAvaliacao = dataPura(dto.dataAvaliacao);
-    const dataSolicitacao =
-      dto.dataSolicitacao !== undefined
-        ? dataPura(dto.dataSolicitacao)
-        : atual.dataSolicitacao;
-    const dataEnvioRelatorio =
-      dto.dataEnvioRelatorio !== undefined
-        ? dataPura(dto.dataEnvioRelatorio)
-        : atual.dataEnvioRelatorio;
+    // A data do retorno e a data em que o fornecedor devolveu o formulario;
+    // por padrao, a propria data da avaliacao lancada pela Qualidade.
+    const dataAvaliacao = dataPura(dto.dataAvaliacao) ?? new Date();
+    const dataRetornoFornecedor =
+      dataPura(dto.dataRetornoFornecedor) ?? dataAvaliacao;
 
     await this.prisma.homologacaoFornecedor.update({
       where: { id },
@@ -156,24 +195,87 @@ export class HomologacoesService {
         inscricaoEstadual: dto.inscricaoEstadual ?? undefined,
         responsavelInfo: dto.responsavelInfo ?? undefined,
         setor: dto.setor ?? undefined,
-        dataAvaliacao: dataAvaliacao ?? undefined,
-        semana: dataAvaliacao ? semanaAno(dataAvaliacao).semana : undefined,
-        ...(calculo
-          ? {
-              respostas: respostas as any,
-              blocos: calculo.blocos as any,
-              nota: calculo.nota,
-              resultado: calculo.resultado,
-            }
-          : {}),
+        dataAvaliacao,
+        dataRetornoFornecedor,
+        tempoRespostaDiasUteis: this.dias(
+          atual.dataSolicitacao,
+          dataRetornoFornecedor,
+        ),
+        respostas: respostas as any,
+        blocos: calculo.blocos as any,
+        nota: calculo.nota,
+        resultado: calculo.resultado,
+      },
+    });
+    return this.detalhe(id);
+  }
+
+  async atualizar(id: number, dto: any) {
+    const atual = await this.prisma.homologacaoFornecedor.findUnique({
+      where: { id },
+    });
+    if (!atual) throw new NotFoundException('Homologação não encontrada');
+
+    const dataSolicitacao =
+      dto.dataSolicitacao !== undefined
+        ? dataPura(dto.dataSolicitacao)
+        : atual.dataSolicitacao;
+    const dataEnvioRelatorio =
+      dto.dataEnvioRelatorio !== undefined
+        ? dataPura(dto.dataEnvioRelatorio)
+        : atual.dataEnvioRelatorio;
+    const dataRetornoFornecedor =
+      dto.dataRetornoFornecedor !== undefined
+        ? dataPura(dto.dataRetornoFornecedor)
+        : atual.dataRetornoFornecedor;
+
+    // O status da homologacao e o do resultado sao coisas diferentes: o ciclo
+    // so pode ser fechado depois que tudo o que a planilha pede esta no lugar.
+    const status = dto.statusHomologacao ?? atual.statusHomologacao;
+    const fechando = status === 'FINALIZADO';
+    if (fechando) {
+      const faltas = await this.pendenciasFinalizacao({
+        id,
+        resultado: dto.resultado ?? atual.resultado,
+        acao: dto.acao !== undefined ? dto.acao : atual.acao,
+        statusPlanoAcao: dto.statusPlanoAcao ?? atual.statusPlanoAcao,
+      });
+      if (faltas.length) {
+        throw new BadRequestException(
+          `Ainda falta ${faltas.join(', ')} para finalizar a homologação.`,
+        );
+      }
+    }
+
+    // Carimbo do fechamento: entra quando o ciclo fecha e sai se for reaberto.
+    const dataFinalizacao = fechando
+      ? (atual.dataFinalizacao ?? new Date())
+      : null;
+
+    await this.prisma.homologacaoFornecedor.update({
+      where: { id },
+      data: {
+        fornecedorNome: dto.fornecedorNome ?? undefined,
+        cnpj: dto.cnpj ?? undefined,
+        inscricaoEstadual: dto.inscricaoEstadual ?? undefined,
+        responsavelInfo: dto.responsavelInfo ?? undefined,
+        setor: dto.setor ?? undefined,
         codigoFornecedor: dto.codigoFornecedor ?? undefined,
         solicitante: dto.solicitante ?? undefined,
         segmento: dto.segmento ?? undefined,
         escopoFornecedor: dto.escopoFornecedor ?? undefined,
         processosTerceirizados: dto.processosTerceirizados ?? undefined,
         dataSolicitacao,
+        semana: dataSolicitacao ? semanaAno(dataSolicitacao).semana : undefined,
         dataEnvioRelatorio,
-        leadTimeDiasUteis: this.leadTime(dataSolicitacao, dataEnvioRelatorio),
+        leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+        dataRetornoFornecedor,
+        tempoRespostaDiasUteis: this.dias(
+          dataSolicitacao,
+          dataRetornoFornecedor,
+        ),
+        dataFinalizacao,
+        tempoTotalDiasUteis: this.dias(dataSolicitacao, dataFinalizacao),
         statusHomologacao: dto.statusHomologacao ?? undefined,
         statusPlanoAcao: dto.statusPlanoAcao ?? undefined,
         dataReavaliacao:
@@ -198,7 +300,7 @@ export class HomologacoesService {
     await this.prisma.anexo.deleteMany({
       where: {
         entidadeId: id,
-        entidadeTipo: { in: ['HOMOLOGACAO_RELATORIO', 'HOMOLOGACAO_PLANO_ACAO'] },
+        entidadeTipo: { in: [TIPO_ANEXO_RELATORIO, TIPO_ANEXO_PLANO_ACAO] },
       },
     });
     await this.prisma.homologacaoFornecedor.delete({ where: { id } });

@@ -2,8 +2,12 @@ import { useState } from 'react';
 import {
   Button,
   Card,
+  Col,
   Form,
+  Input,
   Modal,
+  Row,
+  Select,
   Space,
   Table,
   Tag,
@@ -18,21 +22,19 @@ import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import {
-  Bloco,
-  CamposAutoavaliacao,
-  respostasIniciais,
-} from './FormularioAutoavaliacao';
-import {
   corResultado,
   corStatusHomologacao,
   labelResultado,
+  labelSolicitante,
   labelStatusHomologacao,
   nota,
+  opcoes,
 } from './comum';
 
-// Submenu "Homologação de Fornecedores": historico de todas as autoavaliacoes
-// (BDBR.QUA.FMR.024.03). Cada linha abre o registro de homologacao
-// (BDBR.QUA.FMR.029.01), como a inspecao de recebimento abre a RNC.
+// Submenu "Homologação de Fornecedores": historico dos registros de homologacao
+// (BDBR.QUA.FMR.029.01). O registro nasce aqui, com a data da solicitacao — a
+// mesma em que o formulario segue para o fornecedor — e fica aguardando o
+// retorno. A autoavaliacao (FMR.024.03) e lancada depois, dentro do registro.
 export default function Homologacoes() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -42,7 +44,6 @@ export default function Homologacoes() {
 
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
-  const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
 
   const { data, isLoading } = useQuery<any[]>({
@@ -50,15 +51,9 @@ export default function Homologacoes() {
     queryFn: async () => (await api.get('/sqd/homologacoes')).data,
   });
 
-  const { data: blocos } = useQuery<Bloco[]>({
-    queryKey: ['sqd-formulario'],
-    queryFn: async () => (await api.get('/sqd/homologacoes/formulario')).data,
-  });
-
   function abrir() {
     form.resetFields();
-    form.setFieldsValue({ dataAvaliacao: dayjs().format('YYYY-MM-DD') });
-    setRespostas(respostasIniciais(blocos ?? []));
+    form.setFieldsValue({ dataSolicitacao: dayjs().format('YYYY-MM-DD') });
     setOpen(true);
   }
 
@@ -66,16 +61,16 @@ export default function Homologacoes() {
     const v = await form.validateFields();
     setSalvando(true);
     try {
-      const res = await api.post('/sqd/homologacoes', { ...v, respostas });
+      const res = await api.post('/sqd/homologacoes', v);
       message.success(
-        `Homologação ${res.data.numero} registrada — nota ${nota(res.data.nota)}.`,
+        `Registro ${res.data.numero} aberto — aguardando o retorno do fornecedor.`,
       );
       qc.invalidateQueries({ queryKey: ['sqd-homologacoes'] });
       setOpen(false);
       navigate(`/sqd/homologacoes/${res.data.id}`);
     } catch (e: any) {
       message.error(
-        e?.response?.data?.message ?? 'Não foi possível salvar a homologação.',
+        e?.response?.data?.message ?? 'Não foi possível abrir o registro.',
       );
     } finally {
       setSalvando(false);
@@ -109,7 +104,7 @@ export default function Homologacoes() {
         extra={
           podeEditar && (
             <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
-              Nova homologação
+              Novo registro de homologação
             </Button>
           )
         }
@@ -125,10 +120,10 @@ export default function Homologacoes() {
             style: { cursor: 'pointer' },
           })}
           columns={[
-            { title: 'Número', dataIndex: 'numero', width: 120 },
+            { title: 'Número', dataIndex: 'numero', width: 130 },
             {
-              title: 'Data',
-              dataIndex: 'dataAvaliacao',
+              title: 'Solicitação',
+              dataIndex: 'dataSolicitacao',
               width: 110,
               render: (d: string) => dataBR(d),
             },
@@ -138,23 +133,29 @@ export default function Homologacoes() {
               title: 'Solicitante',
               dataIndex: 'solicitante',
               width: 120,
-              render: (s: string) =>
-                s ? (s === 'NC' ? 'N/C' : s[0] + s.slice(1).toLowerCase()) : '-',
+              render: (s: string) => (s ? labelSolicitante[s] : '-'),
             },
             {
               title: 'Nota',
               dataIndex: 'nota',
               width: 90,
               align: 'right',
-              render: (v: number) => <strong>{nota(v)}</strong>,
+              render: (v: number | null) => <strong>{nota(v)}</strong>,
             },
             {
               title: 'Resultado',
               dataIndex: 'resultado',
-              width: 210,
-              render: (r: string) => (
-                <Tag color={corResultado[r]}>{labelResultado[r]}</Tag>
-              ),
+              width: 230,
+              // Enquanto o fornecedor nao devolve o formulario nao existe nota
+              // nem resultado: a linha mostra o que o registro esta esperando.
+              render: (r: string | null, h: any) =>
+                r ? (
+                  <Tag color={corResultado[r]}>{labelResultado[r]}</Tag>
+                ) : h.statusHomologacao === 'CANCELADO' ? (
+                  '-'
+                ) : (
+                  <Tag>Aguardando retorno do fornecedor</Tag>
+                ),
             },
             {
               title: 'Status',
@@ -189,9 +190,9 @@ export default function Homologacoes() {
 
       <Modal
         open={open}
-        title="Nova Homologação — Autoavaliação de Fornecedores (Doc. BDBR.QUA.FMR.024.03)"
-        width={1100}
-        okText="Salvar e calcular resultado"
+        title="Novo registro de homologação — Doc. BDBR.QUA.FMR.029.01"
+        width={720}
+        okText="Abrir registro"
         cancelText="Cancelar"
         confirmLoading={salvando}
         onOk={salvar}
@@ -199,15 +200,72 @@ export default function Homologacoes() {
         destroyOnClose
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          Lance aqui as respostas enviadas pelo fornecedor. O sistema calcula a
-          pontuação de cada bloco e a nota ponderada final.
+          A data da solicitação é a mesma em que o formulário de autoavaliação
+          segue para o fornecedor: ela numera o registro e é o marco zero dos
+          prazos. O registro fica "Em andamento", aguardando o retorno; a
+          autoavaliação é lançada depois, dentro do próprio registro.
         </Typography.Paragraph>
         <Form form={form} layout="vertical">
-          <CamposAutoavaliacao
-            blocos={blocos ?? []}
-            respostas={respostas}
-            setRespostas={setRespostas}
-          />
+          <Row gutter={12}>
+            <Col span={14}>
+              <Form.Item
+                name="fornecedorNome"
+                label="Fornecedor"
+                rules={[{ required: true, message: 'Informe o fornecedor.' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={10}>
+              <Form.Item
+                name="dataSolicitacao"
+                label="Data da solicitação"
+                rules={[
+                  { required: true, message: 'Informe a data da solicitação.' },
+                ]}
+              >
+                <Input type="date" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="cnpj" label="CNPJ">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="codigoFornecedor" label="Código do fornecedor">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="solicitante" label="Solicitante">
+                <Select allowClear options={opcoes(labelSolicitante)} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="segmento" label="Segmento">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="escopoFornecedor" label="Escopo do fornecedor">
+                <Input.TextArea rows={2} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item
+                name="processosTerceirizados"
+                label="Processos terceirizados"
+              >
+                <Input.TextArea rows={2} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="observacoes" label="Observações">
+                <Input.TextArea rows={2} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </Space>
