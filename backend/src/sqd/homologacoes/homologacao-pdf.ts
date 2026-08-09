@@ -215,6 +215,9 @@ export function ferramentas(doc: PDFKit.PDFDocument) {
     subtitulo: string,
     formulario: string,
     numero: string,
+    // A auditoria numera o proprio documento (AUD0001/2026), entao o rotulo
+    // da caixa do cabecalho e trocavel.
+    rotuloNumero = 'Homologação Nº',
   ) => {
     if (existsSync(LOGO_PATH)) {
       doc.image(LOGO_PATH, X0, 34, { width: 120 });
@@ -230,7 +233,7 @@ export function ferramentas(doc: PDFKit.PDFDocument) {
     const cbW = X1 - cbX;
     const cbLinhas = [
       { rotulo: 'Formulário', valor: formulario },
-      { rotulo: 'Homologação Nº', valor: numero || '-' },
+      { rotulo: rotuloNumero, valor: numero || '-' },
       { rotulo: 'Emissão', valor: hojeNoBrasil() },
     ];
     const cbH = cbLinhas.length * 17;

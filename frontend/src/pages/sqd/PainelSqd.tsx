@@ -19,6 +19,7 @@ import {
   HourglassOutlined,
   RetweetOutlined,
   TrophyOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Dayjs } from 'dayjs';
@@ -27,10 +28,14 @@ import { api } from '../../api';
 import { dataBR, separadoresBR } from '../../formatos';
 import {
   corResultado,
+  corResultadoAuditoria,
   corResultadoItem,
+  corStatusAuditoria,
   corStatusHomologacao,
   labelResultado,
+  labelResultadoAuditoria,
   labelResultadoItem,
+  labelStatusAuditoria,
   labelStatusHomologacao,
   nota,
 } from './comum';
@@ -72,6 +77,20 @@ export default function PainelSqd() {
       queryFn: async () => (await api.get('/sqd/painel/itens/ultimas')).data,
     },
   );
+
+  // Auditoria de fornecedores: alem do resultado, o painel acompanha o loop de
+  // reavaliacao (90 dias corridos para reprovado, 180 para condicional).
+  const { data: kpisAud, isLoading: loadingAud } = useQuery<any>({
+    queryKey: ['sqd-kpis-auditorias', de, ate],
+    queryFn: async () =>
+      (await api.get('/sqd/painel/auditorias/kpis', { params: { de, ate } }))
+        .data,
+  });
+
+  const { data: ultimasAud, isLoading: loadingUltimasAud } = useQuery<any[]>({
+    queryKey: ['sqd-ultimas-auditorias'],
+    queryFn: async () => (await api.get('/sqd/painel/auditorias/ultimas')).data,
+  });
 
   const sla = kpis?.slaDias ?? 3;
   const slaResposta = kpis?.slaRespostaDias ?? 3;
@@ -507,6 +526,174 @@ export default function PainelSqd() {
               render: (s: string) => (
                 <Tag color={corStatusHomologacao[s]}>
                   {labelStatusHomologacao[s]}
+                </Tag>
+              ),
+            },
+          ]}
+        />
+      </Card>
+
+      <Divider orientation="left" plain>
+        Auditoria de Fornecedores — Checklist de Auditoria
+      </Divider>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Aprovação em auditoria"
+              value={kpisAud?.pctAprovacao ?? 0}
+              {...separadoresBR}
+              suffix="%"
+              precision={1}
+              loading={loadingAud}
+              prefix={<CheckCircleOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Nota média das auditorias"
+              value={kpisAud?.notaMedia ?? 0}
+              {...separadoresBR}
+              precision={1}
+              loading={loadingAud}
+              prefix={<TrophyOutlined />}
+              valueStyle={{ color: '#D37119' }}
+            />
+          </Card>
+        </Col>
+        {/* O semaforo do prazo: vermelho ja venceu, amarelo esta nos ultimos
+            15 dias. */}
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Reavaliações vencidas"
+              value={kpisAud?.reavaliacoesVencidas ?? 0}
+              {...separadoresBR}
+              loading={loadingAud}
+              prefix={<WarningOutlined />}
+              valueStyle={{ color: '#cf1322' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Reavaliações a vencer (15 dias)"
+              value={kpisAud?.reavaliacoesAVencer ?? 0}
+              {...separadoresBR}
+              loading={loadingAud}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#d4b106' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} align="stretch">
+        {[
+          { t: 'Auditorias registradas', v: kpisAud?.total },
+          {
+            t: 'Aguardando checklist',
+            v: kpisAud?.aguardandoChecklist,
+            cor: '#0958d9',
+          },
+          { t: 'Auditorias avaliadas', v: kpisAud?.avaliadas },
+          { t: 'Aprovados', v: kpisAud?.aprovados, cor: '#3f8600' },
+          {
+            t: 'Aprovados condicionalmente',
+            v: kpisAud?.condicionais,
+            cor: '#d46b08',
+          },
+          { t: 'Reprovados', v: kpisAud?.reprovados, cor: '#cf1322' },
+          {
+            t: 'No loop de reavaliação',
+            v: kpisAud?.emReavaliacao,
+            cor: '#d46b08',
+          },
+          { t: 'Reavaliadas (2ª rodada ou mais)', v: kpisAud?.reavaliadas },
+          { t: 'Em andamento', v: kpisAud?.emAndamento },
+          { t: 'Encerradas', v: kpisAud?.finalizadas, cor: '#3f8600' },
+          { t: 'Canceladas', v: kpisAud?.canceladas },
+        ].map((c) => (
+          <Col xs={12} sm={8} lg={6} key={c.t}>
+            <Card size="small" style={{ height: '100%' }}>
+              <Statistic
+                title={
+                  <span
+                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
+                  >
+                    {c.t}
+                  </span>
+                }
+                value={c.v ?? 0}
+                {...separadoresBR}
+                loading={loadingAud}
+                valueStyle={c.cor ? { color: c.cor } : undefined}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card title="Últimas auditorias de fornecedores">
+        <Table
+          rowKey="id"
+          size="small"
+          loading={loadingUltimasAud}
+          dataSource={ultimasAud}
+          pagination={false}
+          scroll={{ x: 1100 }}
+          locale={{ emptyText: 'Nenhuma auditoria registrada' }}
+          onRow={(r) => ({
+            onClick: () => navigate(`/sqd/auditorias/${r.id}`),
+            style: { cursor: 'pointer' },
+          })}
+          columns={[
+            { title: 'Número', dataIndex: 'numero', width: 120 },
+            {
+              title: 'Auditoria',
+              dataIndex: 'dataAuditoria',
+              width: 110,
+              render: (d: string) => dataBR(d),
+            },
+            { title: 'Fornecedor', dataIndex: 'fornecedorNome' },
+            {
+              title: 'Rodadas',
+              dataIndex: 'rodadasLancadas',
+              width: 90,
+              align: 'right',
+            },
+            {
+              title: 'Nota',
+              dataIndex: 'nota',
+              width: 90,
+              align: 'right',
+              render: (v: number | null) => <strong>{nota(v)}</strong>,
+            },
+            {
+              title: 'Resultado',
+              dataIndex: 'resultado',
+              width: 210,
+              render: (r: string | null) =>
+                r ? (
+                  <Tag color={corResultadoAuditoria[r]}>
+                    {labelResultadoAuditoria[r]}
+                  </Tag>
+                ) : (
+                  <Tag>Aguardando checklist</Tag>
+                ),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'statusAuditoria',
+              width: 130,
+              render: (s: string) => (
+                <Tag color={corStatusAuditoria[s]}>
+                  {labelStatusAuditoria[s]}
                 </Tag>
               ),
             },

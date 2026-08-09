@@ -21,6 +21,8 @@ import Homologacoes from './pages/sqd/Homologacoes';
 import HomologacaoDetalhe from './pages/sqd/HomologacaoDetalhe';
 import HomologacoesItens from './pages/sqd/HomologacoesItens';
 import HomologacaoItemDetalhe from './pages/sqd/HomologacaoItemDetalhe';
+import Auditorias from './pages/sqd/Auditorias';
+import AuditoriaDetalhe from './pages/sqd/AuditoriaDetalhe';
 
 function Privado({ children }: { children: JSX.Element }) {
   const { usuario } = useAuth();
@@ -73,6 +75,11 @@ export default function App() {
       <Route
         path="/sqd/homologacoes-itens/:id"
         element={<Privado><HomologacaoItemDetalhe /></Privado>}
+      />
+      <Route path="/sqd/auditorias" element={<Privado><Auditorias /></Privado>} />
+      <Route
+        path="/sqd/auditorias/:id"
+        element={<Privado><AuditoriaDetalhe /></Privado>}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

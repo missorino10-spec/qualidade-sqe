@@ -56,6 +56,8 @@ model Usuario {
   homologacoes        HomologacaoFornecedor[]  @relation("HomologacaoCriadoPor")
   homologacoesItem    HomologacaoItem[]        @relation("HomologacaoItemCriadoPor")
   relatoriosInspecaoItem RelatorioInspecaoItem[] @relation("RelatorioItemCriadoPor")
+  auditoriasFornecedor   AuditoriaFornecedor[]   @relation("AuditoriaCriadoPor")
+  rodadasAuditoria       RodadaAuditoria[]       @relation("RodadaAuditoriaCriadoPor")
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
@@ -1014,4 +1016,115 @@ model RelatorioInspecaoItem {
   updatedAt   DateTime @updatedAt
 
   @@unique([homologacaoId, tentativa])
+}
+
+// ---------------------------------------------------------------------------
+// SQD - AUDITORIA DE FORNECEDORES - planilha "Checklist Auditoria"
+// (abas Checklist, Pontuacao e Resumo) + relatorio de auditoria (RT).
+//
+// 46 perguntas distribuidas em 12 blocos com peso. A nota e a media ponderada
+// dos blocos, normalizada pela soma dos pesos dos blocos avaliados (bloco
+// inteiro em N/A sai da conta e o restante se rebalanceia sozinho).
+//
+// A auditoria e um evento: um registro por auditoria, com N rodadas dentro.
+// A rodada 01 e a auditoria inicial; as seguintes sao as reavaliacoes.
+// Reprovado reavalia em 90 dias corridos, aprovado condicionalmente em 180,
+// sempre contados da data da rodada que gerou o resultado. O ciclo so termina
+// quando a Qualidade encerra a auditoria.
+
+enum ResultadoAuditoria {
+  APROVADO                  // nota >= 90
+  APROVADO_CONDICIONALMENTE // nota de 80 a 89,99
+  REPROVADO                 // nota < 80
+  CANCELADO
+}
+
+enum StatusAuditoria {
+  EM_ANDAMENTO
+  FINALIZADO
+  CANCELADO
+}
+
+model AuditoriaFornecedor {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // AUD0001/2026
+  ano        Int
+  sequencial Int
+  semana     String // W28 - mesma regra de semana do resto do sistema
+
+  // --- Cabecalho do checklist (aba "Checklist (2)", linhas 2 a 6) ---
+  fornecedorNome   String
+  cnpj             String?
+  codigoFornecedor String?
+  motivo           String? // motivo da auditoria
+  local            String? // local de realizacao
+  auditores        String? // auditores responsaveis
+  participantes    String? // participantes do fornecedor
+  dataAuditoria    DateTime? // data da auditoria inicial (rodada 01)
+
+  // --- Espelho da ultima rodada lancada ---
+  dataUltimaRodada DateTime?
+  nota             Float? // 0 a 100, ja normalizada
+  resultado        ResultadoAuditoria?
+
+  // Prazo de reavaliacao em dias corridos (90 reprovado / 180 condicional),
+  // contado a partir da data da rodada que gerou o resultado.
+  prazoReavaliacaoDias  Int?
+  dataLimiteReavaliacao DateTime?
+
+  conclusao   String? // conclusao/recomendacao da Qualidade
+  observacoes String?
+
+  statusAuditoria StatusAuditoria @default(EM_ANDAMENTO)
+  dataFinalizacao DateTime?
+
+  // Anexos (tabela polimorfica Anexo):
+  //   "AUDITORIA_RELATORIO"  - relatorio final escrito pela Qualidade
+  //   "AUDITORIA_PLANO_ACAO" - plano de acao enviado pelo fornecedor
+
+  rodadas RodadaAuditoria[]
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("AuditoriaCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ano, sequencial])
+  @@index([dataAuditoria])
+}
+
+// Rodada da auditoria: o checklist preenchido de uma passada. Nao tem numero
+// proprio: carrega o numero do registro mais a revisao (ex.: AUD0001/2026 - Rev. 02).
+model RodadaAuditoria {
+  id          Int                 @id @default(autoincrement())
+  auditoriaId Int
+  auditoria   AuditoriaFornecedor @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
+
+  rodada  Int    @default(1)
+  revisao String @default("01") // sempre igual ao numero da rodada, com dois digitos
+
+  dataAuditoria DateTime?
+  auditores     String?
+  participantes String?
+  local         String?
+
+  // Respostas do checklist:
+  // [{ codigo: "4.1.1", resposta: "SIM"|"PARCIAL"|"NAO"|"NAO_APLICAVEL", evidencia }]
+  respostas Json?
+
+  // Resultado por bloco (aba "Resumo"):
+  // [{ bloco, nome, peso, pontuacao, ponderada, classificacao, respondidas }]
+  blocos    Json?
+  nota      Float?
+  resultado ResultadoAuditoria?
+
+  conclusao   String?
+  observacoes String?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("RodadaAuditoriaCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([auditoriaId, rodada])
 }

@@ -2,6 +2,8 @@
 // As opcoes vieram das listas de validacao do BDBR.QUA.FMR.029.01
 // (abas "2026" e "Base de Dados").
 
+import { dataBR } from '../../formatos';
+
 export const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
   APROVADO_CONDICIONALMENTE: 'Aprovado Condicionalmente',
@@ -129,6 +131,80 @@ export const labelOrigemInspecao: Record<string, string> = {
   LIBERACAO_SETUP: 'Liberação de Setup',
   OUTROS: 'Outros',
 };
+
+// ---------------------------------------------------------------------------
+// Auditoria de Fornecedores (planilha "Checklist Auditoria").
+// A nota tem as mesmas faixas da homologacao de fornecedores; o que muda e o
+// que acontece depois: reprovado e condicional caem no loop de reavaliacao.
+
+export const labelResultadoAuditoria: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  APROVADO_CONDICIONALMENTE: 'Aprovado Condicionalmente',
+  REPROVADO: 'Reprovado',
+  CANCELADO: 'Cancelado',
+};
+export const corResultadoAuditoria: Record<string, string> = {
+  APROVADO: 'green',
+  APROVADO_CONDICIONALMENTE: 'orange',
+  REPROVADO: 'red',
+  CANCELADO: 'default',
+};
+
+export const labelStatusAuditoria: Record<string, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+};
+export const corStatusAuditoria: Record<string, string> = {
+  EM_ANDAMENTO: 'blue',
+  FINALIZADO: 'green',
+  CANCELADO: 'default',
+};
+
+// Legenda da aba "Resumo": Sim = 1,0 · Parcial = 0,5 · Não = 0,0 · N/A fora.
+export const labelRespostaAuditoria: Record<string, string> = {
+  SIM: 'Sim',
+  PARCIAL: 'Parcial',
+  NAO: 'Não',
+  NAO_APLICAVEL: 'N/A',
+};
+export const corRespostaAuditoria: Record<string, string> = {
+  SIM: 'green',
+  PARCIAL: 'orange',
+  NAO: 'red',
+  NAO_APLICAVEL: 'default',
+};
+
+// Regua por bloco da aba "Resumo", com o vocabulario do relatorio de auditoria.
+export const labelClassificacaoBloco: Record<string, string> = {
+  SATISFATORIO: 'Satisfatório',
+  ATENCAO: 'Atenção',
+  CRITICO: 'Crítico',
+};
+export const corClassificacaoBloco: Record<string, string> = {
+  SATISFATORIO: 'green',
+  ATENCAO: 'orange',
+  CRITICO: 'red',
+};
+
+// Semaforo do prazo de reavaliacao (dias corridos): amarelo nos ultimos 15.
+export const corSemaforoReavaliacao: Record<string, string> = {
+  VERDE: 'green',
+  AMARELO: 'gold',
+  VERMELHO: 'red',
+};
+
+// Leitura do prazo do jeito que a Qualidade lê: "Reavaliar até 07/11/2026 ·
+// faltam 30 dias".
+export function textoReavaliacao(r: any): string {
+  if (!r) return '-';
+  const limite = dataBR(r.dataLimite);
+  if (r.diasRestantes < 0) {
+    return `Reavaliar até ${limite} · vencida há ${Math.abs(r.diasRestantes)} dia${Math.abs(r.diasRestantes) === 1 ? '' : 's'}`;
+  }
+  if (r.diasRestantes === 0) return `Reavaliar até ${limite} · vence hoje`;
+  return `Reavaliar até ${limite} · faltam ${r.diasRestantes} dia${r.diasRestantes === 1 ? '' : 's'}`;
+}
 
 export function opcoes(mapa: Record<string, string>) {
   return Object.entries(mapa).map(([value, label]) => ({ value, label }));

@@ -245,4 +245,113 @@ export class PainelSqdService {
     });
     return registros.map((h) => ({ ...h, tentativas: h._count.relatorios }));
   }
+
+  // KPIs da auditoria de fornecedores. Alem da nota e do resultado, o painel
+  // precisa mostrar o relogio das reavaliacoes: quantas ja venceram e quantas
+  // vencem nos proximos 15 dias.
+  async kpisAuditorias(de?: string, ate?: string) {
+    const where =
+      de || ate
+        ? {
+            dataAuditoria: {
+              gte: de ? new Date(`${de}T00:00:00.000Z`) : undefined,
+              lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
+            },
+          }
+        : {};
+
+    const registros = await this.prisma.auditoriaFornecedor.findMany({
+      where,
+      select: {
+        nota: true,
+        resultado: true,
+        statusAuditoria: true,
+        dataLimiteReavaliacao: true,
+        _count: { select: { rodadas: true } },
+      },
+    });
+
+    const total = registros.length;
+    // So entram na conta de aprovacao as que ja tem checklist lancado.
+    const avaliadas = registros.filter(
+      (a) => a.resultado != null && a.resultado !== 'CANCELADO',
+    );
+    const aprovados = avaliadas.filter((a) => a.resultado === 'APROVADO').length;
+    const condicionais = avaliadas.filter(
+      (a) => a.resultado === 'APROVADO_CONDICIONALMENTE',
+    ).length;
+    const reprovados = avaliadas.filter(
+      (a) => a.resultado === 'REPROVADO',
+    ).length;
+
+    // Reavaliacoes: so contam enquanto a auditoria esta aberta.
+    const hoje = new Date();
+    const emReavaliacao = registros.filter(
+      (a) =>
+        a.statusAuditoria === 'EM_ANDAMENTO' && a.dataLimiteReavaliacao != null,
+    );
+    const dias = (limite: Date) =>
+      Math.round(
+        (Date.UTC(
+          limite.getUTCFullYear(),
+          limite.getUTCMonth(),
+          limite.getUTCDate(),
+        ) -
+          Date.UTC(
+            hoje.getUTCFullYear(),
+            hoje.getUTCMonth(),
+            hoje.getUTCDate(),
+          )) /
+          86400000,
+      );
+
+    return {
+      total,
+      avaliadas: avaliadas.length,
+      aguardandoChecklist: registros.filter(
+        (a) => a.resultado == null && a.statusAuditoria === 'EM_ANDAMENTO',
+      ).length,
+      aprovados,
+      condicionais,
+      reprovados,
+      // A auditoria so e aprovacao plena a partir de 90 pontos.
+      pctAprovacao: percentual(aprovados, avaliadas.length),
+      notaMedia: media(avaliadas.map((a) => a.nota ?? 0)),
+      // Quantas precisaram de mais de uma rodada para chegar ao resultado.
+      reavaliadas: registros.filter((a) => a._count.rodadas > 1).length,
+      emReavaliacao: emReavaliacao.length,
+      reavaliacoesVencidas: emReavaliacao.filter(
+        (a) => dias(a.dataLimiteReavaliacao!) < 0,
+      ).length,
+      reavaliacoesAVencer: emReavaliacao.filter((a) => {
+        const d = dias(a.dataLimiteReavaliacao!);
+        return d >= 0 && d <= 15;
+      }).length,
+      emAndamento: registros.filter((a) => a.statusAuditoria === 'EM_ANDAMENTO')
+        .length,
+      finalizadas: registros.filter((a) => a.statusAuditoria === 'FINALIZADO')
+        .length,
+      canceladas: registros.filter((a) => a.statusAuditoria === 'CANCELADO')
+        .length,
+    };
+  }
+
+  async ultimasAuditorias() {
+    const registros = await this.prisma.auditoriaFornecedor.findMany({
+      orderBy: [{ ano: 'desc' }, { sequencial: 'desc' }],
+      take: 10,
+      select: {
+        id: true,
+        numero: true,
+        fornecedorNome: true,
+        dataAuditoria: true,
+        nota: true,
+        resultado: true,
+        statusAuditoria: true,
+        dataLimiteReavaliacao: true,
+        _count: { select: { rodadas: true } },
+      },
+    });
+    return registros.map((a) => ({ ...a, rodadasLancadas: a._count.rodadas }));
+  }
 }

@@ -91,6 +91,11 @@ const itensMenu: {
         icon: <FileProtectOutlined />,
         label: 'Homologação de Itens',
       },
+      {
+        key: '/sqd/auditorias',
+        icon: <AuditOutlined />,
+        label: 'Auditoria de Fornecedores',
+      },
     ],
   },
 ];

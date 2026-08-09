@@ -24,6 +24,7 @@ import { OitoDModule } from './manufatura/oitod/oitod.module';
 import { PainelManufaturaModule } from './manufatura/painel/painel.module';
 import { HomologacoesModule } from './sqd/homologacoes/homologacoes.module';
 import { HomologacoesItensModule } from './sqd/homologacoes-itens/homologacoes-itens.module';
+import { AuditoriasModule } from './sqd/auditorias/auditorias.module';
 import { PainelSqdModule } from './sqd/painel/painel-sqd.module';
 
 // Pasta com o frontend ja compilado (usada no pacote portatil, onde o proprio
@@ -65,6 +66,7 @@ const servirFrontend = existsSync(frontendDir);
     PainelManufaturaModule,
     HomologacoesModule,
     HomologacoesItensModule,
+    AuditoriasModule,
     PainelSqdModule,
   ],
 })
