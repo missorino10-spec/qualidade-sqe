@@ -17,6 +17,7 @@ import {
   Switch,
   Tag,
   Timeline,
+  Tooltip,
   Typography,
   Upload,
   message,
@@ -37,6 +38,11 @@ import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../api';
 import { AuthImage } from '../components/AuthImage';
+import { CotasSomenteLeitura } from '../components/TabelaCotas';
+import {
+  CardDesvioQualidade,
+  TIPO_DESVIO,
+} from '../components/DesvioQualidade';
 import { useAuth } from '../auth';
 import { corStatusRnc, labelStatusRnc } from './RncLista';
 
@@ -161,6 +167,13 @@ export default function RncDetalhe() {
     queryFn: async () => (await api.get(`/rnc/${id}`)).data,
   });
 
+  // Reincidencia: mesmo fornecedor, mesmo item e mesmo modo de falha em uma
+  // RNC anterior. E so a leitura do sistema - quem decide e o campo gravado.
+  const { data: reincidencia } = useQuery<any>({
+    queryKey: ['rnc', 'reincidencia', id],
+    queryFn: async () => (await api.get(`/rnc/${id}/reincidencia`)).data,
+  });
+
   const { data: anexos } = useQuery<any[]>({
     queryKey: ['anexos', 'RNC', id],
     queryFn: async () =>
@@ -278,6 +291,9 @@ export default function RncDetalhe() {
   const cancelada = rnc.status === 'CANCELADA';
   const inspecaoVinculada = rnc.inspecaoVisual ?? rnc.inspecaoLote;
   const tipoInspVinc = rnc.inspecaoVisual ? 'visual' : 'lote';
+  const cotasReprovadas: any[] = (
+    Array.isArray(rnc.inspecaoLote?.cotas) ? rnc.inspecaoLote.cotas : []
+  ).filter((c: any) => c?.conforme === false);
 
   function confirmarExclusao() {
     Modal.confirm({
@@ -473,12 +489,40 @@ export default function RncDetalhe() {
                 ) : (
                   <Tag>Não</Tag>
                 )}
+                {reincidencia?.reincidencia && (
+                  <Tooltip
+                    title={reincidencia.anteriores
+                      .map(
+                        (a: any) =>
+                          `${a.numero} (${dayjs(a.dataAbertura).format('DD/MM/YYYY')}): ${a.modos.join('; ')}`,
+                      )
+                      .join(' | ')}
+                  >
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {reincidencia.anteriores.length} RNC(s) anterior(es) com o
+                      mesmo modo de falha
+                    </Typography.Text>
+                  </Tooltip>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Tipo de desvio" span={2}>
                 {rnc.tipoDesvio ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Descrição do desvio" span={2}>
                 {rnc.descricaoDesvio}
+                {/* Cotas lidas da inspecao vinculada, na mesma tabela do
+                    formulario dimensional. Se a inspecao for corrigida
+                    depois, a RNC mostra a correcao. */}
+                {cotasReprovadas.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <Typography.Text strong>
+                      Cotas reprovadas no dimensional
+                    </Typography.Text>
+                    <div style={{ marginTop: 6 }}>
+                      <CotasSomenteLeitura cotas={cotasReprovadas} />
+                    </div>
+                  </div>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Qtd. de peças">
                 {rnc.quantidadePecas ?? '-'}
@@ -547,6 +591,14 @@ export default function RncDetalhe() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
+
+          <CardDesvioQualidade
+            registro={rnc}
+            entidadeTipo={TIPO_DESVIO.rnc}
+            base={`/rnc/${id}`}
+            podeEditar={!cancelada}
+            onMudou={invalidar}
+          />
 
           <Card
             title={`Evidências / Fotos (até ${MAX_FOTOS})`}
@@ -701,6 +753,14 @@ export default function RncDetalhe() {
                 name="reincidencia"
                 label="Reincidência"
                 valuePropName="checked"
+                // O sistema so sugere; quem decide e a Qualidade.
+                extra={
+                  reincidencia?.reincidencia
+                    ? `Sugerido pelo sistema: ${reincidencia.anteriores
+                        .map((a: any) => a.numero)
+                        .join(', ')} com o mesmo modo de falha.`
+                    : undefined
+                }
               >
                 <Switch checkedChildren="Sim" unCheckedChildren="Não" />
               </Form.Item>

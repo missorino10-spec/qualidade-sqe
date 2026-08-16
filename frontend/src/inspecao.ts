@@ -411,5 +411,69 @@ export function resultadoVisual(
   return reprovou ? 'REPROVADO' : 'APROVADO';
 }
 
-// Limite de fotos do bloco EVIDENCIAS / EVIDENCE do formulario visual.
+// Limite de fotos de CADA bloco de evidencias. Os formularios tem dois blocos
+// independentes - um do dimensional e um do visual -, entao o limite vale por
+// bloco: ate 4 fotos no dimensional e ate 4 no visual.
 export const MAX_FOTOS_EVIDENCIA = 4;
+
+// ---------------------------------------------------------------------------
+// ORIGEM DA INSPECAO
+// A mesma lista dos tres modulos, na ordem do formulario em papel. O enum no
+// banco e um so; o que muda e o que cada modulo oferta:
+//   - INSPECAO_PRODUCAO so faz sentido na Manufatura (inspecao durante a
+//     producao), entao nao aparece no SQE nem no SQD.
+// ---------------------------------------------------------------------------
+
+export const ORIGENS_INSPECAO: { value: string; label: string }[] = [
+  { value: 'PLANO_INSPECAO', label: 'Plano de Inspeção' },
+  { value: 'HOMOLOGACAO', label: 'Homologação' },
+  { value: 'DEVOLUCAO', label: 'Devolução' },
+  { value: 'RETRABALHO', label: 'Retrabalho' },
+  { value: 'RELATORIO_OCORRENCIA', label: 'Relatório de Ocorrência' },
+  { value: 'LIBERACAO_SETUP', label: 'Liberação de Setup' },
+  { value: 'INSPECAO_PRODUCAO', label: 'Inspeção de Produção' },
+  { value: 'OUTROS', label: 'Outros' },
+];
+
+// Lista ofertada fora da Manufatura (sem a inspecao de producao).
+export const ORIGENS_RECEBIMENTO = ORIGENS_INSPECAO.filter(
+  (o) => o.value !== 'INSPECAO_PRODUCAO',
+);
+
+export const labelOrigemInspecao: Record<string, string> = Object.fromEntries(
+  ORIGENS_INSPECAO.map((o) => [o.value, o.label]),
+);
+
+// ---------------------------------------------------------------------------
+// EVIDENCIAS: o dimensional e o visual tem blocos de foto separados.
+// As fotos vivem na tabela polimorfica Anexo, identificadas pelo entidadeTipo
+// abaixo. No SQE cada formulario e um registro proprio, entao cada um tem um
+// bloco so; na Manufatura e no SQD os dois convivem no mesmo registro.
+// INSPECAO_VISUAL e o valor antigo do SQE - foi mantido para nao perder as
+// fotos ja gravadas.
+// ---------------------------------------------------------------------------
+export const EVID = {
+  sqeVisual: 'INSPECAO_VISUAL',
+  sqeDimensional: 'INSPECAO_LOTE',
+  manufaturaDimensional: 'RELATORIO_DIMENSIONAL_DIM',
+  manufaturaVisual: 'RELATORIO_DIMENSIONAL_VIS',
+  homologacaoItemDimensional: 'HOMOLOGACAO_ITEM_AMOSTRAS',
+  homologacaoItemVisual: 'HOMOLOGACAO_ITEM_VISUAL',
+} as const;
+
+// ---------------------------------------------------------------------------
+// DESENHO E REVISAO
+// Hoje sao dois campos. Os registros antigos gravaram os dois juntos num campo
+// unico (desenhoRev), que nao foi migrado: quando os campos novos estao
+// vazios, o que se mostra e o valor legado inteiro, no campo Desenho.
+// ---------------------------------------------------------------------------
+export function textoDesenho(
+  desenho?: string | null,
+  legado?: string | null,
+): string {
+  return desenho || legado || '-';
+}
+
+export function textoRevisao(revisao?: string | null): string {
+  return revisao || '-';
+}

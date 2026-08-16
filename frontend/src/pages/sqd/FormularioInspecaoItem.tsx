@@ -12,9 +12,9 @@ import {
   Table,
   Typography,
 } from 'antd';
-import { labelOrigemInspecao, opcoes } from './comum';
 import { OPCOES_NORMA, cotaVaziaPecas } from '../../components/TabelaCotas';
 import {
+  ORIGENS_RECEBIMENTO,
   CotaPecas,
   GrupoVisual,
   NormaTolerancia,
@@ -176,11 +176,18 @@ export function CamposCabecalhoInspecao() {
       </Col>
       <Col xs={12} md={6}>
         <Form.Item name="origem" label="Origem">
-          <Select options={opcoes(labelOrigemInspecao)} />
+          {/* A inspecao de producao so existe na Manufatura. */}
+          <Select options={ORIGENS_RECEBIMENTO} />
         </Form.Item>
       </Col>
-      <Col xs={12} md={6}>
-        <Form.Item name="desenhoRev" label="Desenho / Rev.">
+      <Col xs={8} md={4}>
+        <Form.Item name="desenho" label="Desenho">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col xs={4} md={2}>
+        {/* Revisao DO DESENHO. */}
+        <Form.Item name="desenhoRevisao" label="Revisão">
           <Input />
         </Form.Item>
       </Col>

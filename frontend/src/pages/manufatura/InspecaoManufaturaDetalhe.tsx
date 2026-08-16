@@ -25,6 +25,11 @@ import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataBR } from '../../formatos';
 import { CotasSomenteLeitura } from '../../components/TabelaCotas';
 import {
+  FotosEvidenciaSalvas,
+  enviarFotosEvidencia,
+} from '../../components/FotosEvidencia';
+import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
+import {
   CamposRelatorio,
   ORIGENS_INSPECAO,
   corResultadoManufatura,
@@ -81,8 +86,11 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           {rel.itemDescricao ?? '-'}
         </Descriptions.Item>
         <Descriptions.Item label="PO">{rel.po ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="Desenho / Rev.">
-          {rel.desenhoRev ?? '-'}
+        <Descriptions.Item label="Desenho">
+          {textoDesenho(rel.desenho, rel.desenhoRev)}
+        </Descriptions.Item>
+        <Descriptions.Item label="Revisão">
+          {textoRevisao(rel.desenhoRevisao)}
         </Descriptions.Item>
         <Descriptions.Item label="Origem">
           {labelOrigem(rel.origem, rel.origemOutros)}
@@ -96,6 +104,19 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
       </Descriptions>
 
       <CotasSomenteLeitura cotas={rel.cotas} />
+
+      <Card size="small" title="Evidências do dimensional" style={{ marginTop: 12 }}>
+        <FotosEvidenciaSalvas
+          entidadeTipo={EVID.manufaturaDimensional}
+          entidadeId={rel.id}
+        />
+      </Card>
+      <Card size="small" title="Evidências do visual" style={{ marginTop: 12 }}>
+        <FotosEvidenciaSalvas
+          entidadeTipo={EVID.manufaturaVisual}
+          entidadeId={rel.id}
+        />
+      </Card>
 
       {defeitos.length > 0 && (
         <Table
@@ -158,6 +179,8 @@ export default function InspecaoManufaturaDetalhe() {
   const [form] = Form.useForm();
   const [cotas, setCotas] = useState<any[]>([]);
   const [defeitos, setDefeitos] = useState<any[]>([]);
+  const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
+  const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const { data, isLoading } = useQuery<any>({
@@ -200,7 +223,8 @@ export default function InspecaoManufaturaDetalhe() {
       origemOutros: ultimo?.origemOutros ?? undefined,
       itemCodigo: ultimo?.itemCodigo ?? undefined,
       itemDescricao: ultimo?.itemDescricao ?? undefined,
-      desenhoRev: ultimo?.desenhoRev ?? undefined,
+      desenho: ultimo?.desenho ?? ultimo?.desenhoRev ?? undefined,
+      desenhoRevisao: ultimo?.desenhoRevisao ?? undefined,
       toleranciasNorm: ultimo?.toleranciasNorm ?? 'ISO2768',
       po: ultimo?.po ?? undefined,
       qtdInspecionada: ultimo?.qtdInspecionada ?? 3,
@@ -225,6 +249,8 @@ export default function InspecaoManufaturaDetalhe() {
         : [cotaVazia()],
     );
     setDefeitos([]);
+    setFotosDimensional([]);
+    setFotosVisual([]);
     setOpen(true);
   }
 
@@ -237,6 +263,23 @@ export default function InspecaoManufaturaDetalhe() {
         cotas,
         defeitos: defeitos.filter((d) => d.tipoDefeitoId),
       });
+      // A evidencia e da tentativa, entao vai no relatorio recem-criado.
+      const novos = res.data.relatorios ?? [];
+      const relatorioId = novos[novos.length - 1]?.id;
+      if (relatorioId) {
+        if (fotosDimensional.length)
+          await enviarFotosEvidencia(
+            fotosDimensional,
+            EVID.manufaturaDimensional,
+            relatorioId,
+          );
+        if (fotosVisual.length)
+          await enviarFotosEvidencia(
+            fotosVisual,
+            EVID.manufaturaVisual,
+            relatorioId,
+          );
+      }
       message.success(`Reinspeção ${res.data.numero} registrada.`);
       qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
@@ -388,6 +431,10 @@ export default function InspecaoManufaturaDetalhe() {
             defeitos={defeitos}
             setDefeitos={setDefeitos}
             tipo={data.tipo}
+            fotosDimensional={fotosDimensional}
+            setFotosDimensional={setFotosDimensional}
+            fotosVisual={fotosVisual}
+            setFotosVisual={setFotosVisual}
           />
         </Form>
       </Modal>

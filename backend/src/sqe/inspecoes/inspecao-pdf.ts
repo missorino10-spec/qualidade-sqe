@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
-import { labelNorma } from '../../comum/inspecao';
+import { labelNorma, labelOrigemInspecao } from '../../comum/inspecao';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
 
 const LARANJA = '#E8792B';
@@ -41,6 +41,7 @@ function txt(v: any): string {
 export function gerarPdfInspecao(
   insp: any,
   fotosVisual: Buffer[] = [],
+  fotosDimensional: Buffer[] = [],
 ): PDFKit.PDFDocument {
   // bufferPages: sem isso o rodape "Pagina X de Y" nao consegue voltar nas
   // paginas anteriores - bufferedPageRange() enxergaria so a pagina atual.
@@ -275,11 +276,25 @@ export function gerarPdfInspecao(
       valor: txt(formulario.qtdInspecionada),
     },
     { w: 80, label: 'QTD. DO LOTE', valor: txt(formulario.qtdTotal) },
-    { w: 130, label: 'DESENHO / REV.', valor: txt(formulario.desenhoRev) },
     {
-      w: W - 90 - 80 - 130,
+      w: 90,
+      label: 'DESENHO',
+      // Registros antigos gravaram desenho e revisao juntos em desenhoRev.
+      valor: txt(formulario.desenho ?? formulario.desenhoRev),
+    },
+    { w: 50, label: 'REVISÃO', valor: txt(formulario.revisao) },
+    {
+      w: W - 90 - 80 - 90 - 50,
       label: 'TOLERÂNCIAS / NORMA',
       valor: labelNorma(formulario.toleranciasNorm),
+    },
+  ]);
+
+  linha([
+    {
+      w: W,
+      label: 'ORIGEM DA INSPEÇÃO',
+      valor: labelOrigemInspecao[formulario.origem] ?? txt(formulario.origem),
     },
   ]);
 
@@ -339,16 +354,18 @@ export function gerarPdfInspecao(
       bloco('Observações da inspeção visual', txt(insp.visual.observacoes), 40);
     }
 
-    // Bloco EVIDENCIAS do formulario: as fotos que comprovam a inspecao.
-    y += 6;
-    faixa('EVIDÊNCIAS / EVIDENCE');
-    y = desenharFotosEvidencia(doc, fotosVisual, {
-      x0: X0,
-      largura: W,
-      y,
-      margem: M,
-      rodape: RODAPE,
-    });
+    // Bloco EVIDENCIAS do visual: as fotos que comprovam a inspecao.
+    if (fotosVisual.length) {
+      y += 6;
+      faixa('EVIDÊNCIAS DO VISUAL');
+      y = desenharFotosEvidencia(doc, fotosVisual, {
+        x0: X0,
+        largura: W,
+        y,
+        margem: M,
+        rodape: RODAPE,
+      });
+    }
   }
 
   // ---------------------------------------------------------- lote
@@ -365,6 +382,19 @@ export function gerarPdfInspecao(
     if (insp.lote.observacoes) {
       y += 4;
       bloco('Observações da inspeção de lote', txt(insp.lote.observacoes), 40);
+    }
+
+    // Bloco EVIDENCIAS do dimensional, independente do bloco do visual.
+    if (fotosDimensional.length) {
+      y += 6;
+      faixa('EVIDÊNCIAS DO DIMENSIONAL');
+      y = desenharFotosEvidencia(doc, fotosDimensional, {
+        x0: X0,
+        largura: W,
+        y,
+        margem: M,
+        rodape: RODAPE,
+      });
     }
   }
 

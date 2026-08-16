@@ -129,6 +129,8 @@ export class InspecoesManufaturaService {
             itemCodigo: dto.itemCodigo ?? null,
             itemDescricao: dto.itemDescricao ?? null,
             desenhoRev: dto.desenhoRev ?? null,
+            desenho: dto.desenho ?? null,
+            desenhoRevisao: dto.desenhoRevisao ?? null,
             po: dto.po ?? null,
             qtdInspecionada: dto.qtdInspecionada ?? null,
             qtdTotal: dto.qtdTotal ?? null,

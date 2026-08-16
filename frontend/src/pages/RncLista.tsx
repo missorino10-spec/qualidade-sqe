@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
+import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
 
 export const corStatusRnc: Record<string, string> = {
   EM_ANDAMENTO: 'orange',
@@ -168,6 +169,18 @@ export default function RncLista() {
             onFilter: (v: any, r: any) => r.reincidencia === v,
             render: (v: boolean) =>
               v ? <Tag color="red">Sim</Tag> : <Tag>Não</Tag>,
+          },
+          {
+            title: 'Desvio de qualidade',
+            dataIndex: 'desvioQualidade',
+            width: 150,
+            align: 'center',
+            filters: FILTROS_DESVIO,
+            onFilter: (v: any, r: any) => situacaoDesvio(r).valor === v,
+            render: (_: any, r: any) => {
+              const s = situacaoDesvio(r);
+              return <Tag color={s.cor}>{s.texto}</Tag>;
+            },
           },
           {
             title: 'Valor (R$)',

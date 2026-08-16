@@ -2,7 +2,14 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
-import { labelNorma } from '../../comum/inspecao';
+import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+import { labelNorma, ORIGENS_INSPECAO } from '../../comum/inspecao';
+
+// Fotos de cada tentativa, indexadas pelo id do relatorio dimensional.
+export type FotosRelatorio = Record<
+  number,
+  { dimensional: Buffer[]; visual: Buffer[] }
+>;
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -18,16 +25,12 @@ const X1 = 555;
 const W = X1 - X0;
 const RODAPE = 55;
 
-// Checkboxes de origem, na mesma ordem do formulario em papel.
-const ORIGENS: { chave: string; label: string }[] = [
-  { chave: 'PLANO_INSPECAO', label: 'Plano de Inspeção' },
-  { chave: 'HOMOLOGACAO', label: 'Homologação' },
-  { chave: 'DEVOLUCAO', label: 'Devolução' },
-  { chave: 'RETRABALHO', label: 'Retrabalho' },
-  { chave: 'RELATORIO_OCORRENCIA', label: 'Relatório de Ocorrência' },
-  { chave: 'LIBERACAO_SETUP', label: 'Liberação de Setup' },
-  { chave: 'OUTROS', label: 'Outros' },
-];
+// Checkboxes de origem, na mesma ordem do formulario em papel. A Manufatura e
+// o unico modulo que oferta a inspecao de producao, entao usa a lista cheia.
+const ORIGENS = ORIGENS_INSPECAO.map((o) => ({
+  chave: o.value,
+  label: o.label,
+}));
 
 const LABEL_RESULTADO: Record<string, string> = {
   APROVADO: 'APROVADO',
@@ -64,7 +67,10 @@ function txt(v: any): string {
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Um documento por INSPECAO, com TODAS as tentativas (1a inspecao e as
 // reinspecoes) na sequencia, cada uma com o seu proprio numero.
-export function gerarPdfRelatorioDimensional(insp: any): PDFKit.PDFDocument {
+export function gerarPdfRelatorioDimensional(
+  insp: any,
+  fotos: FotosRelatorio = {},
+): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   let y = 0;
 
@@ -328,8 +334,13 @@ export function gerarPdfRelatorioDimensional(insp: any): PDFKit.PDFDocument {
         label: 'DESCRIÇÃO',
         valor: txt(rel.itemDescricao ?? insp.itemDescricao),
       },
-      { w: 90, label: 'DESENHO / REV.', valor: txt(rel.desenhoRev) },
-      { w: W - 90 - 215 - 90, label: 'PO', valor: txt(rel.po ?? insp.po) },
+      {
+        w: 65,
+        label: 'DESENHO',
+        valor: txt(rel.desenho ?? rel.desenhoRev),
+      },
+      { w: 45, label: 'REVISÃO', valor: txt(rel.desenhoRevisao) },
+      { w: W - 90 - 215 - 65 - 45, label: 'PO', valor: txt(rel.po ?? insp.po) },
     ]);
 
     linha([
@@ -353,6 +364,24 @@ export function gerarPdfRelatorioDimensional(insp: any): PDFKit.PDFDocument {
     y += 6;
     faixa('COTAS INSPECIONADAS');
     tabelaCotas(rel);
+
+    // Evidencia fotografica e opcional na Manufatura: cada bloco so aparece
+    // no papel quando o inspetor subiu foto nele.
+    const fotosRel = fotos[rel.id] ?? { dimensional: [], visual: [] };
+    const evidencias = (titulo: string, imagens: Buffer[]) => {
+      if (!imagens.length) return;
+      y += 6;
+      faixa(titulo);
+      y = desenharFotosEvidencia(doc, imagens, {
+        x0: X0,
+        largura: W,
+        y,
+        margem: M,
+        rodape: RODAPE,
+      });
+    };
+    evidencias('EVIDÊNCIAS DO DIMENSIONAL', fotosRel.dimensional);
+    evidencias('EVIDÊNCIAS DO VISUAL', fotosRel.visual);
 
     // Bloco visual opcional no fim do relatorio (defeitos encontrados).
     const defeitos = Array.isArray(rel.defeitos) ? rel.defeitos : [];

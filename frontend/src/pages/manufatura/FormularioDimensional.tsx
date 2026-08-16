@@ -19,20 +19,16 @@ import {
   TabelaCotasMaxMin,
   cotaVaziaMaxMin,
 } from '../../components/TabelaCotas';
+import { ORIGENS_INSPECAO } from '../../inspecao';
+import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
 
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Os campos e a ordem seguem o formulario em papel, sem acrescimos.
 // A tabela de cotas e a mesma dos outros modulos (src/components/TabelaCotas).
 
-export const ORIGENS_INSPECAO = [
-  { value: 'PLANO_INSPECAO', label: 'Plano de Inspeção' },
-  { value: 'HOMOLOGACAO', label: 'Homologação' },
-  { value: 'DEVOLUCAO', label: 'Devolução' },
-  { value: 'RETRABALHO', label: 'Retrabalho' },
-  { value: 'RELATORIO_OCORRENCIA', label: 'Relatório de Ocorrência' },
-  { value: 'LIBERACAO_SETUP', label: 'Liberação de Setup' },
-  { value: 'OUTROS', label: 'Outros' },
-];
+// A Manufatura e o unico modulo que oferta a inspecao de producao, entao usa
+// a lista cheia (a fonte da lista e src/inspecao.ts).
+export { ORIGENS_INSPECAO };
 
 export const corResultadoManufatura: Record<string, string> = {
   APROVADO: 'green',
@@ -159,6 +155,10 @@ export function CamposRelatorio({
   tipo,
   setups,
   avaliacao,
+  fotosDimensional,
+  setFotosDimensional,
+  fotosVisual,
+  setFotosVisual,
 }: {
   form: any;
   maquinas?: any[];
@@ -170,6 +170,10 @@ export function CamposRelatorio({
   tipo: 'SETUP' | 'PRODUCAO';
   setups?: any[];
   avaliacao?: any;
+  fotosDimensional: any[];
+  setFotosDimensional: (f: any[]) => void;
+  fotosVisual: any[];
+  setFotosVisual: (f: any[]) => void;
 }) {
   const origem = Form.useWatch('origem', form);
   const resultado = Form.useWatch('resultado', form);
@@ -267,8 +271,14 @@ export function CamposRelatorio({
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={8}>
-          <Form.Item name="desenhoRev" label="Desenho / Rev.">
+        <Col span={5}>
+          <Form.Item name="desenho" label="Desenho">
+            <Input />
+          </Form.Item>
+        </Col>
+        <Col span={3}>
+          {/* Revisao DO DESENHO - a revisao do relatorio e outro campo. */}
+          <Form.Item name="desenhoRevisao" label="Revisão">
             <Input />
           </Form.Item>
         </Col>
@@ -293,6 +303,21 @@ export function CamposRelatorio({
         Cotas
       </Divider>
       <TabelaCotasMaxMin cotas={cotas} setCotas={setCotas} norma={norma} />
+
+      {/* Dois blocos de evidencia independentes. Na Manufatura preencher foto
+          e opcional: o inspetor sobe so o que precisar comprovar. */}
+      <Divider orientation="left" plain>
+        Evidências do dimensional (opcional)
+      </Divider>
+      <UploadFotosEvidencia
+        fotos={fotosDimensional}
+        setFotos={setFotosDimensional}
+      />
+
+      <Divider orientation="left" plain>
+        Evidências do visual (opcional)
+      </Divider>
+      <UploadFotosEvidencia fotos={fotosVisual} setFotos={setFotosVisual} />
 
       <Divider orientation="left" plain>
         Defeitos encontrados (opcional)

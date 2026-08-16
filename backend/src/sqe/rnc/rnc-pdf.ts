@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { desenharTabelaCotas } from '../../comum/cotas-pdf';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -242,16 +243,53 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   }
 
   // ---------- Rodape ----------
-  doc
-    .font('Helvetica')
-    .fontSize(7)
-    .fillColor(CINZA)
-    .text(
-      `Big Dutchman Brasil — Sistema de Qualidade · Emitido em ${new Date().toLocaleString('pt-BR')}`,
-      X0,
-      doc.page.height - 45,
-      { width: W, align: 'center' },
-    );
+  const rodape = () =>
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .fillColor(CINZA)
+      .text(
+        `Big Dutchman Brasil — Sistema de Qualidade · Emitido em ${new Date().toLocaleString('pt-BR')}`,
+        X0,
+        doc.page.height - 45,
+        { width: W, align: 'center' },
+      );
+  rodape();
+
+  // ---------- Anexo: cotas reprovadas ----------
+  // O formulario oficial e de uma pagina so, entao a tabela do dimensional
+  // entra como anexo. As cotas vem da inspecao vinculada (leitura ao vivo),
+  // e nao de uma copia gravada na RNC.
+  const cotas: any[] = Array.isArray(rnc.inspecaoLote?.cotas)
+    ? rnc.inspecaoLote.cotas
+    : [];
+  const reprovadas = cotas.filter((c) => c?.conforme === false);
+  if (reprovadas.length) {
+    doc.addPage();
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor(PRETO)
+      .text('Cotas Reprovadas', X0, M, { width: W });
+    doc
+      .font('Helvetica-Oblique')
+      .fontSize(8)
+      .fillColor(CINZA)
+      .text(
+        `Rejected Dimensions — RNC ${rnc.numero} · inspeção dimensional do recebimento`,
+        X0,
+        M + 15,
+        { width: W },
+      );
+    desenharTabelaCotas(doc, reprovadas, {
+      x0: X0,
+      largura: W,
+      y: M + 34,
+      margem: M,
+      rodape: 60,
+    });
+    rodape();
+  }
 
   return doc;
 }

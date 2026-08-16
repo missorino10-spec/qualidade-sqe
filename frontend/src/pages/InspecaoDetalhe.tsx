@@ -22,6 +22,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../api';
 import { CotasSomenteLeitura } from '../components/TabelaCotas';
 import { FotosEvidenciaSalvas } from '../components/FotosEvidencia';
+import {
+  EVID,
+  labelOrigemInspecao,
+  textoDesenho,
+  textoRevisao,
+} from '../inspecao';
 
 // Detalhe da inspecao: mostra os formularios COMO FORAM PREENCHIDOS, item a
 // item, aprovada ou reprovada. E o mesmo conteudo exportado no PDF.
@@ -107,11 +113,17 @@ function Formulario({
         <Descriptions.Item label="Qtd. inspecionada">
           {dados.qtdInspecionada ?? '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Desenho / Revisão">
-          {dados.desenhoRev ?? '-'}
+        <Descriptions.Item label="Desenho">
+          {textoDesenho(dados.desenho, dados.desenhoRev)}
         </Descriptions.Item>
-        <Descriptions.Item label="Tolerâncias / Norma" span={2}>
+        <Descriptions.Item label="Revisão">
+          {textoRevisao(dados.revisao)}
+        </Descriptions.Item>
+        <Descriptions.Item label="Tolerâncias / Norma">
           {dados.toleranciasNorm ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label="Origem da inspeção" span={3}>
+          {labelOrigemInspecao[dados.origem] ?? dados.origem ?? '-'}
         </Descriptions.Item>
       </Descriptions>
       {children}
@@ -243,9 +255,13 @@ export default function InspecaoDetalhe() {
           dados={data.visual}
         >
           <ChecklistPreenchido checklist={data.visual.checklist} />
-          <Card size="small" title="Evidências / Evidence" style={{ marginTop: 12 }}>
+          <Card
+            size="small"
+            title="Evidências do visual"
+            style={{ marginTop: 12 }}
+          >
             <FotosEvidenciaSalvas
-              entidadeTipo="INSPECAO_VISUAL"
+              entidadeTipo={EVID.sqeVisual}
               entidadeId={data.visual.id}
             />
           </Card>
@@ -259,6 +275,16 @@ export default function InspecaoDetalhe() {
           dados={data.lote}
         >
           <CotasSomenteLeitura cotas={data.lote.cotas} />
+          <Card
+            size="small"
+            title="Evidências do dimensional"
+            style={{ marginTop: 12 }}
+          >
+            <FotosEvidenciaSalvas
+              entidadeTipo={EVID.sqeDimensional}
+              entidadeId={data.lote.id}
+            />
+          </Card>
         </Formulario>
       )}
     </Space>

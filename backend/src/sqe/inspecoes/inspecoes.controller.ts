@@ -26,20 +26,16 @@ import { InspecoesService } from './inspecoes.service';
 import { gerarPdfInspecao } from './inspecao-pdf';
 import { StorageService } from '../../anexos/storage.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
+import { EVID, ORIGENS_RECEBIMENTO } from '../../comum/inspecao';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 
-const ORIGENS = [
-  'PLANO_INSPECAO',
-  'HOMOLOGACAO',
-  'DEVOLUCAO',
-  'RETRABALHO',
-  'RELATORIO_OCORRENCIA',
-  'OUTROS',
-];
+// O SQE oferta todas as origens menos a inspecao de producao, que so existe
+// na Manufatura.
+const ORIGENS = ORIGENS_RECEBIMENTO.map((o) => o.value);
 
 class CabecalhoDto {
   @IsOptional() @Type(() => Number) @IsInt() entregaId?: number;
@@ -48,6 +44,8 @@ class CabecalhoDto {
   @IsOptional() @IsString() itemCodigo?: string;
   @IsOptional() @IsString() itemDescricao?: string;
   @IsOptional() @IsString() desenhoRev?: string;
+  @IsOptional() @IsString() desenho?: string;
+  @IsOptional() @IsString() revisao?: string;
   @IsOptional() @IsString() toleranciasNorm?: string;
   @IsOptional() @IsString() notaFiscal?: string;
   @IsOptional() @IsString() po?: string;
@@ -158,17 +156,26 @@ export class InspecoesController {
   @Get(':id/pdf')
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const insp = await this.service.detalhe(id);
-    const fotos = await carregarFotosEvidencia(
-      this.prisma,
-      this.storage,
-      'INSPECAO_VISUAL',
-      insp.visual?.id,
-    );
+    // Dois blocos independentes de evidencia: um por formulario.
+    const [fotosVisual, fotosDimensional] = await Promise.all([
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.sqeVisual,
+        insp.visual?.id,
+      ),
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.sqeDimensional,
+        insp.lote?.id,
+      ),
+    ]);
     const numero = insp.numeroInspecao ?? `recebimento-${id}`;
     const nomeArquivo = `${numero.replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfInspecao(insp, fotos);
+    const doc = gerarPdfInspecao(insp, fotosVisual, fotosDimensional);
     doc.pipe(res);
     doc.end();
   }

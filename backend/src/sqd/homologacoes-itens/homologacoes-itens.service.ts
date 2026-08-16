@@ -16,6 +16,15 @@ import {
   resultadoDimensional,
   resultadoVisual,
 } from '../../comum/inspecao';
+import {
+  DESVIO,
+  dadosAberturaDesvio,
+  dadosEncerramentoDesvio,
+} from '../../comum/desvio-qualidade';
+import type {
+  AbrirDesvioDados,
+  EncerrarDesvioDados,
+} from '../../comum/desvio-qualidade';
 
 const includeHomologacao = {
   criadoPor: { select: { id: true, nome: true } },
@@ -228,6 +237,8 @@ export class HomologacoesItensService {
       dataInspecao,
       origem: dto.origem ?? 'HOMOLOGACAO',
       desenhoRev: dto.desenhoRev ?? null,
+      desenho: dto.desenho ?? null,
+      desenhoRevisao: dto.desenhoRevisao ?? null,
       tolerancias: dto.tolerancias ?? null,
       nf: dto.nf ?? null,
       po: dto.po ?? null,
@@ -442,6 +453,28 @@ export class HomologacoesItensService {
     return this.detalhe(id);
   }
 
+  // Desvio de qualidade (concessao): mesmas regras da RNC, em comum/.
+  async abrirDesvio(id: number, dados: AbrirDesvioDados) {
+    const h = await this.prisma.homologacaoItem.findUnique({ where: { id } });
+    if (!h) throw new NotFoundException('Homologação não encontrada');
+    const data = await dadosAberturaDesvio(
+      this.prisma,
+      DESVIO.homologacaoItem,
+      id,
+      dados,
+    );
+    await this.prisma.homologacaoItem.update({ where: { id }, data });
+    return this.detalhe(id);
+  }
+
+  async encerrarDesvio(id: number, dados: EncerrarDesvioDados) {
+    const h = await this.prisma.homologacaoItem.findUnique({ where: { id } });
+    if (!h) throw new NotFoundException('Homologação não encontrada');
+    const data = dadosEncerramentoDesvio(h, dados);
+    await this.prisma.homologacaoItem.update({ where: { id }, data });
+    return this.detalhe(id);
+  }
+
   async remover(id: number) {
     const h = await this.prisma.homologacaoItem.findUnique({ where: { id } });
     if (!h) throw new NotFoundException('Homologação não encontrada');
@@ -452,7 +485,11 @@ export class HomologacoesItensService {
       where: {
         entidadeId: id,
         entidadeTipo: {
-          in: [TIPO_ANEXO_RELATORIO_ITEM, TIPO_ANEXO_PLANO_ACAO_ITEM],
+          in: [
+            TIPO_ANEXO_RELATORIO_ITEM,
+            TIPO_ANEXO_PLANO_ACAO_ITEM,
+            DESVIO.homologacaoItem,
+          ],
         },
       },
     });

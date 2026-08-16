@@ -28,10 +28,14 @@ import { HomologacoesItensService } from './homologacoes-itens.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
+import { EVID, ORIGENS_RECEBIMENTO } from '../../comum/inspecao';
 import {
   gerarPdfRegistroHomologacaoItem,
   gerarPdfRelatorioInspecaoItem,
 } from './homologacao-item-pdf';
+
+// A inspecao de producao so existe na Manufatura.
+const ORIGENS = ORIGENS_RECEBIMENTO.map((o) => o.value);
 
 // Registro de Homologacao de Itens (FMR.025.01, aba "Lista"). O registro nasce
 // so com o controle; o relatorio de inspecao entra depois, pela rota
@@ -84,18 +88,11 @@ class RelatorioInspecaoDto {
   @IsOptional() @IsNumber() tentativa?: number;
   @IsOptional() @IsString() dataInspecao?: string;
   @IsOptional() @IsString() dataRetornoFornecedor?: string;
-  @IsOptional()
-  @IsIn([
-    'PLANO_INSPECAO',
-    'HOMOLOGACAO',
-    'DEVOLUCAO',
-    'RETRABALHO',
-    'RELATORIO_OCORRENCIA',
-    'LIBERACAO_SETUP',
-    'OUTROS',
-  ])
-  origem?: string;
+  @IsOptional() @IsIn(ORIGENS) origem?: string;
   @IsOptional() @IsString() desenhoRev?: string;
+  @IsOptional() @IsString() desenho?: string;
+  // Revisao DO DESENHO - "revisao" no SQD e o numero da tentativa.
+  @IsOptional() @IsString() desenhoRevisao?: string;
   @IsOptional() @IsString() tolerancias?: string;
   @IsOptional() @IsString() nf?: string;
   @IsOptional() @IsString() po?: string;
@@ -112,6 +109,20 @@ class RelatorioInspecaoDto {
   @IsOptional() @IsString() evidenciasVisual?: string;
   @IsOptional() @IsString() observacoesVisual?: string;
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultadoVisual?: string;
+}
+
+// Desvio de qualidade (concessao): quantidade, prazo, ou os dois. A validacao
+// do "ao menos um" e do documento anexo esta em comum/desvio-qualidade.
+class AbrirDesvioDto {
+  @IsString() aberturaEm: string;
+  @IsOptional() @IsNumber() quantidade?: number;
+  @IsOptional() @IsString() prazoFim?: string;
+  @IsOptional() @IsString() descricao?: string;
+}
+
+class EncerrarDesvioDto {
+  @IsString() encerradoEm: string;
+  @IsOptional() @IsString() observacoes?: string;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -163,13 +174,27 @@ export class HomologacoesItensController {
     const rel = alvo
       ? relatorios.find((x) => x.tentativa === alvo)
       : relatorios.at(-1);
-    const fotos = await carregarFotosEvidencia(
-      this.prisma,
-      this.storage,
-      'HOMOLOGACAO_ITEM_VISUAL',
-      rel?.id,
+    // Dois blocos independentes de evidencia, um por aba do relatorio.
+    const [fotosDimensional, fotosVisual] = await Promise.all([
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.homologacaoItemDimensional,
+        rel?.id,
+      ),
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.homologacaoItemVisual,
+        rel?.id,
+      ),
+    ]);
+    const doc = gerarPdfRelatorioInspecaoItem(
+      h,
+      alvo,
+      fotosVisual,
+      fotosDimensional,
     );
-    const doc = gerarPdfRelatorioInspecaoItem(h, alvo, fotos);
     this.enviarPdf(res, `${h.numero.replace('/', '-')}-relatorio.pdf`);
     doc.pipe(res);
     doc.end();
@@ -217,6 +242,26 @@ export class HomologacoesItensController {
   @Post(':id/reabrir')
   reabrir(@Param('id', ParseIntPipe) id: number) {
     return this.service.reabrir(id);
+  }
+
+  // O documento que autoriza o desvio sobe antes, em /anexos com entidadeTipo
+  // HOMOLOGACAO_ITEM_DESVIO - sem ele a abertura e recusada.
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/desvio')
+  abrirDesvio(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AbrirDesvioDto,
+  ) {
+    return this.service.abrirDesvio(id, dto);
+  }
+
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/desvio/encerrar')
+  encerrarDesvio(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EncerrarDesvioDto,
+  ) {
+    return this.service.encerrarDesvio(id, dto);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

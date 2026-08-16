@@ -27,7 +27,7 @@ import {
 } from './itens-utils';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
-import { labelNorma } from '../../comum/inspecao';
+import { labelNorma, labelOrigemInspecao } from '../../comum/inspecao';
 
 const LABEL_RESULTADO: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -48,15 +48,7 @@ const LABEL_MOTIVO: Record<string, string> = {
   ALTERACAO_PROCESSO: 'Alteração de Processo',
 };
 
-const LABEL_ORIGEM: Record<string, string> = {
-  PLANO_INSPECAO: 'Plano de Inspeção',
-  HOMOLOGACAO: 'Homologação',
-  DEVOLUCAO: 'Devolução',
-  RETRABALHO: 'Retrabalho',
-  RELATORIO_OCORRENCIA: 'Relatório de Ocorrência',
-  LIBERACAO_SETUP: 'Liberação de Setup',
-  OUTROS: 'Outros',
-};
+const LABEL_ORIGEM = labelOrigemInspecao;
 
 const LABEL_VISUAL: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -370,6 +362,7 @@ export function gerarPdfRelatorioInspecaoItem(
   h: any,
   tentativa?: number,
   fotosVisual: Buffer[] = [],
+  fotosDimensional: Buffer[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   const t = ferramentas(doc);
@@ -434,9 +427,14 @@ export function gerarPdfRelatorioInspecaoItem(
     },
   ]);
   t.linha([
-    { w: 170, label: 'DESENHO E REV. / DRAWING AND REV.', valor: txt(r.desenhoRev) },
     {
-      w: W - 170 - 175,
+      w: 120,
+      label: 'DESENHO / DRAWING',
+      valor: txt(r.desenho ?? r.desenhoRev),
+    },
+    { w: 50, label: 'REVISÃO / REV.', valor: txt(r.desenhoRevisao) },
+    {
+      w: W - 120 - 50 - 175,
       label: 'TOLERÂNCIAS / TOLERANCES',
       valor: labelNorma(r.tolerancias),
     },
@@ -479,6 +477,19 @@ export function gerarPdfRelatorioInspecaoItem(
     margem: M,
     rodape: RODAPE,
   });
+
+  // Evidencia da aba AMOSTRAS: opcional, so entra no papel quando tem foto.
+  if (fotosDimensional.length) {
+    t.estado.y += 6;
+    t.faixa('EVIDÊNCIAS DO DIMENSIONAL / DIMENSIONAL EVIDENCE');
+    t.estado.y = desenharFotosEvidencia(doc, fotosDimensional, {
+      x0: X0,
+      largura: W,
+      y: t.estado.y,
+      margem: M,
+      rodape: RODAPE,
+    });
+  }
 
   t.estado.y += 4;
   t.bloco(
@@ -552,9 +563,9 @@ export function gerarPdfRelatorioInspecaoItem(
     t.estado.y += 4;
   }
 
-  // Bloco EVIDENCIAS do formulario: as fotos que comprovam a inspecao.
+  // Bloco EVIDENCIAS do formulario visual: as fotos que comprovam a inspecao.
   t.estado.y += 6;
-  t.faixa('EVIDÊNCIAS / EVIDENCE');
+  t.faixa('EVIDÊNCIAS DO VISUAL / VISUAL EVIDENCE');
   t.estado.y = desenharFotosEvidencia(doc, fotosVisual, {
     x0: X0,
     largura: W,

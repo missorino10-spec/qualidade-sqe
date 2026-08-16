@@ -23,6 +23,10 @@ import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import {
+  FILTROS_DESVIO,
+  situacaoDesvio,
+} from '../../components/DesvioQualidade';
+import {
   corResultadoItem,
   corStatusHomologacao,
   labelMotivoItem,
@@ -180,6 +184,18 @@ export default function HomologacoesItens() {
                 ) : (
                   <Tag>Aguardando amostras do fornecedor</Tag>
                 ),
+            },
+            {
+              title: 'Desvio de qualidade',
+              dataIndex: 'desvioQualidade',
+              width: 150,
+              align: 'center',
+              filters: FILTROS_DESVIO,
+              onFilter: (v: any, r: any) => situacaoDesvio(r).valor === v,
+              render: (_: any, r: any) => {
+                const s = situacaoDesvio(r);
+                return <Tag color={s.cor}>{s.texto}</Tag>;
+              },
             },
             {
               title: 'Status',

@@ -3,6 +3,7 @@
 // (abas "2026" e "Base de Dados").
 
 import { dataBR } from '../../formatos';
+import { labelOrigemInspecao } from '../../inspecao';
 
 export const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -122,15 +123,9 @@ export const corStatusVisual: Record<string, string> = {
   NAO_APLICAVEL: 'default',
 };
 
-export const labelOrigemInspecao: Record<string, string> = {
-  PLANO_INSPECAO: 'Plano de Inspeção',
-  HOMOLOGACAO: 'Homologação',
-  DEVOLUCAO: 'Devolução',
-  RETRABALHO: 'Retrabalho',
-  RELATORIO_OCORRENCIA: 'Relatório de Ocorrência',
-  LIBERACAO_SETUP: 'Liberação de Setup',
-  OUTROS: 'Outros',
-};
+// Os rotulos das origens vivem em src/inspecao.ts, junto com a lista que os
+// formularios ofertam. Aqui so reexportamos para o SQD.
+export { labelOrigemInspecao };
 
 // ---------------------------------------------------------------------------
 // Auditoria de Fornecedores (planilha "Checklist Auditoria").

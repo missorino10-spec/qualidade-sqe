@@ -90,6 +90,20 @@ class CancelarRncDto {
   @IsString() motivo: string;
 }
 
+// Desvio de qualidade: quantidade, prazo, ou os dois. A validacao do "ao menos
+// um" e do documento anexo fica no servico, junto com a da homologacao.
+class AbrirDesvioDto {
+  @IsString() aberturaEm: string;
+  @IsOptional() @Type(() => Number) @IsNumber() quantidade?: number;
+  @IsOptional() @IsString() prazoFim?: string;
+  @IsOptional() @IsString() descricao?: string;
+}
+
+class EncerrarDesvioDto {
+  @IsString() encerradoEm: string;
+  @IsOptional() @IsString() observacoes?: string;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('rnc')
 export class RncController {
@@ -114,16 +128,31 @@ export class RncController {
     });
   }
 
+  // Consulta antes de abrir a RNC: o mesmo fornecedor ja repetiu este modo de
+  // falha neste item? Devolve tambem as RNCs que bateram, para a tela mostrar
+  // o motivo da sugestao.
   @Get('reincidencia')
-  async reincidencia(
+  reincidencia(
     @Query('fornecedorId') fornecedorId: string,
     @Query('itemId') itemId: string,
+    @Query('tipoDesvio') tipoDesvio?: string,
+    @Query('inspecaoVisualId') inspecaoVisualId?: string,
+    @Query('inspecaoLoteId') inspecaoLoteId?: string,
   ) {
-    const sugere = await this.service.sugereReincidencia(
-      Number(fornecedorId),
-      Number(itemId),
-    );
-    return { reincidencia: sugere };
+    return this.service.analisarReincidencia({
+      fornecedorId: Number(fornecedorId),
+      itemId: Number(itemId),
+      tipoDesvio,
+      inspecaoVisualId: inspecaoVisualId ? Number(inspecaoVisualId) : undefined,
+      inspecaoLoteId: inspecaoLoteId ? Number(inspecaoLoteId) : undefined,
+    });
+  }
+
+  // Mesma analise, para uma RNC ja gravada (a RNC aberta pela inspecao ja
+  // nasce com o fornecedor, o item e as inspecoes vinculadas).
+  @Get(':id/reincidencia')
+  reincidenciaDaRnc(@Param('id', ParseIntPipe) id: number) {
+    return this.service.reincidenciaDaRnc(id);
   }
 
   @Get(':id')
@@ -138,6 +167,9 @@ export class RncController {
       include: {
         fornecedor: { select: { nome: true, codigo: true } },
         item: { select: { descricao: true, codigo: true } },
+        // As cotas reprovadas saem no PDF lidas da inspecao, e nao de uma
+        // copia: o papel sempre reflete o dimensional como ele esta hoje.
+        inspecaoLote: { select: { cotas: true } },
       },
     });
     if (!rnc) throw new NotFoundException('RNC nao encontrada');
@@ -217,6 +249,28 @@ export class RncController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.reabrir(id, user.id);
+  }
+
+  // Desvio de qualidade (concessao). O documento que autoriza sobe antes, em
+  // /anexos com entidadeTipo RNC_DESVIO - sem ele a abertura e recusada.
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/desvio')
+  abrirDesvio(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AbrirDesvioDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.abrirDesvio(id, dto, user.id);
+  }
+
+  @Roles('QUALIDADE', 'ADMIN')
+  @Post(':id/desvio/encerrar')
+  encerrarDesvio(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EncerrarDesvioDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.encerrarDesvio(id, dto, user.id);
   }
 
   // Remocao permanente do banco - restrito a ADMIN.

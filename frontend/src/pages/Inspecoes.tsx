@@ -46,6 +46,7 @@ import {
   UploadFotosEvidencia,
   enviarFotosEvidencia,
 } from '../components/FotosEvidencia';
+import { EVID, ORIGENS_RECEBIMENTO } from '../inspecao';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
@@ -168,6 +169,9 @@ export default function Inspecoes() {
   const [formRnc] = Form.useForm();
   const [fotosRnc, setFotosRnc] = useState<any[]>([]);
   const [salvandoRnc, setSalvandoRnc] = useState(false);
+  // Analise de reincidencia da RNC recem-aberta (mesmo fornecedor, mesmo item
+  // e mesmo modo de falha). O sistema sugere; a palavra final e do usuario.
+  const [reincidencia, setReincidencia] = useState<any | null>(null);
   const qtdPecasRnc = Form.useWatch('quantidadePecas', formRnc);
   const valorUnitRnc = Form.useWatch('valorUnitario', formRnc);
 
@@ -324,6 +328,16 @@ export default function Inspecoes() {
   function abrirRncObrigatoria(rnc: any) {
     setRncObrigatoria(rnc);
     setFotosRnc([]);
+    setReincidencia(null);
+    // A analise roda com a RNC ja gravada: quando o Visual e o Dimensional do
+    // mesmo recebimento reprovam, os dois modos de falha ja estao vinculados.
+    api
+      .get(`/rnc/${rnc.id}/reincidencia`)
+      .then(({ data }) => {
+        setReincidencia(data);
+        if (data.reincidencia) formRnc.setFieldsValue({ reincidencia: true });
+      })
+      .catch(() => setReincidencia(null));
     formRnc.setFieldsValue({
       tipoDesvio: rnc.tipoDesvio,
       descricaoDesvio: rnc.descricaoDesvio,
@@ -363,6 +377,7 @@ export default function Inspecoes() {
       setRncObrigatoria(null);
       formRnc.resetFields();
       setFotosRnc([]);
+      setReincidencia(null);
       invalidar();
       Modal.confirm({
         title: `Inspeção concluída — RNC ${rnc.numero} registrada`,
@@ -407,8 +422,10 @@ export default function Inspecoes() {
         po: v.po,
         qtdInspecionada: v.qtdInspecionada,
         qtdTotal: v.qtdTotal,
-        desenhoRev: v.desenhoRev,
+        desenho: v.desenho,
+        revisao: v.revisao,
         toleranciasNorm: v.toleranciasNorm,
+        origem: v.origem,
         observacoes: v.observacoes,
         dataInspecao: hoje.toISOString(),
         resultado: resultadoAuto,
@@ -423,10 +440,10 @@ export default function Inspecoes() {
 
       // As fotos do bloco EVIDENCIAS so podem subir depois: elas precisam do
       // id do formulario recem-criado.
-      if (tipo === 'VISUAL' && fotosVisual.length && res.inspecao?.id) {
+      if (fotosVisual.length && res.inspecao?.id) {
         await enviarFotosEvidencia(
           fotosVisual,
-          'INSPECAO_VISUAL',
+          tipo === 'VISUAL' ? EVID.sqeVisual : EVID.sqeDimensional,
           res.inspecao.id,
         );
       }
@@ -950,16 +967,26 @@ export default function Inspecoes() {
               </Row>
 
               <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name="desenhoRev" label="Desenho / Revisão">
+                <Col span={8}>
+                  <Form.Item name="desenho" label="Desenho">
                     <Input />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col span={4}>
+                  <Form.Item name="revisao" label="Revisão">
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
                   {/* A norma escolhida aqui puxa as tolerancias da tabela em
                       todas as cotas do dimensional. */}
                   <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
                     <Select options={OPCOES_NORMA} />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="origem" label="Origem da inspeção">
+                    <Select options={ORIGENS_RECEBIMENTO} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -980,19 +1007,19 @@ export default function Inspecoes() {
                 />
               )}
 
-              {/* Bloco EVIDENCIAS do formulario visual. So faz sentido quando
-                  o resultado e aprovado: reprovado, as fotos vao na RNC. */}
-              {tipo === 'VISUAL' && resultadoAuto === 'APROVADO' && (
-                <>
-                  <Divider orientation="left" plain>
-                    Evidências / Evidence (opcional)
-                  </Divider>
-                  <UploadFotosEvidencia
-                    fotos={fotosVisual}
-                    setFotos={setFotosVisual}
-                  />
-                </>
-              )}
+              {/* Bloco EVIDENCIAS. No SQE o visual e o dimensional sao
+                  formularios separados, entao cada um tem o seu bloco -
+                  sempre opcional e sempre disponivel, inclusive quando o
+                  resultado reprova. */}
+              <Divider orientation="left" plain>
+                {tipo === 'VISUAL'
+                  ? 'Evidências do visual (opcional)'
+                  : 'Evidências do dimensional (opcional)'}
+              </Divider>
+              <UploadFotosEvidencia
+                fotos={fotosVisual}
+                setFotos={setFotosVisual}
+              />
 
               <Form.Item
                 name="observacoes"
@@ -1070,6 +1097,29 @@ export default function Inspecoes() {
           message="Preenchimento obrigatório para encerrar a inspeção"
           description="Causa raiz, plano do fornecedor e verificação de eficácia são preenchidos depois, na tela da RNC."
         />
+        {/* O sistema so sugere: se a Qualidade discordar, basta trocar o
+            "Reincidência" para "Não". */}
+        {reincidencia?.reincidencia && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="Reincidência detectada"
+            description={
+              <>
+                Este fornecedor já teve o mesmo modo de falha neste item:
+                <ul style={{ margin: '6px 0 0 0', paddingLeft: 18 }}>
+                  {reincidencia.anteriores.map((a: any) => (
+                    <li key={a.id}>
+                      <b>{a.numero}</b> ({dayjs(a.dataAbertura).format('DD/MM/YYYY')})
+                      — {a.modos.join('; ')}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            }
+          />
+        )}
         <Form form={formRnc} layout="vertical" onFinish={salvarRncObrigatoria}>
           <Row gutter={12}>
             <Col span={16}>

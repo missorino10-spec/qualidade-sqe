@@ -26,6 +26,15 @@ import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import type { Response } from 'express';
 import { InspecoesManufaturaService } from './inspecoes-manufatura.service';
 import { gerarPdfRelatorioDimensional } from './relatorio-pdf';
+import type { FotosRelatorio } from './relatorio-pdf';
+import { StorageService } from '../../anexos/storage.service';
+import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
+import { EVID, ORIGENS_INSPECAO } from '../../comum/inspecao';
+import { PrismaService } from '../../prisma/prisma.service';
+
+// A Manufatura e o unico modulo que oferta a inspecao de producao, entao usa
+// a lista cheia de origens.
+const ORIGENS = ORIGENS_INSPECAO.map((o) => o.value);
 
 // Relatorio de Inspecao Dimensional - Doc BDBR.QUA.FMR.011.06.
 // Os campos abaixo sao os do formulario, na mesma ordem do papel.
@@ -36,21 +45,14 @@ class RelatorioDto {
   @IsOptional() @IsString() dataInspecao?: string;
   // Revisao do proprio relatorio, digitada pelo inspetor. Comeca em "01".
   @IsOptional() @IsString() revisao?: string;
-  @IsOptional()
-  @IsIn([
-    'PLANO_INSPECAO',
-    'HOMOLOGACAO',
-    'DEVOLUCAO',
-    'RETRABALHO',
-    'RELATORIO_OCORRENCIA',
-    'LIBERACAO_SETUP',
-    'OUTROS',
-  ])
-  origem?: any;
+  @IsOptional() @IsIn(ORIGENS) origem?: any;
   @IsOptional() @IsString() origemOutros?: string;
   @IsOptional() @IsString() itemCodigo?: string;
   @IsOptional() @IsString() itemDescricao?: string;
   @IsOptional() @IsString() desenhoRev?: string;
+  @IsOptional() @IsString() desenho?: string;
+  // Revisao DO DESENHO - nao confundir com "revisao", que e a do relatorio.
+  @IsOptional() @IsString() desenhoRevisao?: string;
   @IsOptional() @IsString() po?: string;
   @IsOptional() @IsNumber() qtdInspecionada?: number;
   @IsOptional() @IsNumber() qtdTotal?: number;
@@ -73,7 +75,11 @@ class RelatorioDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('manufatura/inspecoes')
 export class InspecoesManufaturaController {
-  constructor(private service: InspecoesManufaturaService) {}
+  constructor(
+    private service: InspecoesManufaturaService,
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   @Get()
   listar(@Query('tipo') tipo?: string, @Query('maquinaId') maquinaId?: string) {
@@ -103,10 +109,32 @@ export class InspecoesManufaturaController {
   @Get(':id/pdf')
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const insp = await this.service.detalhe(id);
+    // Cada tentativa tem os seus dois blocos de evidencia (dimensional e
+    // visual), independentes e opcionais.
+    const fotos: FotosRelatorio = {};
+    await Promise.all(
+      (insp.relatorios ?? []).map(async (rel) => {
+        const [dimensional, visual] = await Promise.all([
+          carregarFotosEvidencia(
+            this.prisma,
+            this.storage,
+            EVID.manufaturaDimensional,
+            rel.id,
+          ),
+          carregarFotosEvidencia(
+            this.prisma,
+            this.storage,
+            EVID.manufaturaVisual,
+            rel.id,
+          ),
+        ]);
+        fotos[rel.id] = { dimensional, visual };
+      }),
+    );
     const nomeArquivo = `${(insp.numero ?? `inspecao-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfRelatorioDimensional(insp);
+    const doc = gerarPdfRelatorioDimensional(insp, fotos);
     doc.pipe(res);
     doc.end();
   }

@@ -6,6 +6,15 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { HistoricoService } from '../../historico/historico.service';
 import { numeroDocumento, semanaAno } from '../sqe-utils';
+import {
+  DESVIO,
+  dadosAberturaDesvio,
+  dadosEncerramentoDesvio,
+} from '../../comum/desvio-qualidade';
+import type {
+  AbrirDesvioDados,
+  EncerrarDesvioDados,
+} from '../../comum/desvio-qualidade';
 
 const ENTIDADE = 'RNC';
 
@@ -69,7 +78,15 @@ export class RncService {
   async findOne(id: number) {
     const rnc = await this.prisma.rnc.findUnique({
       where: { id },
-      include: includePadrao,
+      // As cotas vem da inspecao vinculada, sem copia: se o dimensional for
+      // corrigido depois, a RNC acompanha. Fica so no detalhe - a listagem
+      // nao precisa carregar a tabela inteira.
+      include: {
+        ...includePadrao,
+        inspecaoLote: {
+          select: { id: true, resultado: true, cotas: true },
+        },
+      },
     });
     if (!rnc) throw new NotFoundException('RNC nao encontrada');
     const historico = await this.historico.listar(ENTIDADE, id);
@@ -80,15 +97,157 @@ export class RncService {
     return { ...rnc, historico, anexos };
   }
 
-  // Sugere se e reincidencia: mesmo fornecedor + item ja teve RNC antes
-  async sugereReincidencia(
-    fornecedorId: number,
-    itemId: number,
-  ): Promise<boolean> {
-    const anterior = await this.prisma.rnc.findFirst({
-      where: { fornecedorId, itemId },
+  // -------------------------------------------------------------------------
+  // REINCIDENCIA
+  // E reincidencia quando o MESMO fornecedor repete o MESMO modo de falha no
+  // MESMO item. Nao ha janela de tempo: qualquer RNC anterior conta.
+  //
+  // "Modo de falha" e o que efetivamente reprovou, e nao o texto livre da
+  // descricao:
+  //   - VISUAL      -> cada item do checklist marcado como REPROVADO;
+  //   - DIMENSIONAL -> a localizacao de cada cota fora da tolerancia.
+  // O tipo de desvio digitado so entra quando a RNC nao tem inspecao
+  // vinculada (RNC aberta a mao), porque nas automaticas ele e um resumo
+  // generico ("Dimensional") que casaria com qualquer outra RNC.
+  // -------------------------------------------------------------------------
+
+  // Busca o que a comparacao precisa ler das inspecoes vinculadas.
+  private readonly includeModos = {
+    inspecaoVisual: { select: { checklist: true } },
+    inspecaoLote: { select: { cotas: true } },
+  };
+
+  // Devolve os modos de falha de uma RNC: chave normalizada -> texto legivel.
+  // Normalizar (sem acento, sem caixa, sem espaco duplicado) faz "Rebarba " e
+  // "rebarba" contarem como o mesmo modo.
+  private modosDeFalha(fonte: any): Map<string, string> {
+    const modos = new Map<string, string>();
+    const chave = (t: string) =>
+      t
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    const add = (prefixo: string, texto: unknown, rotulo: string) => {
+      const k = chave(String(texto ?? ''));
+      if (k) modos.set(`${prefixo}:${k}`, rotulo);
+    };
+
+    const checklist = fonte?.inspecaoVisual?.checklist;
+    for (const grupo of Array.isArray(checklist) ? checklist : [])
+      for (const item of grupo?.itens ?? [])
+        if (item?.status === 'REPROVADO')
+          add('VISUAL', item.texto, `Visual: ${item.texto}`);
+
+    const cotas = fonte?.inspecaoLote?.cotas;
+    for (const cota of Array.isArray(cotas) ? cotas : [])
+      if (cota?.conforme === false)
+        add('COTA', cota.localizacao, `Cota ${cota.localizacao}`);
+
+    if (!modos.size)
+      for (const parte of String(fonte?.tipoDesvio ?? '').split('|'))
+        add('DESVIO', parte, parte.trim());
+
+    return modos;
+  }
+
+  // Compara os modos de falha com os das RNCs anteriores do mesmo fornecedor
+  // e item. Devolve tambem quais RNCs bateram, para a tela mostrar o porque.
+  async analisarReincidencia(candidato: {
+    fornecedorId: number;
+    itemId: number;
+    ignorarRncId?: number;
+    tipoDesvio?: string | null;
+    inspecaoVisualId?: number | null;
+    inspecaoLoteId?: number | null;
+  }): Promise<{
+    reincidencia: boolean;
+    anteriores: { id: number; numero: string; dataAbertura: Date; modos: string[] }[];
+  }> {
+    const vazio = { reincidencia: false, anteriores: [] };
+    if (!candidato.fornecedorId || !candidato.itemId) return vazio;
+
+    const [inspecaoVisual, inspecaoLote] = await Promise.all([
+      candidato.inspecaoVisualId
+        ? this.prisma.inspecaoVisual.findUnique({
+            where: { id: candidato.inspecaoVisualId },
+            select: { checklist: true },
+          })
+        : null,
+      candidato.inspecaoLoteId
+        ? this.prisma.inspecaoLote.findUnique({
+            where: { id: candidato.inspecaoLoteId },
+            select: { cotas: true },
+          })
+        : null,
+    ]);
+    const modos = this.modosDeFalha({
+      tipoDesvio: candidato.tipoDesvio,
+      inspecaoVisual,
+      inspecaoLote,
     });
-    return !!anterior;
+    if (!modos.size) return vazio;
+
+    // RNC cancelada foi anulada (abertura indevida), entao nao conta como
+    // historico de falha do fornecedor.
+    const anteriores = await this.prisma.rnc.findMany({
+      where: {
+        fornecedorId: candidato.fornecedorId,
+        itemId: candidato.itemId,
+        status: { not: 'CANCELADA' },
+        id: candidato.ignorarRncId ? { not: candidato.ignorarRncId } : undefined,
+      },
+      select: {
+        id: true,
+        numero: true,
+        dataAbertura: true,
+        tipoDesvio: true,
+        ...this.includeModos,
+      },
+      orderBy: { dataAbertura: 'desc' },
+    });
+
+    const casaram = anteriores
+      .map((a) => {
+        const iguais = [...this.modosDeFalha(a).keys()].filter((k) =>
+          modos.has(k),
+        );
+        return {
+          id: a.id,
+          numero: a.numero,
+          dataAbertura: a.dataAbertura,
+          modos: iguais.map((k) => modos.get(k) as string),
+        };
+      })
+      .filter((a) => a.modos.length > 0);
+
+    return { reincidencia: casaram.length > 0, anteriores: casaram };
+  }
+
+  // Analise de uma RNC ja gravada (usada pela tela, que precisa do motivo).
+  async reincidenciaDaRnc(id: number) {
+    const rnc = await this.prisma.rnc.findUnique({ where: { id } });
+    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    return this.analisarReincidencia({
+      fornecedorId: rnc.fornecedorId,
+      itemId: rnc.itemId,
+      ignorarRncId: rnc.id,
+      tipoDesvio: rnc.tipoDesvio,
+      inspecaoVisualId: rnc.inspecaoVisualId,
+      inspecaoLoteId: rnc.inspecaoLoteId,
+    });
+  }
+
+  async sugereReincidencia(candidato: {
+    fornecedorId: number;
+    itemId: number;
+    ignorarRncId?: number;
+    tipoDesvio?: string | null;
+    inspecaoVisualId?: number | null;
+    inspecaoLoteId?: number | null;
+  }): Promise<boolean> {
+    return (await this.analisarReincidencia(candidato)).reincidencia;
   }
 
   // Resolve o item a partir de texto livre (a Qualidade define o item ao abrir
@@ -143,7 +302,13 @@ export class RncService {
     const itemId = await this.resolverItemId(data);
     const reincidencia =
       data.reincidencia ??
-      (await this.sugereReincidencia(data.fornecedorId, itemId));
+      (await this.sugereReincidencia({
+        fornecedorId: data.fornecedorId,
+        itemId,
+        tipoDesvio: data.tipoDesvio,
+        inspecaoVisualId: data.inspecaoVisualId,
+        inspecaoLoteId: data.inspecaoLoteId,
+      }));
     const valorTotal =
       data.quantidadePecas != null && data.valorUnitario != null
         ? data.quantidadePecas * data.valorUnitario
@@ -211,12 +376,32 @@ export class RncService {
       return a.includes(n) ? a : `${a} | ${n}`;
     };
 
+    const inspecaoVisualId =
+      data.inspecaoVisualId ?? existente.inspecaoVisualId;
+    const inspecaoLoteId = data.inspecaoLoteId ?? existente.inspecaoLoteId;
+    const tipoDesvio = juntar(existente.tipoDesvio, data.tipoDesvio);
+
+    // O segundo formulario traz modos de falha novos, entao a sugestao e
+    // refeita. Sempre soma: o que ja apontava reincidencia continua valendo.
+    // A palavra final e do usuario, no formulario de encerramento.
+    const reincidencia =
+      existente.reincidencia ||
+      (await this.sugereReincidencia({
+        fornecedorId: existente.fornecedorId,
+        itemId: existente.itemId,
+        ignorarRncId: existente.id,
+        tipoDesvio,
+        inspecaoVisualId,
+        inspecaoLoteId,
+      }));
+
     const atualizada = await this.prisma.rnc.update({
       where: { id: existente.id },
       data: {
-        inspecaoVisualId: data.inspecaoVisualId ?? existente.inspecaoVisualId,
-        inspecaoLoteId: data.inspecaoLoteId ?? existente.inspecaoLoteId,
-        tipoDesvio: juntar(existente.tipoDesvio, data.tipoDesvio),
+        inspecaoVisualId,
+        inspecaoLoteId,
+        reincidencia,
+        tipoDesvio,
         descricaoDesvio: juntar(
           existente.descricaoDesvio,
           data.descricaoDesvio,
@@ -366,6 +551,67 @@ export class RncService {
     return atualizada;
   }
 
+  // -------------------------------------------------------------------------
+  // DESVIO DE QUALIDADE (concessao). As regras estao em comum/desvio-qualidade,
+  // porque a homologacao de itens usa exatamente as mesmas.
+  // -------------------------------------------------------------------------
+  async abrirDesvio(id: number, dados: AbrirDesvioDados, usuarioId: number) {
+    const rnc = await this.prisma.rnc.findUnique({ where: { id } });
+    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    const data = await dadosAberturaDesvio(
+      this.prisma,
+      DESVIO.rnc,
+      id,
+      dados,
+    );
+    const atualizada = await this.prisma.rnc.update({
+      where: { id },
+      data,
+      include: includePadrao,
+    });
+    const limite = [
+      data.desvioQuantidade != null ? `${data.desvioQuantidade} peça(s)` : null,
+      data.desvioPrazoFim ? `até ${dataBr(data.desvioPrazoFim)}` : null,
+    ]
+      .filter(Boolean)
+      .join(' e ');
+    await this.historico.registrar({
+      entidadeTipo: ENTIDADE,
+      entidadeId: id,
+      statusAnterior: 'DESVIO_NAO',
+      statusNovo: 'DESVIO_ABERTO',
+      comentario: `Desvio de qualidade aberto em ${dataBr(data.desvioAberturaEm)} (${limite})`,
+      usuarioId,
+    });
+    return atualizada;
+  }
+
+  async encerrarDesvio(
+    id: number,
+    dados: EncerrarDesvioDados,
+    usuarioId: number,
+  ) {
+    const rnc = await this.prisma.rnc.findUnique({ where: { id } });
+    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    const data = dadosEncerramentoDesvio(rnc, dados);
+    const atualizada = await this.prisma.rnc.update({
+      where: { id },
+      data,
+      include: includePadrao,
+    });
+    await this.historico.registrar({
+      entidadeTipo: ENTIDADE,
+      entidadeId: id,
+      statusAnterior: 'DESVIO_ABERTO',
+      statusNovo: 'DESVIO_ENCERRADO',
+      comentario: `Desvio de qualidade encerrado em ${dataBr(data.desvioEncerradoEm)}${
+        data.desvioEncerramentoObs ? ` - ${data.desvioEncerramentoObs}` : ''
+      }`,
+      usuarioId,
+    });
+    return atualizada;
+  }
+
   async mudarStatus(
     id: number,
     novoStatus: string,
@@ -462,8 +708,13 @@ export class RncService {
   async remover(id: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
     if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    // O documento que autoriza o desvio de qualidade fica em outro
+    // entidadeTipo, mas pertence a mesma RNC: sai junto.
     await this.prisma.anexo.deleteMany({
-      where: { entidadeTipo: ENTIDADE, entidadeId: id },
+      where: {
+        entidadeTipo: { in: [ENTIDADE, DESVIO.rnc] },
+        entidadeId: id,
+      },
     });
     await this.historico.remover(ENTIDADE, id);
     await this.prisma.rnc.delete({ where: { id } });

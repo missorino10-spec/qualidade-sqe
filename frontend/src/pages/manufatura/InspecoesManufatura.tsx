@@ -16,6 +16,8 @@ import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { dataBR } from '../../formatos';
+import { EVID } from '../../inspecao';
+import { enviarFotosEvidencia } from '../../components/FotosEvidencia';
 import {
   CamposRelatorio,
   corStatusInspecao,
@@ -36,6 +38,8 @@ export default function InspecoesManufatura({
   const [form] = Form.useForm();
   const [cotas, setCotas] = useState<any[]>([]);
   const [defeitos, setDefeitos] = useState<any[]>([]);
+  const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
+  const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const maquinaId = Form.useWatch('maquinaId', form);
@@ -85,6 +89,8 @@ export default function InspecoesManufatura({
     });
     setCotas([cotaVazia()]);
     setDefeitos([]);
+    setFotosDimensional([]);
+    setFotosVisual([]);
     setOpen(true);
   }
 
@@ -98,6 +104,24 @@ export default function InspecoesManufatura({
         cotas,
         defeitos: defeitos.filter((d) => d.tipoDefeitoId),
       });
+      // As fotos ficam presas ao RELATORIO (a tentativa), nao a inspecao:
+      // cada reinspecao tem a sua propria evidencia.
+      const relatorios = res.data.relatorios ?? [];
+      const relatorioId = relatorios[relatorios.length - 1]?.id;
+      if (relatorioId) {
+        if (fotosDimensional.length)
+          await enviarFotosEvidencia(
+            fotosDimensional,
+            EVID.manufaturaDimensional,
+            relatorioId,
+          );
+        if (fotosVisual.length)
+          await enviarFotosEvidencia(
+            fotosVisual,
+            EVID.manufaturaVisual,
+            relatorioId,
+          );
+      }
       message.success(`Inspeção ${res.data.numero} registrada.`);
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
       qc.invalidateQueries({ queryKey: ['maquinas'] });
@@ -206,6 +230,10 @@ export default function InspecoesManufatura({
             tipo={tipo}
             setups={setups}
             avaliacao={avaliacao}
+            fotosDimensional={fotosDimensional}
+            setFotosDimensional={setFotosDimensional}
+            fotosVisual={fotosVisual}
+            setFotosVisual={setFotosVisual}
           />
         </Form>
       </Modal>

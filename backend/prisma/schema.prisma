@@ -292,6 +292,8 @@ enum OrigemInspecao {
   RETRABALHO
   RELATORIO_OCORRENCIA
   LIBERACAO_SETUP
+  // So aparece na Manufatura: e a inspecao feita durante a producao.
+  INSPECAO_PRODUCAO
   OUTROS
 }
 
@@ -307,7 +309,12 @@ model InspecaoVisual {
   item         Item             @relation(fields: [itemId], references: [id])
 
   // Cabecalho comum
+  // desenhoRev e o campo antigo (desenho e revisao juntos). Ficou para nao
+  // mexer nos registros ja gravados; o que se preenche hoje sao os dois
+  // campos separados abaixo.
   desenhoRev      String?
+  desenho         String?
+  revisao         String?
   toleranciasNorm String?
   notaFiscal      String?
   po              String?
@@ -342,7 +349,11 @@ model InspecaoLote {
   item         Item             @relation(fields: [itemId], references: [id])
 
   // Cabecalho comum
+  // Ver InspecaoVisual: desenhoRev e o campo legado, desenho/revisao sao os
+  // campos que valem hoje.
   desenhoRev      String?
+  desenho         String?
+  revisao         String?
   toleranciasNorm String?
   notaFiscal      String?
   po              String?
@@ -448,6 +459,18 @@ model Rnc {
   dataEncerramento      DateTime? // preenchida quando status = FINALIZADA
   verificacaoEficacia   VerificacaoEficacia @default(PENDENTE)
   dataVerificacao       DateTime? // so existe quando a eficacia saiu de PENDENTE
+
+  // Desvio de qualidade: libera o item por um limite acordado - uma
+  // quantidade de pecas, um prazo, ou os dois (ao menos um e obrigatorio).
+  // O documento que autoriza o desvio e obrigatorio e vive na tabela Anexo,
+  // com entidadeTipo "RNC_DESVIO".
+  desvioQualidade       Boolean   @default(false)
+  desvioAberturaEm      DateTime?
+  desvioQuantidade      Float?
+  desvioPrazoFim        DateTime?
+  desvioDescricao       String?
+  desvioEncerradoEm     DateTime?
+  desvioEncerramentoObs String?
 
   evidencias  String?
   observacoes String?
@@ -615,7 +638,12 @@ model RelatorioDimensional {
 
   itemCodigo      String?
   itemDescricao   String?
+  // desenhoRev e o campo legado (desenho e revisao juntos). O que se preenche
+  // hoje sao os dois campos separados. Aqui a revisao do desenho se chama
+  // desenhoRevisao porque "revisao" ja e a revisao do proprio relatorio.
   desenhoRev      String?
+  desenho         String?
+  desenhoRevisao  String?
   // Norma de tolerancia do relatorio: ISO2768 | DIN7168 | NA
   toleranciasNorm String?
   po              String?
@@ -969,9 +997,20 @@ model HomologacaoItem {
   acao                 String?
   observacoes          String?
 
+  // Desvio de qualidade: mesma regra da RNC - quantidade de pecas, prazo, ou
+  // os dois (ao menos um e obrigatorio), com documento anexo obrigatorio.
+  desvioQualidade       Boolean   @default(false)
+  desvioAberturaEm      DateTime?
+  desvioQuantidade      Float?
+  desvioPrazoFim        DateTime?
+  desvioDescricao       String?
+  desvioEncerradoEm     DateTime?
+  desvioEncerramentoObs String?
+
   // Anexos (tabela polimorfica Anexo):
   //   "HOMOLOGACAO_ITEM_RELATORIO"  - relatorio final escrito pela Qualidade
   //   "HOMOLOGACAO_ITEM_PLANO_ACAO" - plano de acao enviado pelo fornecedor
+  //   "HOMOLOGACAO_ITEM_DESVIO"     - documento que autoriza o desvio
 
   relatorios RelatorioInspecaoItem[]
 
@@ -997,7 +1036,11 @@ model RelatorioInspecaoItem {
   // --- CABECALHO do modelo de relatorios ---
   dataInspecao    DateTime?
   origem          OrigemInspecao @default(HOMOLOGACAO)
+  // Ver RelatorioDimensional: desenhoRev e o legado e a revisao do desenho se
+  // chama desenhoRevisao para nao colidir com a revisao do relatorio.
   desenhoRev      String?
+  desenho         String?
+  desenhoRevisao  String?
   tolerancias     String?
   nf              String?
   po              String?

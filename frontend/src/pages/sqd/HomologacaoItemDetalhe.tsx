@@ -50,10 +50,15 @@ import {
 } from './FormularioInspecaoItem';
 import { CotasSomenteLeitura, TabelaCotasPecas } from '../../components/TabelaCotas';
 import {
+  CardDesvioQualidade,
+  TIPO_DESVIO,
+} from '../../components/DesvioQualidade';
+import {
   FotosEvidenciaSalvas,
   UploadFotosEvidencia,
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
+import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
 import {
   corResultadoItem,
   corStatusHomologacao,
@@ -72,8 +77,6 @@ import {
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_ITEM_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_ITEM_PLANO_ACAO';
-// Fotos do bloco EVIDENCIAS da aba VISUAL, presas ao relatorio da tentativa.
-const TIPO_EVIDENCIA_VISUAL = 'HOMOLOGACAO_ITEM_VISUAL';
 
 // Mesmos prazos usados pelo backend (itens-utils): 3 dias uteis para as
 // amostras chegarem e 3 dias uteis da solicitacao ate o envio do relatorio.
@@ -186,6 +189,7 @@ export default function HomologacaoItemDetalhe() {
   const [formInspecao] = Form.useForm();
   const [cotas, setCotas] = useState<Cota[]>([]);
   const [checklist, setChecklist] = useState<GrupoVisual[]>([]);
+  const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
   const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   // Tentativa que está aberta no modal; null = uma rodada nova.
   const [tentativaEdicao, setTentativaEdicao] = useState<number | null>(null);
@@ -257,19 +261,26 @@ export default function HomologacaoItemDetalhe() {
         resultadoAmostras: cotasComDesvio(cotas) ? 'REPROVADO' : 'APROVADO',
         resultadoVisual: resultadoVisual(checklist),
       });
-      // As fotos do bloco EVIDENCIAS so podem subir depois: elas precisam do id
-      // do relatorio da tentativa que acabou de ser gravada.
-      if (fotosVisual.length) {
+      // As fotos dos blocos EVIDENCIAS so podem subir depois: elas precisam do
+      // id do relatorio da tentativa que acabou de ser gravada.
+      if (fotosDimensional.length || fotosVisual.length) {
         const lista: any[] = res.data?.relatorios ?? [];
         const alvo = tentativaEdicao
           ? lista.find((r) => r.tentativa === tentativaEdicao)
           : lista[lista.length - 1];
         if (alvo?.id) {
-          await enviarFotosEvidencia(
-            fotosVisual,
-            TIPO_EVIDENCIA_VISUAL,
-            alvo.id,
-          );
+          if (fotosDimensional.length)
+            await enviarFotosEvidencia(
+              fotosDimensional,
+              EVID.homologacaoItemDimensional,
+              alvo.id,
+            );
+          if (fotosVisual.length)
+            await enviarFotosEvidencia(
+              fotosVisual,
+              EVID.homologacaoItemVisual,
+              alvo.id,
+            );
         }
       }
       return res;
@@ -359,7 +370,8 @@ export default function HomologacaoItemDetalhe() {
       dataRetornoFornecedor:
         dataInput(h.dataRetornoFornecedor) || dayjs().format('YYYY-MM-DD'),
       origem: base?.origem ?? 'HOMOLOGACAO',
-      desenhoRev: base?.desenhoRev,
+      desenho: base?.desenho ?? base?.desenhoRev,
+      desenhoRevisao: base?.desenhoRevisao,
       tolerancias: normaDoRelatorio(base?.tolerancias),
       nf: r?.nf,
       po: base?.po,
@@ -391,6 +403,7 @@ export default function HomologacaoItemDetalhe() {
         ? (r.checklistVisual as GrupoVisual[])
         : checklistInicial(catalogo),
     );
+    setFotosDimensional([]);
     setFotosVisual([]);
     setInspecaoOpen(true);
   }
@@ -693,8 +706,11 @@ export default function HomologacaoItemDetalhe() {
                     <Descriptions.Item label="Origem">
                       {labelOrigemInspecao[recente.origem] ?? recente.origem}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Desenho / Rev.">
-                      {recente.desenhoRev ?? '-'}
+                    <Descriptions.Item label="Desenho">
+                      {textoDesenho(recente.desenho, recente.desenhoRev)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Revisão do desenho">
+                      {textoRevisao(recente.desenhoRevisao)}
                     </Descriptions.Item>
                     <Descriptions.Item label="Tolerâncias">
                       {recente.tolerancias ?? '-'}
@@ -723,6 +739,13 @@ export default function HomologacaoItemDetalhe() {
                     AMOSTRAS — Doc. BDBR.QUA.FMR.011.06
                   </Divider>
                   <CotasSomenteLeitura cotas={recente.cotas} />
+                  <Divider orientation="left" plain>
+                    Evidências do dimensional
+                  </Divider>
+                  <FotosEvidenciaSalvas
+                    entidadeTipo={EVID.homologacaoItemDimensional}
+                    entidadeId={recente.id}
+                  />
                   {recente.observacoesAmostras && (
                     <Typography.Paragraph style={{ marginTop: 12 }}>
                       <Typography.Text strong>Observações: </Typography.Text>
@@ -762,10 +785,10 @@ export default function HomologacaoItemDetalhe() {
                     ),
                   )}
                   <Divider orientation="left" plain>
-                    Evidências / Evidence
+                    Evidências do visual
                   </Divider>
                   <FotosEvidenciaSalvas
-                    entidadeTipo={TIPO_EVIDENCIA_VISUAL}
+                    entidadeTipo={EVID.homologacaoItemVisual}
                     entidadeId={recente.id}
                   />
                   {recente.evidenciasVisual && (
@@ -883,6 +906,14 @@ export default function HomologacaoItemDetalhe() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
+
+          <CardDesvioQualidade
+            registro={h}
+            entidadeTipo={TIPO_DESVIO.homologacaoItem}
+            base={`/sqd/homologacoes-itens/${id}`}
+            podeEditar={podeEditar}
+            onMudou={invalidar}
+          />
 
           <CardAnexos
             titulo="Relatório final da Qualidade"
@@ -1062,6 +1093,13 @@ export default function HomologacaoItemDetalhe() {
             qtdPecas={qtdPecas}
             norma={norma}
           />
+          <Divider orientation="left" plain>
+            Evidências do dimensional (opcional)
+          </Divider>
+          <UploadFotosEvidencia
+            fotos={fotosDimensional}
+            setFotos={setFotosDimensional}
+          />
           <Form.Item
             name="observacoesAmostras"
             label="Observações das amostras"
@@ -1082,7 +1120,7 @@ export default function HomologacaoItemDetalhe() {
           </Divider>
           <ChecklistVisual checklist={checklist} setChecklist={setChecklist} />
           <Divider orientation="left" plain>
-            Evidências / Evidence
+            Evidências do visual (opcional)
           </Divider>
           <UploadFotosEvidencia fotos={fotosVisual} setFotos={setFotosVisual} />
           <Form.Item
