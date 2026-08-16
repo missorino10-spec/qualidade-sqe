@@ -56,6 +56,8 @@ class CabecalhoDto {
   // proprio numero da inspecao (INSP0001/2026), atribuido no servico.
   @IsOptional() @IsBoolean() extra?: boolean;
   @IsOptional() @IsIn(ORIGENS) origem?: any;
+  // Texto do campo "Outros:" - so vale quando origem = OUTROS.
+  @IsOptional() @IsString() origemOutros?: string;
   @IsOptional() @IsString() observacoes?: string;
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultado?: any;
   @IsOptional() @IsString() dataInspecao?: string;

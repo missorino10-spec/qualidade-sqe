@@ -178,6 +178,7 @@ export default function Inspecoes() {
   const fornecedorId = Form.useWatch('fornecedorId', form);
   const normaSel = Form.useWatch('toleranciasNorm', form) ?? 'ISO2768';
   const extra = Form.useWatch('extra', form);
+  const origemSel = Form.useWatch('origem', form);
   const formulariosExtra: string[] | undefined = Form.useWatch(
     'formulariosExtra',
     form,
@@ -426,6 +427,8 @@ export default function Inspecoes() {
         revisao: v.revisao,
         toleranciasNorm: v.toleranciasNorm,
         origem: v.origem,
+        // So faz sentido guardar o texto livre quando a origem e "Outros".
+        origemOutros: v.origem === 'OUTROS' ? v.origemOutros : undefined,
         observacoes: v.observacoes,
         dataInspecao: hoje.toISOString(),
         resultado: resultadoAuto,
@@ -990,6 +993,17 @@ export default function Inspecoes() {
                   </Form.Item>
                 </Col>
               </Row>
+
+              {/* Campo livre do "Outros:", igual ao da Manufatura. */}
+              {origemSel === 'OUTROS' && (
+                <Row gutter={12}>
+                  <Col span={12}>
+                    <Form.Item name="origemOutros" label="Especifique a origem">
+                      <Input />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
 
               <Divider orientation="left" plain>
                 {tipo === 'VISUAL'

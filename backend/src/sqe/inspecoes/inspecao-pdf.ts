@@ -290,11 +290,17 @@ export function gerarPdfInspecao(
     },
   ]);
 
+  const origemLabel =
+    labelOrigemInspecao[formulario.origem] ?? txt(formulario.origem);
   linha([
     {
       w: W,
       label: 'ORIGEM DA INSPEÇÃO',
-      valor: labelOrigemInspecao[formulario.origem] ?? txt(formulario.origem),
+      // Em "Outros" o que interessa e o texto que o inspetor digitou.
+      valor:
+        formulario.origem === 'OUTROS' && formulario.origemOutros
+          ? `${origemLabel} (${txt(formulario.origemOutros)})`
+          : origemLabel,
     },
   ]);
 

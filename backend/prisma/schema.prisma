@@ -322,6 +322,7 @@ model InspecaoVisual {
   qtdTotal        Float?
   relatorioNumero String?
   origem          OrigemInspecao @default(PLANO_INSPECAO)
+  origemOutros    String? // texto do campo "Outros:"
 
   // Checklist (12 grupos) - JSON: [{ grupo, itens: [{ texto, status }] }]
   checklist Json
@@ -361,6 +362,7 @@ model InspecaoLote {
   qtdTotal        Float?
   relatorioNumero String?
   origem          OrigemInspecao @default(PLANO_INSPECAO)
+  origemOutros    String? // texto do campo "Outros:"
 
   // Tabela de cotas, no padrao comum aos tres modulos:
   // [{ localizacao, especificado, unidade, norma, tolerancia, upper, lower,

@@ -398,6 +398,7 @@ export class InspecoesService {
         // recebimento, referenciado pela RNC.
         relatorioNumero: ctx.entrega.numeroInspecao,
         origem: dto.origem ?? 'PLANO_INSPECAO',
+        origemOutros: dto.origemOutros ?? null,
         checklist,
         observacoes: dto.observacoes ?? null,
         resultado: dto.resultado ?? resultadoVisual(checklist),
@@ -468,6 +469,7 @@ export class InspecoesService {
         qtdTotal: dto.qtdTotal ?? null,
         relatorioNumero: ctx.entrega.numeroInspecao,
         origem: dto.origem ?? 'PLANO_INSPECAO',
+        origemOutros: dto.origemOutros ?? null,
         cotas,
         observacoes: dto.observacoes ?? null,
         resultado: dto.resultado ?? resultadoDimensional(cotas),

@@ -123,7 +123,10 @@ function Formulario({
           {dados.toleranciasNorm ?? '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Origem da inspeção" span={3}>
-          {labelOrigemInspecao[dados.origem] ?? dados.origem ?? '-'}
+          {/* Em "Outros" sai junto o texto digitado, como na Manufatura. */}
+          {dados.origem === 'OUTROS' && dados.origemOutros
+            ? `Outros — ${dados.origemOutros}`
+            : (labelOrigemInspecao[dados.origem] ?? dados.origem ?? '-')}
         </Descriptions.Item>
       </Descriptions>
       {children}
