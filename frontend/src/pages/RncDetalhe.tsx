@@ -23,6 +23,7 @@ import {
 } from 'antd';
 import {
   ArrowLeftOutlined,
+  AuditOutlined,
   CheckCircleOutlined,
   FilePdfOutlined,
   UploadOutlined,
@@ -51,8 +52,8 @@ const corEficacia: Record<string, string> = {
   REPROVADO: 'red',
   NAO_APLICAVEL: 'default',
 };
-// Usadas no modal de edicao e no de finalizacao - a eficacia pode ser
-// registrada nos dois lugares, entao as opcoes precisam ser as mesmas.
+// Usadas no modal de edicao e no da verificacao de eficacia - a eficacia pode
+// ser registrada nos dois lugares, entao as opcoes precisam ser as mesmas.
 const OPCOES_EFICACIA = [
   { value: 'PENDENTE', label: 'Pendente' },
   { value: 'APROVADO', label: 'Satisfatório' },
@@ -118,6 +119,22 @@ function CamposEficacia({ form }: { form: any }) {
   );
 }
 
+// O historico guarda dois tipos de evento: mudanca de status da RNC e
+// verificacao da eficacia (gravada com o prefixo EFICACIA_).
+function eventoHistorico(statusNovo: string) {
+  if (statusNovo?.startsWith('EFICACIA_')) {
+    const v = statusNovo.replace('EFICACIA_', '');
+    return {
+      cor: corEficacia[v] ?? 'gray',
+      titulo: `Eficácia: ${labelEficacia[v] ?? v}`,
+    };
+  }
+  return {
+    cor: corStatusRnc[statusNovo] ?? 'gray',
+    titulo: labelStatusRnc[statusNovo] ?? statusNovo,
+  };
+}
+
 function moeda(v?: number | null) {
   return v != null
     ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -132,9 +149,11 @@ export default function RncDetalhe() {
   const isAdmin = usuario?.papel === 'ADMIN';
   const [editOpen, setEditOpen] = useState(false);
   const [encerrarOpen, setEncerrarOpen] = useState(false);
+  const [eficaciaOpen, setEficaciaOpen] = useState(false);
   const [cancelarOpen, setCancelarOpen] = useState(false);
   const [formEdit] = Form.useForm();
   const [formEncerrar] = Form.useForm();
+  const [formEficacia] = Form.useForm();
   const [formCancelar] = Form.useForm();
 
   const { data: rnc, isLoading } = useQuery<any>({
@@ -179,27 +198,46 @@ export default function RncDetalhe() {
       ),
   });
 
-  // A data de encerramento e a da verificacao sao informadas pelo usuario -
-  // datas retroativas sao comuns porque a RNC costuma ser fechada no sistema
-  // depois do fato.
+  // Encerrar a RNC e verificar a eficacia sao atos independentes, cada um com
+  // sua data. As duas sao informadas pelo usuario - datas retroativas sao
+  // comuns porque o registro no sistema costuma vir depois do fato.
   const encerrar = useMutation({
     mutationFn: async (v: any) =>
       api.patch(`/rnc/${id}`, {
         ...v,
         status: 'FINALIZADA',
         dataEncerramento: v.dataEncerramento.toISOString(),
-        dataVerificacao: v.dataVerificacao
-          ? v.dataVerificacao.toISOString()
-          : null,
       }),
     onSuccess: () => {
-      message.success('RNC finalizada.');
+      message.success('RNC encerrada.');
       setEncerrarOpen(false);
       invalidar();
     },
     onError: (e: any) =>
       message.error(
-        e?.response?.data?.message ?? 'Não foi possível finalizar a RNC.',
+        e?.response?.data?.message ?? 'Não foi possível encerrar a RNC.',
+      ),
+  });
+
+  const verificarEficacia = useMutation({
+    mutationFn: async (v: any) =>
+      api.patch(`/rnc/${id}`, {
+        ...v,
+        // null (e nao undefined) para o backend entender que a data foi
+        // apagada de proposito.
+        dataVerificacao: v.dataVerificacao
+          ? v.dataVerificacao.toISOString()
+          : null,
+      }),
+    onSuccess: () => {
+      message.success('Verificação de eficácia registrada.');
+      setEficaciaOpen(false);
+      invalidar();
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ??
+          'Não foi possível registrar a verificação de eficácia.',
       ),
   });
 
@@ -317,6 +355,26 @@ export default function RncDetalhe() {
           <Button icon={<EditOutlined />} onClick={abrirEdicao}>
             Editar
           </Button>
+          {/* A verificacao de eficacia tem botao proprio: ela costuma vir
+              depois do encerramento, no lote seguinte. */}
+          {!cancelada && (
+            <Button
+              icon={<AuditOutlined />}
+              onClick={() => {
+                formEficacia.setFieldsValue({
+                  verificacaoEficacia: rnc.verificacaoEficacia ?? 'PENDENTE',
+                  dataVerificacao: rnc.dataVerificacao
+                    ? dayjs(rnc.dataVerificacao)
+                    : undefined,
+                  evidencias: rnc.evidencias ?? undefined,
+                  comentario: undefined,
+                });
+                setEficaciaOpen(true);
+              }}
+            >
+              Verificar eficácia
+            </Button>
+          )}
           {finalizada || cancelada ? (
             <Button
               icon={<ReloadOutlined />}
@@ -352,7 +410,7 @@ export default function RncDetalhe() {
                   setEncerrarOpen(true);
                 }}
               >
-                Finalizar
+                Encerrar RNC
               </Button>
             </>
           )}
@@ -597,12 +655,10 @@ export default function RncDetalhe() {
           <Card title="Histórico de Status">
             <Timeline
               items={(rnc.historico ?? []).map((h: any) => ({
-                color: corStatusRnc[h.statusNovo] ?? 'gray',
+                color: eventoHistorico(h.statusNovo).cor,
                 children: (
                   <div>
-                    <strong>
-                      {labelStatusRnc[h.statusNovo] ?? h.statusNovo}
-                    </strong>
+                    <strong>{eventoHistorico(h.statusNovo).titulo}</strong>
                     <div style={{ fontSize: 12, color: '#888' }}>
                       {dayjs(h.createdAt).format('DD/MM/YYYY HH:mm')}
                       {h.usuario ? ` · ${h.usuario.nome}` : ''}
@@ -726,12 +782,12 @@ export default function RncDetalhe() {
       </Modal>
 
       <Modal
-        title="Finalizar RNC"
+        title="Encerrar RNC"
         open={encerrarOpen}
         onCancel={() => setEncerrarOpen(false)}
         onOk={() => formEncerrar.submit()}
         confirmLoading={encerrar.isPending}
-        okText="Finalizar RNC"
+        okText="Encerrar RNC"
         cancelText="Cancelar"
       >
         <Form
@@ -749,9 +805,29 @@ export default function RncDetalhe() {
           >
             <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
           </Form.Item>
-          {/* A RNC pode ser encerrada com a eficacia ainda pendente - a
-              verificacao costuma vir depois, no lote seguinte. */}
-          <CamposEficacia form={formEncerrar} />
+          {/* A RNC pode ser encerrada com a eficacia ainda pendente: a
+              verificacao tem botao proprio e costuma vir depois. */}
+          <Form.Item name="comentario" label="Comentário (histórico)">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Verificação de eficácia"
+        open={eficaciaOpen}
+        onCancel={() => setEficaciaOpen(false)}
+        onOk={() => formEficacia.submit()}
+        confirmLoading={verificarEficacia.isPending}
+        okText="Registrar verificação"
+        cancelText="Cancelar"
+      >
+        <Form
+          form={formEficacia}
+          layout="vertical"
+          onFinish={(v) => verificarEficacia.mutate(v)}
+        >
+          <CamposEficacia form={formEficacia} />
           <Form.Item name="evidencias" label="Evidências da verificação">
             <Input.TextArea rows={3} />
           </Form.Item>

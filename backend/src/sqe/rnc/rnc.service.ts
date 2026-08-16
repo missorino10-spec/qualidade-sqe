@@ -9,6 +9,12 @@ import { numeroDocumento, semanaAno } from '../sqe-utils';
 
 const ENTIDADE = 'RNC';
 
+// Data do jeito que o usuario le no formulario. Usada nos comentarios do
+// historico, onde o que importa e a data informada e nao a do salvamento.
+function dataBr(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
 const includePadrao = {
   fornecedor: { select: { id: true, nome: true, codigo: true } },
   item: { select: { id: true, descricao: true, codigo: true } },
@@ -325,12 +331,35 @@ export class RncService {
     });
 
     if (novoStatus !== statusAnterior) {
+      // A data que vale e a informada pelo usuario, nao a hora em que o
+      // registro foi salvo - por isso ela entra no comentario.
+      const quando =
+        novoStatus === 'FINALIZADA' && dataEncerramento
+          ? ` em ${dataBr(dataEncerramento)}`
+          : '';
       await this.historico.registrar({
         entidadeTipo: ENTIDADE,
         entidadeId: id,
         statusAnterior,
         statusNovo: novoStatus,
-        comentario: data.comentario ?? `Status alterado para ${novoStatus}`,
+        comentario:
+          data.comentario ?? `Status alterado para ${novoStatus}${quando}`,
+        usuarioId,
+      });
+    }
+
+    // Verificar a eficacia e um ato proprio: entra no historico com a data em
+    // que a verificacao aconteceu, mesmo que o status da RNC nao mude.
+    if (eficacia !== rnc.verificacaoEficacia) {
+      const quando = dataVerificacao
+        ? `Eficácia verificada em ${dataBr(dataVerificacao)}`
+        : 'Verificação de eficácia pendente';
+      await this.historico.registrar({
+        entidadeTipo: ENTIDADE,
+        entidadeId: id,
+        statusAnterior: `EFICACIA_${rnc.verificacaoEficacia}`,
+        statusNovo: `EFICACIA_${eficacia}`,
+        comentario: data.comentario ? `${quando} - ${data.comentario}` : quando,
         usuarioId,
       });
     }
@@ -367,7 +396,11 @@ export class RncService {
       entidadeId: id,
       statusAnterior: rnc.status,
       statusNovo: novoStatus,
-      comentario: comentario ?? null,
+      comentario:
+        comentario ??
+        (novoStatus === 'FINALIZADA' && encerramento
+          ? `Encerrada em ${dataBr(encerramento)}`
+          : null),
       usuarioId,
     });
     return atualizada;
