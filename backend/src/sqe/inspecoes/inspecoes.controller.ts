@@ -24,6 +24,8 @@ import { Type } from 'class-transformer';
 import type { Response } from 'express';
 import { InspecoesService } from './inspecoes.service';
 import { gerarPdfInspecao } from './inspecao-pdf';
+import { StorageService } from '../../anexos/storage.service';
+import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -85,6 +87,7 @@ export class InspecoesController {
   constructor(
     private service: InspecoesService,
     private prisma: PrismaService,
+    private storage: StorageService,
   ) {}
 
   // Template do checklist visual (12 grupos)
@@ -155,11 +158,17 @@ export class InspecoesController {
   @Get(':id/pdf')
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const insp = await this.service.detalhe(id);
+    const fotos = await carregarFotosEvidencia(
+      this.prisma,
+      this.storage,
+      'INSPECAO_VISUAL',
+      insp.visual?.id,
+    );
     const numero = insp.numeroInspecao ?? `recebimento-${id}`;
     const nomeArquivo = `${numero.replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfInspecao(insp);
+    const doc = gerarPdfInspecao(insp, fotos);
     doc.pipe(res);
     doc.end();
   }

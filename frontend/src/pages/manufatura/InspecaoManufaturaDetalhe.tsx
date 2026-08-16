@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataBR } from '../../formatos';
+import { CotasSomenteLeitura } from '../../components/TabelaCotas';
 import {
   CamposRelatorio,
   ORIGENS_INSPECAO,
@@ -39,49 +40,6 @@ import {
 function labelOrigem(v: string, outros?: string) {
   if (v === 'OUTROS') return outros ? `Outros — ${outros}` : 'Outros';
   return ORIGENS_INSPECAO.find((o) => o.value === v)?.label ?? v ?? '-';
-}
-
-function CotasPreenchidas({ cotas }: { cotas: any }) {
-  const linhas = Array.isArray(cotas) ? cotas : [];
-  // Uma coluna "Encontrado" por peca medida, igual ao formulario em papel.
-  const pecas = Math.max(
-    1,
-    ...linhas.map((c: any) => (Array.isArray(c.pecas) ? c.pecas.length : 0)),
-  );
-
-  return (
-    <Table
-      size="small"
-      rowKey={(_, i) => String(i)}
-      dataSource={linhas}
-      pagination={false}
-      scroll={{ x: 800 + pecas * 90 }}
-      locale={{ emptyText: 'Nenhuma cota registrada' }}
-      columns={[
-        { title: 'Localização', dataIndex: 'localizacao', width: 150 },
-        { title: 'Especificado', dataIndex: 'especificado', width: 110 },
-        { title: 'Tolerância', dataIndex: 'tolerancia', width: 100 },
-        { title: 'Upper', dataIndex: 'upper', width: 90 },
-        { title: 'Lower', dataIndex: 'lower', width: 90 },
-        {
-          title: 'Encontrado',
-          children: Array.from({ length: pecas }, (_, p) => ({
-            title: `PEÇA ${String(p + 1).padStart(2, '0')}`,
-            width: 90,
-            render: (_: any, r: any) => r.pecas?.[p] ?? '-',
-          })),
-        } as any,
-        { title: 'Instrumento Utilizado', dataIndex: 'instrumento', width: 150 },
-        {
-          title: 'Desvio',
-          children: [
-            { title: 'Mín.', dataIndex: 'desvioMin', width: 90 },
-            { title: 'Máx.', dataIndex: 'desvioMax', width: 90 },
-          ],
-        } as any,
-      ]}
-    />
-  );
 }
 
 function Tentativa({ rel, total }: { rel: any; total: number }) {
@@ -137,7 +95,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         </Descriptions.Item>
       </Descriptions>
 
-      <CotasPreenchidas cotas={rel.cotas} />
+      <CotasSomenteLeitura cotas={rel.cotas} />
 
       {defeitos.length > 0 && (
         <Table
@@ -243,15 +201,27 @@ export default function InspecaoManufaturaDetalhe() {
       itemCodigo: ultimo?.itemCodigo ?? undefined,
       itemDescricao: ultimo?.itemDescricao ?? undefined,
       desenhoRev: ultimo?.desenhoRev ?? undefined,
+      toleranciasNorm: ultimo?.toleranciasNorm ?? 'ISO2768',
       po: ultimo?.po ?? undefined,
       qtdInspecionada: ultimo?.qtdInspecionada ?? 3,
       qtdTotal: ultimo?.qtdTotal ?? undefined,
       resultado: 'APROVADO',
     });
+    // Repete as cotas da tentativa anterior, mas sem as medidas: o que muda na
+    // reinspecao e justamente o que foi encontrado.
     const anteriores = Array.isArray(ultimo?.cotas) ? ultimo.cotas : [];
     setCotas(
       anteriores.length
-        ? anteriores.map((c: any) => ({ ...c, pecas: [] }))
+        ? anteriores.map((c: any) => ({
+            ...c,
+            encontradoMax: '',
+            encontradoMin: '',
+            desvioMin: '',
+            desvioMax: '',
+            conformeAuto: null,
+            conformeManual: null,
+            conforme: null,
+          }))
         : [cotaVazia()],
     );
     setDefeitos([]);

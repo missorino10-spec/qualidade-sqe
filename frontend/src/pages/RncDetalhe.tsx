@@ -72,6 +72,52 @@ const OPCOES_NIVEL_PLANO = Object.entries(labelNivelPlano).map(
 
 const MAX_FOTOS = 5;
 
+// Par eficacia + data da verificacao. Pendente nao tem data (o campo trava e
+// e limpo); Satisfatorio / Nao Satisfatorio exigem a data; "Nao se aplica"
+// deixa a data aberta e opcional.
+function CamposEficacia({ form }: { form: any }) {
+  const eficacia = Form.useWatch('verificacaoEficacia', form) ?? 'PENDENTE';
+  const pendente = eficacia === 'PENDENTE';
+  const exigeData = eficacia === 'APROVADO' || eficacia === 'REPROVADO';
+
+  return (
+    <Row gutter={12}>
+      <Col span={12}>
+        <Form.Item name="verificacaoEficacia" label="Verificação de eficácia">
+          <Select
+            options={OPCOES_EFICACIA}
+            onChange={(v) => {
+              if (v === 'PENDENTE') {
+                form.setFieldValue('dataVerificacao', undefined);
+              }
+            }}
+          />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item
+          name="dataVerificacao"
+          label="Data da verificação"
+          rules={
+            exigeData
+              ? [{ required: true, message: 'Informe a data da verificação.' }]
+              : []
+          }
+          extra={
+            pendente ? 'Sem data enquanto a eficácia estiver pendente.' : undefined
+          }
+        >
+          <DatePicker
+            format="DD/MM/YYYY"
+            style={{ width: '100%' }}
+            disabled={pendente}
+          />
+        </Form.Item>
+      </Col>
+    </Row>
+  );
+}
+
 function moeda(v?: number | null) {
   return v != null
     ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -116,31 +162,45 @@ export default function RncDetalhe() {
       api.patch(`/rnc/${id}`, {
         ...v,
         dataRetorno: v.dataRetorno ? v.dataRetorno.toISOString() : undefined,
+        // null (e nao undefined) para o backend entender que a data foi
+        // apagada de proposito.
         dataVerificacao: v.dataVerificacao
           ? v.dataVerificacao.toISOString()
-          : undefined,
+          : null,
       }),
     onSuccess: () => {
       message.success('RNC atualizada.');
       setEditOpen(false);
       invalidar();
     },
-    onError: () => message.error('Não foi possível atualizar a RNC.'),
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível atualizar a RNC.',
+      ),
   });
 
+  // A data de encerramento e a da verificacao sao informadas pelo usuario -
+  // datas retroativas sao comuns porque a RNC costuma ser fechada no sistema
+  // depois do fato.
   const encerrar = useMutation({
     mutationFn: async (v: any) =>
       api.patch(`/rnc/${id}`, {
         ...v,
         status: 'FINALIZADA',
-        dataVerificacao: new Date().toISOString(),
+        dataEncerramento: v.dataEncerramento.toISOString(),
+        dataVerificacao: v.dataVerificacao
+          ? v.dataVerificacao.toISOString()
+          : null,
       }),
     onSuccess: () => {
       message.success('RNC finalizada.');
       setEncerrarOpen(false);
       invalidar();
     },
-    onError: () => message.error('Não foi possível finalizar a RNC.'),
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível finalizar a RNC.',
+      ),
   });
 
   const reabrir = useMutation({
@@ -282,7 +342,12 @@ export default function RncDetalhe() {
                 icon={<CheckCircleOutlined />}
                 onClick={() => {
                   formEncerrar.setFieldsValue({
-                    verificacaoEficacia: 'APROVADO',
+                    dataEncerramento: dayjs(),
+                    verificacaoEficacia:
+                      rnc.verificacaoEficacia ?? 'PENDENTE',
+                    dataVerificacao: rnc.dataVerificacao
+                      ? dayjs(rnc.dataVerificacao)
+                      : undefined,
                   });
                   setEncerrarOpen(true);
                 }}
@@ -412,6 +477,11 @@ export default function RncDetalhe() {
               <Descriptions.Item label="Data da verificação">
                 {rnc.dataVerificacao
                   ? dayjs(rnc.dataVerificacao).format('DD/MM/YYYY')
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Data de encerramento">
+                {rnc.dataEncerramento
+                  ? dayjs(rnc.dataEncerramento).format('DD/MM/YYYY')
                   : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Observações" span={2}>
@@ -648,21 +718,7 @@ export default function RncDetalhe() {
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                name="verificacaoEficacia"
-                label="Verificação de eficácia"
-              >
-                <Select options={OPCOES_EFICACIA} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="dataVerificacao" label="Data da verificação">
-                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <CamposEficacia form={formEdit} />
           <Form.Item name="observacoes" label="Observações">
             <Input.TextArea rows={2} />
           </Form.Item>
@@ -684,14 +740,18 @@ export default function RncDetalhe() {
           onFinish={(v) => encerrar.mutate(v)}
         >
           <Form.Item
-            name="verificacaoEficacia"
-            label="Verificação de eficácia"
-            rules={[{ required: true, message: 'Informe a eficácia.' }]}
+            name="dataEncerramento"
+            label="Data de encerramento"
+            rules={[
+              { required: true, message: 'Informe a data de encerramento.' },
+            ]}
+            extra="Pode ser retroativa: vale a data em que a RNC foi de fato encerrada."
           >
-            <Select
-              options={OPCOES_EFICACIA.filter((o) => o.value !== 'PENDENTE')}
-            />
+            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
           </Form.Item>
+          {/* A RNC pode ser encerrada com a eficacia ainda pendente - a
+              verificacao costuma vir depois, no lote seguinte. */}
+          <CamposEficacia form={formEncerrar} />
           <Form.Item name="evidencias" label="Evidências da verificação">
             <Input.TextArea rows={3} />
           </Form.Item>

@@ -14,9 +14,15 @@ import {
   Typography,
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  OPCOES_NORMA,
+  TabelaCotasMaxMin,
+  cotaVaziaMaxMin,
+} from '../../components/TabelaCotas';
 
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Os campos e a ordem seguem o formulario em papel, sem acrescimos.
+// A tabela de cotas e a mesma dos outros modulos (src/components/TabelaCotas).
 
 export const ORIGENS_INSPECAO = [
   { value: 'PLANO_INSPECAO', label: 'Plano de Inspeção' },
@@ -54,125 +60,7 @@ export const labelStatusInspecao: Record<string, string> = {
   REPROVADA: 'Reprovada',
 };
 
-export function cotaVazia() {
-  return {
-    localizacao: '',
-    especificado: '',
-    tolerancia: '',
-    upper: '',
-    lower: '',
-    pecas: [] as string[],
-    instrumento: '',
-    desvioMin: '',
-    desvioMax: '',
-  };
-}
-
-// Tabela de cotas com UMA coluna "Encontrado" por peça inspecionada, como no
-// formulario: a quantidade de colunas acompanha a Qtd. inspecionada.
-export function TabelaCotasDimensional({
-  cotas,
-  setCotas,
-  qtdPecas,
-}: {
-  cotas: any[];
-  setCotas: (c: any[]) => void;
-  qtdPecas: number;
-}) {
-  const pecas = Math.max(1, Math.min(10, qtdPecas || 1));
-
-  function copiar() {
-    return cotas.map((c) => ({ ...c, pecas: [...(c.pecas ?? [])] }));
-  }
-  function edit(idx: number, campo: string, valor: any) {
-    const copia = copiar();
-    copia[idx][campo] = valor;
-    setCotas(copia);
-  }
-  function editPeca(idx: number, p: number, valor: any) {
-    const copia = copiar();
-    copia[idx].pecas[p] = valor;
-    setCotas(copia);
-  }
-
-  const colunaTexto = (titulo: string, campo: string, width?: number) => ({
-    title: titulo,
-    width,
-    render: (_: any, r: any, i: number) => (
-      <Input
-        size="small"
-        value={r[campo]}
-        onChange={(e) => edit(i, campo, e.target.value)}
-      />
-    ),
-  });
-
-  const colunasPecas = Array.from({ length: pecas }, (_, p) => ({
-    title: `PEÇA ${String(p + 1).padStart(2, '0')}`,
-    width: 90,
-    render: (_: any, r: any, i: number) => (
-      <Input
-        size="small"
-        value={r.pecas?.[p] ?? ''}
-        onChange={(e) => editPeca(i, p, e.target.value)}
-      />
-    ),
-  }));
-
-  return (
-    <div>
-      <Table
-        size="small"
-        rowKey={(_, i) => String(i)}
-        dataSource={cotas}
-        pagination={false}
-        scroll={{ x: 900 + pecas * 90 }}
-        locale={{ emptyText: 'Nenhuma cota adicionada' }}
-        columns={[
-          colunaTexto('Localização', 'localizacao', 150),
-          colunaTexto('Especificado', 'especificado', 110),
-          colunaTexto('Tolerância', 'tolerancia', 100),
-          colunaTexto('Upper', 'upper', 90),
-          colunaTexto('Lower', 'lower', 90),
-          {
-            title: 'Encontrado',
-            children: colunasPecas,
-          } as any,
-          colunaTexto('Instrumento Utilizado', 'instrumento', 150),
-          {
-            title: 'Desvio',
-            children: [
-              colunaTexto('Mín.', 'desvioMin', 90),
-              colunaTexto('Máx.', 'desvioMax', 90),
-            ],
-          } as any,
-          {
-            title: '',
-            width: 40,
-            fixed: 'right' as const,
-            render: (_: any, __: any, i: number) => (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => setCotas(cotas.filter((_, k) => k !== i))}
-              />
-            ),
-          },
-        ]}
-      />
-      <Button
-        type="dashed"
-        block
-        icon={<PlusOutlined />}
-        onClick={() => setCotas([...copiar(), cotaVazia()])}
-        style={{ marginTop: 8 }}
-      >
-        Adicionar cota
-      </Button>
-    </div>
-  );
-}
+export { cotaVaziaMaxMin as cotaVazia };
 
 // Bloco visual opcional do fim do relatorio: defeitos encontrados e quantidade.
 export function BlocoDefeitos({
@@ -283,9 +171,9 @@ export function CamposRelatorio({
   setups?: any[];
   avaliacao?: any;
 }) {
-  const qtdInspecionada = Form.useWatch('qtdInspecionada', form);
   const origem = Form.useWatch('origem', form);
   const resultado = Form.useWatch('resultado', form);
+  const norma = Form.useWatch('toleranciasNorm', form) ?? 'ISO2768';
 
   return (
     <>
@@ -386,6 +274,12 @@ export function CamposRelatorio({
         </Col>
       </Row>
 
+      {/* A norma escolhida aqui puxa as tolerancias da tabela em todas as
+          cotas do relatorio. */}
+      <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
+        <Select options={OPCOES_NORMA} />
+      </Form.Item>
+
       <Form.Item name="origem" label="Origem da inspeção">
         <Select options={ORIGENS_INSPECAO} />
       </Form.Item>
@@ -398,11 +292,7 @@ export function CamposRelatorio({
       <Divider orientation="left" plain>
         Cotas
       </Divider>
-      <TabelaCotasDimensional
-        cotas={cotas}
-        setCotas={setCotas}
-        qtdPecas={qtdInspecionada ?? 1}
-      />
+      <TabelaCotasMaxMin cotas={cotas} setCotas={setCotas} norma={norma} />
 
       <Divider orientation="left" plain>
         Defeitos encontrados (opcional)

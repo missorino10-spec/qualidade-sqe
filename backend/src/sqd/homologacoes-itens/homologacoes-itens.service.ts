@@ -8,13 +8,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
 import { diasUteisEntre, numeroSqd } from '../sqd-utils';
 import {
-  CHECKLIST_VISUAL_SQD,
-  CotaItem,
+  CHECKLIST_VISUAL,
+  CotaPecas,
   GrupoVisual,
-  calcularCota,
+  calcularCotaPecas,
   checklistVisualInicial,
+  resultadoDimensional,
   resultadoVisual,
-} from './itens-utils';
+} from '../../comum/inspecao';
 
 const includeHomologacao = {
   criadoPor: { select: { id: true, nome: true } },
@@ -43,7 +44,7 @@ export class HomologacoesItensService {
 
   // O checklist VISUAL em branco: e daqui que a tela monta os 12 grupos.
   formulario() {
-    return CHECKLIST_VISUAL_SQD;
+    return CHECKLIST_VISUAL;
   }
 
   async listar(ano?: number) {
@@ -74,7 +75,7 @@ export class HomologacoesItensService {
       ...h,
       tentativas: h.relatorios.length,
       revisao: String(h.relatorios.length).padStart(2, '0'),
-      checklistVisual: CHECKLIST_VISUAL_SQD,
+      checklistVisual: CHECKLIST_VISUAL,
       pendenciasFinalizacao: await this.pendenciasFinalizacao(h),
     };
   }
@@ -199,18 +200,14 @@ export class HomologacoesItensService {
       );
     }
 
-    const cotas = (dto.cotas ?? []).map((c: CotaItem) => calcularCota(c));
+    const cotas = (dto.cotas ?? []).map((c: CotaPecas) => calcularCotaPecas(c));
     const checklist: GrupoVisual[] = dto.checklistVisual?.length
       ? dto.checklistVisual
       : checklistVisualInicial();
 
     // O papel tem os dois campos "RESULTADO" marcados a mao; o calculo entra
     // so como padrao quando a tela nao manda nada.
-    const temDesvio = cotas.some(
-      (c: CotaItem) => (numero(c.desvioMin) ?? 0) > 0 || (numero(c.desvioMax) ?? 0) > 0,
-    );
-    const resAmostras =
-      dto.resultadoAmostras ?? (temDesvio ? 'REPROVADO' : 'APROVADO');
+    const resAmostras = dto.resultadoAmostras ?? resultadoDimensional(cotas);
     const resVisual = dto.resultadoVisual ?? resultadoVisual(checklist);
 
     const existente = dto.tentativa

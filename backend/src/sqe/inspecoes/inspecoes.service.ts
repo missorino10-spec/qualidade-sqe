@@ -2,11 +2,17 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import { RncService } from '../rnc/rnc.service';
 import {
-  checklistVisualInicial,
   numeroDocumento,
   semanaAno,
   semanaReferencia,
 } from '../sqe-utils';
+import {
+  CotaMaxMin,
+  calcularCotaMaxMin,
+  checklistVisualInicial,
+  resultadoDimensional,
+  resultadoVisual,
+} from '../../comum/inspecao';
 
 const includeFormulario = {
   fornecedor: { select: { id: true, nome: true, codigo: true } },
@@ -371,6 +377,7 @@ export class InspecoesService {
 
   async criarVisual(dto: any, usuarioId: number) {
     const ctx = await this.prepararInspecao(dto, usuarioId);
+    const checklist = dto.checklist ?? checklistVisualInicial();
     const insp = await this.prisma.inspecaoVisual.create({
       data: {
         entregaId: ctx.entregaId,
@@ -389,9 +396,9 @@ export class InspecoesService {
         // recebimento, referenciado pela RNC.
         relatorioNumero: ctx.entrega.numeroInspecao,
         origem: dto.origem ?? 'PLANO_INSPECAO',
-        checklist: dto.checklist ?? checklistVisualInicial(),
+        checklist,
         observacoes: dto.observacoes ?? null,
-        resultado: dto.resultado ?? 'APROVADO',
+        resultado: dto.resultado ?? resultadoVisual(checklist),
         inspetorId: usuarioId,
       },
       include: includeFormulario,
@@ -438,6 +445,9 @@ export class InspecoesService {
 
   async criarLote(dto: any, usuarioId: number) {
     const ctx = await this.prepararInspecao(dto, usuarioId);
+    // O calculo das cotas e refeito aqui: o que a tela mostrou tem que ser
+    // exatamente o que vai para o banco e para o PDF.
+    const cotas = (dto.cotas ?? []).map((c: CotaMaxMin) => calcularCotaMaxMin(c));
     const insp = await this.prisma.inspecaoLote.create({
       data: {
         entregaId: ctx.entregaId,
@@ -454,9 +464,9 @@ export class InspecoesService {
         qtdTotal: dto.qtdTotal ?? null,
         relatorioNumero: ctx.entrega.numeroInspecao,
         origem: dto.origem ?? 'PLANO_INSPECAO',
-        cotas: dto.cotas ?? [],
+        cotas,
         observacoes: dto.observacoes ?? null,
-        resultado: dto.resultado ?? 'APROVADO',
+        resultado: dto.resultado ?? resultadoDimensional(cotas),
         inspetorId: usuarioId,
       },
       include: includeFormulario,

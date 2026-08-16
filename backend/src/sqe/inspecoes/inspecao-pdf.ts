@@ -1,6 +1,9 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { labelNorma } from '../../comum/inspecao';
+import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -33,7 +36,12 @@ function txt(v: any): string {
 // Relatorio de inspecao de recebimento: um documento por INSPECAO, contendo os
 // formularios que foram preenchidos (Visual e/ou Lote) exatamente como ficaram
 // salvos. Serve tanto para inspecao aprovada quanto reprovada.
-export function gerarPdfInspecao(insp: any): PDFKit.PDFDocument {
+// As fotos do bloco EVIDENCIAS chegam como bytes (e nao como caminho) porque
+// ficam no Supabase Storage, nao no disco do servidor.
+export function gerarPdfInspecao(
+  insp: any,
+  fotosVisual: Buffer[] = [],
+): PDFKit.PDFDocument {
   // bufferPages: sem isso o rodape "Pagina X de Y" nao consegue voltar nas
   // paginas anteriores - bufferedPageRange() enxergaria so a pagina atual.
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
@@ -243,10 +251,9 @@ export function gerarPdfInspecao(insp: any): PDFKit.PDFDocument {
 
   linha([
     { w: 70, label: 'FORNECEDOR', valor: txt(insp.fornecedor?.codigo) },
-    { w: 215, label: 'RAZÃO SOCIAL', valor: txt(insp.fornecedor?.nome) },
-    { w: 80, label: 'CLASSIFICAÇÃO', valor: txt(insp.fornecedor?.classificacaoFornecimento) },
+    { w: 295, label: 'RAZÃO SOCIAL', valor: txt(insp.fornecedor?.nome) },
     {
-      w: W - 70 - 215 - 80,
+      w: W - 70 - 295,
       label: 'RNC',
       valor: (insp.rncs ?? []).map((r: any) => r.numero).join(', ') || '-',
       cor: reprovado ? VERMELHO : PRETO,
@@ -272,7 +279,7 @@ export function gerarPdfInspecao(insp: any): PDFKit.PDFDocument {
     {
       w: W - 90 - 80 - 130,
       label: 'TOLERÂNCIAS / NORMA',
-      valor: txt(formulario.toleranciasNorm),
+      valor: labelNorma(formulario.toleranciasNorm),
     },
   ]);
 
@@ -331,85 +338,30 @@ export function gerarPdfInspecao(insp: any): PDFKit.PDFDocument {
       y += 4;
       bloco('Observações da inspeção visual', txt(insp.visual.observacoes), 40);
     }
+
+    // Bloco EVIDENCIAS do formulario: as fotos que comprovam a inspecao.
+    y += 6;
+    faixa('EVIDÊNCIAS / EVIDENCE');
+    y = desenharFotosEvidencia(doc, fotosVisual, {
+      x0: X0,
+      largura: W,
+      y,
+      margem: M,
+      rodape: RODAPE,
+    });
   }
 
   // ---------------------------------------------------------- lote
   if (insp.lote) {
     y += 6;
     faixa('INSPEÇÃO DE LOTE / DIMENSIONAL — cotas medidas');
-    const cotas = Array.isArray(insp.lote.cotas) ? insp.lote.cotas : [];
-    const colunas = [
-      { titulo: 'Localização / Cota', w: 150, campo: 'localizacao' },
-      { titulo: 'Especificado', w: 75, campo: 'especificado' },
-      { titulo: 'Tol. +', w: 50, campo: 'tolUpper' },
-      { titulo: 'Tol. -', w: 50, campo: 'tolLower' },
-      { titulo: 'Medido', w: 65, campo: 'medido' },
-      { titulo: 'Instrumento', w: 75, campo: 'instrumento' },
-      { titulo: 'Conforme', w: W - 150 - 75 - 50 - 50 - 65 - 75, campo: 'conforme' },
-    ];
-
-    const cabecalhoTabela = () => {
-      espaco(16);
-      doc.rect(X0, y, W, 15).fill('#F0F0F0');
-      let x = X0;
-      for (const c of colunas) {
-        doc
-          .lineWidth(0.5)
-          .strokeColor('#999999')
-          .rect(x, y, c.w, 15)
-          .stroke();
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(7)
-          .fillColor(PRETO)
-          .text(c.titulo, x + 3, y + 4, { width: c.w - 6, lineBreak: false });
-        x += c.w;
-      }
-      y += 15;
-    };
-    cabecalhoTabela();
-
-    if (!cotas.length) {
-      espaco(18);
-      doc
-        .font('Helvetica-Oblique')
-        .fontSize(8)
-        .fillColor(CINZA)
-        .text('Nenhuma cota registrada.', X0 + 4, y + 4, { width: W - 8 });
-      y += 18;
-    }
-
-    for (const cota of cotas) {
-      if (y + 16 > doc.page.height - RODAPE) {
-        doc.addPage();
-        y = M;
-        cabecalhoTabela();
-      }
-      let x = X0;
-      for (const c of colunas) {
-        doc.lineWidth(0.5).strokeColor('#CCCCCC').rect(x, y, c.w, 16).stroke();
-        const conforme = cota.conforme !== false;
-        const valor =
-          c.campo === 'conforme'
-            ? conforme
-              ? 'Sim'
-              : 'Não'
-            : txt(cota[c.campo]);
-        doc
-          .font(c.campo === 'conforme' ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(7.5)
-          .fillColor(
-            c.campo === 'conforme' ? (conforme ? VERDE : VERMELHO) : PRETO,
-          )
-          .text(valor, x + 3, y + 5, {
-            width: c.w - 6,
-            lineBreak: false,
-            ellipsis: true,
-          });
-        x += c.w;
-      }
-      y += 16;
-    }
+    y = desenharTabelaCotas(doc, insp.lote.cotas, {
+      x0: X0,
+      largura: W,
+      y,
+      margem: M,
+      rodape: RODAPE,
+    });
     if (insp.lote.observacoes) {
       y += 4;
       bloco('Observações da inspeção de lote', txt(insp.lote.observacoes), 40);

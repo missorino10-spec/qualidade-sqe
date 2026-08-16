@@ -25,6 +25,9 @@ import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { CODIGOS_ACAO_ITEM } from './itens-utils';
 import { HomologacoesItensService } from './homologacoes-itens.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../../anexos/storage.service';
+import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import {
   gerarPdfRegistroHomologacaoItem,
   gerarPdfRelatorioInspecaoItem,
@@ -114,7 +117,11 @@ class RelatorioInspecaoDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('sqd/homologacoes-itens')
 export class HomologacoesItensController {
-  constructor(private service: HomologacoesItensService) {}
+  constructor(
+    private service: HomologacoesItensService,
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   // Catalogo do checklist VISUAL (12 grupos) para montar a tela.
   @Get('formulario')
@@ -151,10 +158,18 @@ export class HomologacoesItensController {
     @Query('tentativa') tentativa?: string,
   ) {
     const h = await this.service.detalhe(id);
-    const doc = gerarPdfRelatorioInspecaoItem(
-      h,
-      tentativa ? Number(tentativa) : undefined,
+    const alvo = tentativa ? Number(tentativa) : undefined;
+    const relatorios: any[] = h.relatorios ?? [];
+    const rel = alvo
+      ? relatorios.find((x) => x.tentativa === alvo)
+      : relatorios.at(-1);
+    const fotos = await carregarFotosEvidencia(
+      this.prisma,
+      this.storage,
+      'HOMOLOGACAO_ITEM_VISUAL',
+      rel?.id,
     );
+    const doc = gerarPdfRelatorioInspecaoItem(h, alvo, fotos);
     this.enviarPdf(res, `${h.numero.replace('/', '-')}-relatorio.pdf`);
     doc.pipe(res);
     doc.end();

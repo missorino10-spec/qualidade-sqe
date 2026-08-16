@@ -255,6 +255,48 @@ export class RncService {
     const statusAnterior = rnc.status;
     const novoStatus = data.status ?? rnc.status;
 
+    // Eficacia e encerramento andam em pares independentes: cada status manda
+    // na sua propria data. Pendente nao pode ter data; verificada exige data.
+    const eficacia = data.verificacaoEficacia ?? rnc.verificacaoEficacia;
+    // dataVerificacao === null significa "limpar"; ausente significa "manter".
+    const dataVerificacao =
+      eficacia === 'PENDENTE'
+        ? null
+        : data.dataVerificacao !== undefined
+          ? data.dataVerificacao
+            ? new Date(data.dataVerificacao)
+            : null
+          : rnc.dataVerificacao;
+    // So cobra a data quando o usuario mexe na eficacia ou na propria data.
+    // Registros antigos, gravados antes desta regra, continuam editaveis.
+    const mexeuNaEficacia =
+      eficacia !== rnc.verificacaoEficacia || data.dataVerificacao !== undefined;
+    if (
+      (eficacia === 'APROVADO' || eficacia === 'REPROVADO') &&
+      mexeuNaEficacia &&
+      !dataVerificacao
+    ) {
+      throw new BadRequestException(
+        'Informe a data da verificacao de eficacia.',
+      );
+    }
+
+    const dataEncerramento =
+      novoStatus === 'FINALIZADA'
+        ? data.dataEncerramento
+          ? new Date(data.dataEncerramento)
+          : rnc.dataEncerramento
+        : null;
+    // So cobra a data no ato de encerrar. RNCs finalizadas antes deste campo
+    // existir continuam editaveis sem data.
+    if (
+      novoStatus === 'FINALIZADA' &&
+      statusAnterior !== 'FINALIZADA' &&
+      !dataEncerramento
+    ) {
+      throw new BadRequestException('Informe a data de encerramento da RNC.');
+    }
+
     const atualizada = await this.prisma.rnc.update({
       where: { id },
       data: {
@@ -273,11 +315,9 @@ export class RncService {
           data.fornecedorEnviouPlano ?? rnc.fornecedorEnviouPlano,
         nivelPlano: data.nivelPlano ?? rnc.nivelPlano,
         status: novoStatus,
-        verificacaoEficacia:
-          data.verificacaoEficacia ?? rnc.verificacaoEficacia,
-        dataVerificacao: data.dataVerificacao
-          ? new Date(data.dataVerificacao)
-          : rnc.dataVerificacao,
+        dataEncerramento,
+        verificacaoEficacia: eficacia,
+        dataVerificacao,
         evidencias: data.evidencias ?? rnc.evidencias,
         observacoes: data.observacoes ?? rnc.observacoes,
       },
@@ -302,12 +342,24 @@ export class RncService {
     novoStatus: string,
     comentario: string | undefined,
     usuarioId: number,
+    dataEncerramento?: string,
   ) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
     if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    // Mesma regra do PATCH: so a RNC finalizada tem data de encerramento, e
+    // ela e sempre informada pelo usuario.
+    const encerramento =
+      novoStatus === 'FINALIZADA'
+        ? dataEncerramento
+          ? new Date(dataEncerramento)
+          : rnc.dataEncerramento
+        : null;
+    if (novoStatus === 'FINALIZADA' && !encerramento) {
+      throw new BadRequestException('Informe a data de encerramento da RNC.');
+    }
     const atualizada = await this.prisma.rnc.update({
       where: { id },
-      data: { status: novoStatus as any },
+      data: { status: novoStatus as any, dataEncerramento: encerramento },
       include: includePadrao,
     });
     await this.historico.registrar({
@@ -333,6 +385,7 @@ export class RncService {
       data: {
         status: 'CANCELADA' as any,
         motivoCancelamento: motivo.trim(),
+        dataEncerramento: null,
       },
       include: includePadrao,
     });
@@ -356,6 +409,7 @@ export class RncService {
       data: {
         status: 'EM_ANDAMENTO' as any,
         motivoCancelamento: null,
+        dataEncerramento: null,
       },
       include: includePadrao,
     });

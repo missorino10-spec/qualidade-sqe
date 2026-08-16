@@ -6,6 +6,11 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
 import { numeroManufatura, statusPorResultado } from '../manufatura-utils';
+import {
+  CotaMaxMin,
+  calcularCotaMaxMin,
+  resultadoDimensional,
+} from '../../comum/inspecao';
 
 const includeInspecao = {
   maquina: { select: { id: true, codigo: true, nome: true, area: true } },
@@ -98,6 +103,9 @@ export class InspecoesManufaturaService {
     const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
     const ano = data.getFullYear();
     const prefixo = tipo === 'SETUP' ? 'SET' : 'PROD';
+    // O calculo das cotas e refeito aqui: o que a tela mostrou tem que ser
+    // exatamente o que vai para o banco e para o PDF.
+    const cotas = (dto.cotas ?? []).map((c: CotaMaxMin) => calcularCotaMaxMin(c));
 
     for (let i = 0; i < 5; i++) {
       const ultimo = await this.prisma.relatorioDimensional.findFirst({
@@ -124,9 +132,9 @@ export class InspecoesManufaturaService {
             po: dto.po ?? null,
             qtdInspecionada: dto.qtdInspecionada ?? null,
             qtdTotal: dto.qtdTotal ?? null,
-            cotas: dto.cotas ?? [],
+            cotas,
             observacoesFinais: dto.observacoesFinais ?? null,
-            resultado: dto.resultado ?? 'APROVADO',
+            resultado: dto.resultado ?? resultadoDimensional(cotas),
             observacaoResultado: dto.observacaoResultado ?? null,
             defeitos: dto.defeitos ?? undefined,
             qtdAfetada: dto.qtdAfetada ?? null,

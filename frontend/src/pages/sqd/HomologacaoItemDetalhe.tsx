@@ -41,12 +41,19 @@ import {
   Cota,
   GrupoVisual,
   CamposCabecalhoInspecao,
-  TabelaCotas,
+  PECAS_PADRAO,
   checklistInicial,
   cotaVazia,
   cotasComDesvio,
+  normaDoRelatorio,
   resultadoVisual,
 } from './FormularioInspecaoItem';
+import { CotasSomenteLeitura, TabelaCotasPecas } from '../../components/TabelaCotas';
+import {
+  FotosEvidenciaSalvas,
+  UploadFotosEvidencia,
+  enviarFotosEvidencia,
+} from '../../components/FotosEvidencia';
 import {
   corResultadoItem,
   corStatusHomologacao,
@@ -65,6 +72,8 @@ import {
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_ITEM_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_ITEM_PLANO_ACAO';
+// Fotos do bloco EVIDENCIAS da aba VISUAL, presas ao relatorio da tentativa.
+const TIPO_EVIDENCIA_VISUAL = 'HOMOLOGACAO_ITEM_VISUAL';
 
 // Mesmos prazos usados pelo backend (itens-utils): 3 dias uteis para as
 // amostras chegarem e 3 dias uteis da solicitacao ate o envio do relatorio.
@@ -177,8 +186,15 @@ export default function HomologacaoItemDetalhe() {
   const [formInspecao] = Form.useForm();
   const [cotas, setCotas] = useState<Cota[]>([]);
   const [checklist, setChecklist] = useState<GrupoVisual[]>([]);
+  const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   // Tentativa que está aberta no modal; null = uma rodada nova.
   const [tentativaEdicao, setTentativaEdicao] = useState<number | null>(null);
+
+  // A norma vale para o relatorio inteiro e o numero de colunas de peca segue a
+  // quantidade inspecionada — os dois vem do cabecalho.
+  const norma = normaDoRelatorio(Form.useWatch('tolerancias', formInspecao));
+  const qtdPecas =
+    Number(Form.useWatch('qtdInspecionada', formInspecao)) || PECAS_PADRAO;
 
   const { data: h, isLoading } = useQuery<any>({
     queryKey: ['sqd-homologacao-item', id],
@@ -232,15 +248,32 @@ export default function HomologacaoItemDetalhe() {
   // O relatorio de inspecao tem rota propria: e ele que apura o resultado do
   // item e o tempo de resposta do fornecedor.
   const salvarInspecao = useMutation({
-    mutationFn: async (v: any) =>
-      api.post(`/sqd/homologacoes-itens/${id}/relatorio`, {
+    mutationFn: async (v: any) => {
+      const res = await api.post(`/sqd/homologacoes-itens/${id}/relatorio`, {
         ...v,
         tentativa: tentativaEdicao ?? undefined,
         cotas,
         checklistVisual: checklist,
         resultadoAmostras: cotasComDesvio(cotas) ? 'REPROVADO' : 'APROVADO',
         resultadoVisual: resultadoVisual(checklist),
-      }),
+      });
+      // As fotos do bloco EVIDENCIAS so podem subir depois: elas precisam do id
+      // do relatorio da tentativa que acabou de ser gravada.
+      if (fotosVisual.length) {
+        const lista: any[] = res.data?.relatorios ?? [];
+        const alvo = tentativaEdicao
+          ? lista.find((r) => r.tentativa === tentativaEdicao)
+          : lista[lista.length - 1];
+        if (alvo?.id) {
+          await enviarFotosEvidencia(
+            fotosVisual,
+            TIPO_EVIDENCIA_VISUAL,
+            alvo.id,
+          );
+        }
+      }
+      return res;
+    },
     onSuccess: (res: any) => {
       message.success(
         `Relatório de inspeção lançado — item ${
@@ -327,7 +360,7 @@ export default function HomologacaoItemDetalhe() {
         dataInput(h.dataRetornoFornecedor) || dayjs().format('YYYY-MM-DD'),
       origem: base?.origem ?? 'HOMOLOGACAO',
       desenhoRev: base?.desenhoRev,
-      tolerancias: base?.tolerancias ?? 'ISO 2768 - média',
+      tolerancias: normaDoRelatorio(base?.tolerancias),
       nf: r?.nf,
       po: base?.po,
       qtdInspecionada: r?.qtdInspecionada,
@@ -348,6 +381,9 @@ export default function HomologacaoItemDetalhe() {
             pecas: (c.pecas ?? []).map(() => ''),
             desvioMin: '',
             desvioMax: '',
+            conformeAuto: null,
+            conformeManual: null,
+            conforme: null,
           })),
     );
     setChecklist(
@@ -355,6 +391,7 @@ export default function HomologacaoItemDetalhe() {
         ? (r.checklistVisual as GrupoVisual[])
         : checklistInicial(catalogo),
     );
+    setFotosVisual([]);
     setInspecaoOpen(true);
   }
 
@@ -685,69 +722,7 @@ export default function HomologacaoItemDetalhe() {
                   <Divider orientation="left" plain>
                     AMOSTRAS — Doc. BDBR.QUA.FMR.011.06
                   </Divider>
-                  <Table
-                    rowKey={(_, i) => String(i)}
-                    size="small"
-                    pagination={false}
-                    scroll={{ x: 900 }}
-                    dataSource={(recente.cotas ?? []) as any[]}
-                    locale={{ emptyText: 'Nenhuma cota lançada.' }}
-                    columns={[
-                      { title: 'Localização', dataIndex: 'localizacao' },
-                      {
-                        title: 'Especificado',
-                        dataIndex: 'especificado',
-                        width: 110,
-                        align: 'right',
-                      },
-                      {
-                        title: 'Tol.',
-                        dataIndex: 'tolerancia',
-                        width: 80,
-                        align: 'right',
-                      },
-                      {
-                        title: 'Máx.',
-                        dataIndex: 'upper',
-                        width: 80,
-                        align: 'right',
-                      },
-                      {
-                        title: 'Mín.',
-                        dataIndex: 'lower',
-                        width: 80,
-                        align: 'right',
-                      },
-                      {
-                        title: 'Medidas',
-                        render: (_: any, c: any) =>
-                          (c.pecas ?? [])
-                            .filter((p: any) => p !== '' && p != null)
-                            .join('  ·  ') || '-',
-                      },
-                      {
-                        title: 'Instrumento',
-                        dataIndex: 'instrumento',
-                        width: 130,
-                      },
-                      {
-                        title: 'Desvio',
-                        width: 120,
-                        align: 'right',
-                        render: (_: any, c: any) => {
-                          const min = Number(c.desvioMin ?? 0);
-                          const max = Number(c.desvioMax ?? 0);
-                          return min || max ? (
-                            <Tag color="red">
-                              -{min || 0} / +{max || 0}
-                            </Tag>
-                          ) : (
-                            <Tag color="green">OK</Tag>
-                          );
-                        },
-                      },
-                    ]}
-                  />
+                  <CotasSomenteLeitura cotas={recente.cotas} />
                   {recente.observacoesAmostras && (
                     <Typography.Paragraph style={{ marginTop: 12 }}>
                       <Typography.Text strong>Observações: </Typography.Text>
@@ -786,6 +761,13 @@ export default function HomologacaoItemDetalhe() {
                       </div>
                     ),
                   )}
+                  <Divider orientation="left" plain>
+                    Evidências / Evidence
+                  </Divider>
+                  <FotosEvidenciaSalvas
+                    entidadeTipo={TIPO_EVIDENCIA_VISUAL}
+                    entidadeId={recente.id}
+                  />
                   {recente.evidenciasVisual && (
                     <Typography.Paragraph style={{ marginTop: 12 }}>
                       <Typography.Text strong>Evidências: </Typography.Text>
@@ -1074,7 +1056,12 @@ export default function HomologacaoItemDetalhe() {
           <Divider orientation="left" plain>
             AMOSTRAS — Doc. BDBR.QUA.FMR.011.06 (Rev. 06)
           </Divider>
-          <TabelaCotas cotas={cotas} setCotas={setCotas} />
+          <TabelaCotasPecas
+            cotas={cotas}
+            setCotas={setCotas}
+            qtdPecas={qtdPecas}
+            norma={norma}
+          />
           <Form.Item
             name="observacoesAmostras"
             label="Observações das amostras"
@@ -1094,9 +1081,13 @@ export default function HomologacaoItemDetalhe() {
             VISUAL — Doc. BDBR.QUA.FMR.06.07 (Rev. 07)
           </Divider>
           <ChecklistVisual checklist={checklist} setChecklist={setChecklist} />
+          <Divider orientation="left" plain>
+            Evidências / Evidence
+          </Divider>
+          <UploadFotosEvidencia fotos={fotosVisual} setFotos={setFotosVisual} />
           <Form.Item
             name="evidenciasVisual"
-            label="Evidências"
+            label="Descrição das evidências"
             style={{ marginTop: 12 }}
           >
             <Input.TextArea rows={2} />

@@ -25,6 +25,9 @@ import {
   SLA_HOMOLOGACAO_ITEM_DIAS,
   SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
 } from './itens-utils';
+import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+import { labelNorma } from '../../comum/inspecao';
 
 const LABEL_RESULTADO: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -361,9 +364,12 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
 // O relatorio nao tem numero proprio: carrega o numero do registro mais a
 // revisao, que e o numero da tentativa.
 // ---------------------------------------------------------------------------
+// As fotos do bloco EVIDENCIAS chegam como bytes (e nao como caminho) porque
+// ficam no Supabase Storage, nao no disco do servidor.
 export function gerarPdfRelatorioInspecaoItem(
   h: any,
   tentativa?: number,
+  fotosVisual: Buffer[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   const t = ferramentas(doc);
@@ -432,7 +438,7 @@ export function gerarPdfRelatorioInspecaoItem(
     {
       w: W - 170 - 175,
       label: 'TOLERÂNCIAS / TOLERANCES',
-      valor: txt(r.tolerancias),
+      valor: labelNorma(r.tolerancias),
     },
     { w: 175, label: 'FORNECEDOR / VENDOR', valor: txt(h.fornecedorNome) },
   ]);
@@ -466,115 +472,13 @@ export function gerarPdfRelatorioInspecaoItem(
   // ------------------------------------------------ aba AMOSTRAS
   t.estado.y += 6;
   t.faixa('AMOSTRAS / SAMPLES — BDBR.QUA.FMR.011.06 (Rev. 06)');
-  const cotas: any[] = r.cotas ?? [];
-  const nPecas = Math.max(
-    1,
-    ...cotas.map((c) => (Array.isArray(c.pecas) ? c.pecas.length : 0)),
-  );
-
-  // As colunas fixas somam sempre a mesma largura; o que sobra e dividido
-  // entre as colunas "Peça 01..N". Com muitas pecas, os dois campos de texto
-  // cedem espaco para as medidas continuarem legiveis.
-  let wLoc = 92;
-  let wInst = 78;
-  const fixas = () => wLoc + 46 + 44 + 38 + 38 + wInst + 32 + 32;
-  if ((W - fixas()) / nPecas < 30) {
-    wLoc = 66;
-    wInst = 52;
-  }
-  const wPeca = (W - fixas()) / nPecas;
-
-  const colunas = [
-    { titulo: 'LOCALIZAÇÃO', w: wLoc, align: 'left' as const },
-    { titulo: 'ESPECIF.', w: 46, align: 'right' as const },
-    { titulo: 'TOLER.', w: 44, align: 'right' as const },
-    { titulo: 'UPPER', w: 38, align: 'right' as const },
-    { titulo: 'LOWER', w: 38, align: 'right' as const },
-    ...Array.from({ length: nPecas }, (_, i) => ({
-      titulo: `PEÇA ${String(i + 1).padStart(2, '0')}`,
-      w: wPeca,
-      align: 'right' as const,
-    })),
-    { titulo: 'INSTRUMENTO', w: wInst, align: 'left' as const },
-    { titulo: 'DESV. MÍN.', w: 32, align: 'right' as const },
-    { titulo: 'DESV. MÁX.', w: 32, align: 'right' as const },
-  ];
-
-  const cabecalhoCotas = () => {
-    t.espaco(20);
-    let x = X0;
-    for (const c of colunas) {
-      doc.lineWidth(0.5).strokeColor(PRETO).rect(x, t.estado.y, c.w, 19).stroke();
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(5.5)
-        .fillColor(CINZA)
-        .text(c.titulo, x + 2, t.estado.y + 6, {
-          width: c.w - 4,
-          align: c.align,
-        });
-      x += c.w;
-    }
-    t.estado.y += 19;
-  };
-
-  if (!cotas.length) {
-    t.espaco(18);
-    doc
-      .font('Helvetica-Oblique')
-      .fontSize(8)
-      .fillColor(CINZA)
-      .text('Nenhuma cota medida.', X0 + 4, t.estado.y + 4, { width: W - 8 });
-    t.estado.y += 18;
-  } else {
-    cabecalhoCotas();
-    for (const c of cotas) {
-      if (t.estado.y + 15 > doc.page.height - RODAPE) {
-        doc.addPage();
-        t.estado.y = M;
-        cabecalhoCotas();
-      }
-      const pecas = Array.isArray(c.pecas) ? c.pecas : [];
-      const valores = [
-        txt(c.localizacao),
-        num(c.especificado),
-        num(c.tolerancia),
-        num(c.upper),
-        num(c.lower),
-        ...Array.from({ length: nPecas }, (_, i) => num(pecas[i])),
-        txt(c.instrumento),
-        num(c.desvioMin),
-        num(c.desvioMax),
-      ];
-      // Fora de tolerancia sai em vermelho: e a leitura imediata da planilha.
-      const foraMin = Number(c.desvioMin) > 0;
-      const foraMax = Number(c.desvioMax) > 0;
-      let x = X0;
-      colunas.forEach((col, i) => {
-        doc
-          .lineWidth(0.5)
-          .strokeColor('#CCCCCC')
-          .rect(x, t.estado.y, col.w, 15)
-          .stroke();
-        const ultimoDesvio = i === colunas.length - 1;
-        const penultimoDesvio = i === colunas.length - 2;
-        const vermelho =
-          (penultimoDesvio && foraMin) || (ultimoDesvio && foraMax);
-        doc
-          .font(vermelho ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(6.5)
-          .fillColor(vermelho ? VERMELHO : PRETO)
-          .text(valores[i], x + 2, t.estado.y + 4, {
-            width: col.w - 4,
-            align: col.align,
-            lineBreak: false,
-            ellipsis: true,
-          });
-        x += col.w;
-      });
-      t.estado.y += 15;
-    }
-  }
+  t.estado.y = desenharTabelaCotas(doc, r.cotas, {
+    x0: X0,
+    largura: W,
+    y: t.estado.y,
+    margem: M,
+    rodape: RODAPE,
+  });
 
   t.estado.y += 4;
   t.bloco(
@@ -648,7 +552,17 @@ export function gerarPdfRelatorioInspecaoItem(
     t.estado.y += 4;
   }
 
-  t.bloco('Evidências / Evidence', txt(r.evidenciasVisual), 30);
+  // Bloco EVIDENCIAS do formulario: as fotos que comprovam a inspecao.
+  t.estado.y += 6;
+  t.faixa('EVIDÊNCIAS / EVIDENCE');
+  t.estado.y = desenharFotosEvidencia(doc, fotosVisual, {
+    x0: X0,
+    largura: W,
+    y: t.estado.y,
+    margem: M,
+    rodape: RODAPE,
+  });
+  t.bloco('Descrição das evidências', txt(r.evidenciasVisual), 30);
   t.bloco('Observações finais', txt(r.observacoesVisual), 30);
   t.linha(
     [

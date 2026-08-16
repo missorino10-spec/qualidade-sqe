@@ -81,6 +81,7 @@ export default function InspecoesManufatura({
       qtdInspecionada: 3,
       origem: tipo === 'SETUP' ? 'LIBERACAO_SETUP' : 'PLANO_INSPECAO',
       resultado: 'APROVADO',
+      toleranciasNorm: 'ISO2768',
     });
     setCotas([cotaVazia()]);
     setDefeitos([]);

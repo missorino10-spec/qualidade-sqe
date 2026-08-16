@@ -70,6 +70,7 @@ class AtualizarRncDto {
   @IsOptional()
   @IsIn(['EM_ANDAMENTO', 'FINALIZADA', 'CANCELADA'])
   status?: any;
+  @IsOptional() @IsString() dataEncerramento?: string;
   @IsOptional()
   @IsIn(['PENDENTE', 'APROVADO', 'REPROVADO', 'NAO_APLICAVEL'])
   verificacaoEficacia?: any;
@@ -82,6 +83,7 @@ class AtualizarRncDto {
 class MudarStatusDto {
   @IsIn(['EM_ANDAMENTO', 'FINALIZADA', 'CANCELADA']) status: string;
   @IsOptional() @IsString() comentario?: string;
+  @IsOptional() @IsString() dataEncerramento?: string;
 }
 
 class CancelarRncDto {
@@ -189,7 +191,13 @@ export class RncController {
     @Body() dto: MudarStatusDto,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.service.mudarStatus(id, dto.status, dto.comentario, user.id);
+    return this.service.mudarStatus(
+      id,
+      dto.status,
+      dto.comentario,
+      user.id,
+      dto.dataEncerramento,
+    );
   }
 
   @Roles('QUALIDADE', 'ADMIN')

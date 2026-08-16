@@ -20,6 +20,8 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../api';
+import { CotasSomenteLeitura } from '../components/TabelaCotas';
+import { FotosEvidenciaSalvas } from '../components/FotosEvidencia';
 
 // Detalhe da inspecao: mostra os formularios COMO FORAM PREENCHIDOS, item a
 // item, aprovada ou reprovada. E o mesmo conteudo exportado no PDF.
@@ -64,38 +66,6 @@ function ChecklistPreenchido({ checklist }: { checklist: any }) {
         </Card>
       ))}
     </>
-  );
-}
-
-function CotasPreenchidas({ cotas }: { cotas: any }) {
-  const linhas = Array.isArray(cotas) ? cotas : [];
-  return (
-    <Table
-      size="small"
-      rowKey={(_, i) => String(i)}
-      dataSource={linhas}
-      pagination={false}
-      locale={{ emptyText: 'Nenhuma cota registrada' }}
-      columns={[
-        { title: 'Localização / Cota', dataIndex: 'localizacao' },
-        { title: 'Especificado', dataIndex: 'especificado', width: 110 },
-        { title: 'Tol. +', dataIndex: 'tolUpper', width: 80 },
-        { title: 'Tol. -', dataIndex: 'tolLower', width: 80 },
-        { title: 'Medido', dataIndex: 'medido', width: 100 },
-        { title: 'Instrumento', dataIndex: 'instrumento', width: 130 },
-        {
-          title: 'Conforme?',
-          dataIndex: 'conforme',
-          width: 110,
-          render: (c: boolean) =>
-            c === false ? (
-              <Tag color="red">Não</Tag>
-            ) : (
-              <Tag color="green">Sim</Tag>
-            ),
-        },
-      ]}
-    />
   );
 }
 
@@ -273,6 +243,12 @@ export default function InspecaoDetalhe() {
           dados={data.visual}
         >
           <ChecklistPreenchido checklist={data.visual.checklist} />
+          <Card size="small" title="Evidências / Evidence" style={{ marginTop: 12 }}>
+            <FotosEvidenciaSalvas
+              entidadeTipo="INSPECAO_VISUAL"
+              entidadeId={data.visual.id}
+            />
+          </Card>
         </Formulario>
       )}
 
@@ -282,7 +258,7 @@ export default function InspecaoDetalhe() {
           doc="Doc. BDBR.QUA.FMR.011.06"
           dados={data.lote}
         >
-          <CotasPreenchidas cotas={data.lote.cotas} />
+          <CotasSomenteLeitura cotas={data.lote.cotas} />
         </Formulario>
       )}
     </Space>

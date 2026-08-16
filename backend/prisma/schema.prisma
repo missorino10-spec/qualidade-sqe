@@ -351,7 +351,10 @@ model InspecaoLote {
   relatorioNumero String?
   origem          OrigemInspecao @default(PLANO_INSPECAO)
 
-  // Tabela de cotas - JSON: [{ localizacao, especificado, tolUpper, tolLower, pecas:[..], instrumento, desvioMin, desvioMax }]
+  // Tabela de cotas, no padrao comum aos tres modulos:
+  // [{ localizacao, especificado, unidade, norma, tolerancia, upper, lower,
+  //    encontradoMax, encontradoMin, instrumento, desvioMin, desvioMax,
+  //    conformeAuto, conformeManual, conforme }]
   cotas Json
 
   observacoes  String?
@@ -439,8 +442,12 @@ model Rnc {
   nivelPlano            NivelPlano?
   status                StatusRnc           @default(EM_ANDAMENTO)
   motivoCancelamento    String? // motivo quando status = CANCELADA
+  // Dois pares independentes: encerrar a RNC e verificar a eficacia sao atos
+  // diferentes. As duas datas sao informadas pelo usuario (retroativas sao
+  // permitidas) e nunca carimbadas automaticamente com o "agora".
+  dataEncerramento      DateTime? // preenchida quando status = FINALIZADA
   verificacaoEficacia   VerificacaoEficacia @default(PENDENTE)
-  dataVerificacao       DateTime?
+  dataVerificacao       DateTime? // so existe quando a eficacia saiu de PENDENTE
 
   evidencias  String?
   observacoes String?
@@ -609,13 +616,16 @@ model RelatorioDimensional {
   itemCodigo      String?
   itemDescricao   String?
   desenhoRev      String?
+  // Norma de tolerancia do relatorio: ISO2768 | DIN7168 | NA
+  toleranciasNorm String?
   po              String?
   qtdInspecionada Float?
   qtdTotal        Float?
 
-  // Cotas do formulario. Uma coluna "Encontrado" por peca inspecionada:
-  // [{ localizacao, especificado, tolerancia, upper, lower, pecas: [n1, n2, n3],
-  //    instrumento, desvioMin, desvioMax }]
+  // Cotas do formulario, no padrao comum aos tres modulos:
+  // [{ localizacao, especificado, unidade, norma, tolerancia, upper, lower,
+  //    encontradoMax, encontradoMin, instrumento, desvioMin, desvioMax,
+  //    conformeAuto, conformeManual, conforme }]
   cotas Json
 
   observacoesFinais   String?

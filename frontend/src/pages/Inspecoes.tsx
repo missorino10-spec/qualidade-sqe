@@ -41,6 +41,11 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
+import { OPCOES_NORMA, TabelaCotasMaxMin } from '../components/TabelaCotas';
+import {
+  UploadFotosEvidencia,
+  enviarFotosEvidencia,
+} from '../components/FotosEvidencia';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
@@ -132,147 +137,6 @@ function ChecklistVisual({
   );
 }
 
-function TabelaCotas({
-  cotas,
-  setCotas,
-}: {
-  cotas: any[];
-  setCotas: (c: any[]) => void;
-}) {
-  function add() {
-    setCotas([
-      ...cotas,
-      {
-        localizacao: '',
-        especificado: '',
-        tolUpper: '',
-        tolLower: '',
-        medido: '',
-        instrumento: '',
-        conforme: true,
-      },
-    ]);
-  }
-  function edit(idx: number, campo: string, valor: any) {
-    const copia = cotas.map((c) => ({ ...c }));
-    copia[idx][campo] = valor;
-    setCotas(copia);
-  }
-  function remove(idx: number) {
-    setCotas(cotas.filter((_, i) => i !== idx));
-  }
-
-  return (
-    <div>
-      <Table
-        size="small"
-        rowKey={(_, i) => String(i)}
-        dataSource={cotas}
-        pagination={false}
-        locale={{ emptyText: 'Nenhuma cota adicionada' }}
-        columns={[
-          {
-            title: 'Localização / Cota',
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.localizacao}
-                onChange={(e) => edit(i, 'localizacao', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Especificado',
-            width: 110,
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.especificado}
-                onChange={(e) => edit(i, 'especificado', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Tol. +',
-            width: 80,
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.tolUpper}
-                onChange={(e) => edit(i, 'tolUpper', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Tol. -',
-            width: 80,
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.tolLower}
-                onChange={(e) => edit(i, 'tolLower', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Medido',
-            width: 100,
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.medido}
-                onChange={(e) => edit(i, 'medido', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Instrumento',
-            width: 130,
-            render: (_: any, r: any, i: number) => (
-              <Input
-                value={r.instrumento}
-                onChange={(e) => edit(i, 'instrumento', e.target.value)}
-              />
-            ),
-          },
-          {
-            title: 'Conforme?',
-            width: 120,
-            render: (_: any, r: any, i: number) => (
-              <Radio.Group
-                size="small"
-                value={r.conforme}
-                onChange={(e) => edit(i, 'conforme', e.target.value)}
-                optionType="button"
-                buttonStyle="solid"
-              >
-                <Radio.Button value={true}>Sim</Radio.Button>
-                <Radio.Button value={false}>Não</Radio.Button>
-              </Radio.Group>
-            ),
-          },
-          {
-            title: '',
-            width: 40,
-            render: (_: any, __: any, i: number) => (
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => remove(i)}
-              />
-            ),
-          },
-        ]}
-      />
-      <Button
-        type="dashed"
-        block
-        icon={<PlusOutlined />}
-        onClick={add}
-        style={{ marginTop: 8 }}
-      >
-        Adicionar cota
-      </Button>
-    </div>
-  );
-}
-
 export default function Inspecoes() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -282,6 +146,8 @@ export default function Inspecoes() {
   const [form] = Form.useForm();
   const [grupos, setGrupos] = useState<any[]>([]);
   const [cotas, setCotas] = useState<any[]>([]);
+  // Bloco EVIDENCIAS do formulario visual: ate 4 fotos, sempre opcional.
+  const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   const [passoIdx, setPassoIdx] = useState(0);
   // Uma inspecao = um recebimento. A entrega criada no primeiro formulario e
   // reaproveitada no seguinte, para Visual e Lote serem a MESMA inspecao,
@@ -306,6 +172,7 @@ export default function Inspecoes() {
   const valorUnitRnc = Form.useWatch('valorUnitario', formRnc);
 
   const fornecedorId = Form.useWatch('fornecedorId', form);
+  const normaSel = Form.useWatch('toleranciasNorm', form) ?? 'ISO2768';
   const extra = Form.useWatch('extra', form);
   const formulariosExtra: string[] | undefined = Form.useWatch(
     'formulariosExtra',
@@ -366,6 +233,9 @@ export default function Inspecoes() {
   const preencheFormulario = passos.length > 0;
   const ultimoPasso = passoIdx >= passos.length - 1;
 
+  // Limpa SO o preenchimento do formulario (checklist, cotas, fotos e
+  // observacoes). O cabecalho fica: Visual e Lote sao a mesma peca, o mesmo
+  // item e a mesma nota, entao o inspetor nao redigita nada.
   function limparEtapa() {
     setGrupos(
       template
@@ -376,17 +246,8 @@ export default function Inspecoes() {
         : [],
     );
     setCotas([]);
-    form.setFieldsValue({
-      itemDescricao: undefined,
-      itemCodigo: undefined,
-      notaFiscal: undefined,
-      po: undefined,
-      qtdInspecionada: undefined,
-      qtdTotal: undefined,
-      desenhoRev: undefined,
-      toleranciasNorm: undefined,
-      observacoes: undefined,
-    });
+    setFotosVisual([]);
+    form.setFieldsValue({ observacoes: undefined });
   }
 
   function novaInspecao() {
@@ -397,7 +258,11 @@ export default function Inspecoes() {
     setDesvioAnterior(false);
     setRncDaInspecao(null);
     limparEtapa();
-    form.setFieldsValue({ origem: 'PLANO_INSPECAO', extra: false });
+    form.setFieldsValue({
+      origem: 'PLANO_INSPECAO',
+      extra: false,
+      toleranciasNorm: 'ISO2768',
+    });
     setOpen(true);
   }
 
@@ -555,6 +420,16 @@ export default function Inspecoes() {
       else payload.cotas = cotas;
 
       const res = (await api.post(rota, payload)).data;
+
+      // As fotos do bloco EVIDENCIAS so podem subir depois: elas precisam do
+      // id do formulario recem-criado.
+      if (tipo === 'VISUAL' && fotosVisual.length && res.inspecao?.id) {
+        await enviarFotosEvidencia(
+          fotosVisual,
+          'INSPECAO_VISUAL',
+          res.inspecao.id,
+        );
+      }
 
       const rnc = res.rnc ?? rncDaInspecao;
       if (res.rnc) setRncDaInspecao(res.rnc);
@@ -1081,8 +956,10 @@ export default function Inspecoes() {
                   </Form.Item>
                 </Col>
                 <Col span={12}>
+                  {/* A norma escolhida aqui puxa as tolerancias da tabela em
+                      todas as cotas do dimensional. */}
                   <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
-                    <Input />
+                    <Select options={OPCOES_NORMA} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -1096,7 +973,25 @@ export default function Inspecoes() {
               {tipo === 'VISUAL' ? (
                 <ChecklistVisual grupos={grupos} setGrupos={setGrupos} />
               ) : (
-                <TabelaCotas cotas={cotas} setCotas={setCotas} />
+                <TabelaCotasMaxMin
+                  cotas={cotas}
+                  setCotas={setCotas}
+                  norma={normaSel}
+                />
+              )}
+
+              {/* Bloco EVIDENCIAS do formulario visual. So faz sentido quando
+                  o resultado e aprovado: reprovado, as fotos vao na RNC. */}
+              {tipo === 'VISUAL' && resultadoAuto === 'APROVADO' && (
+                <>
+                  <Divider orientation="left" plain>
+                    Evidências / Evidence (opcional)
+                  </Divider>
+                  <UploadFotosEvidencia
+                    fotos={fotosVisual}
+                    setFotos={setFotosVisual}
+                  />
+                </>
               )}
 
               <Form.Item

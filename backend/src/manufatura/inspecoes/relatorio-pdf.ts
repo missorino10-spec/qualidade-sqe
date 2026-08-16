@@ -1,6 +1,8 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { labelNorma } from '../../comum/inspecao';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -266,128 +268,13 @@ export function gerarPdfRelatorioDimensional(insp: any): PDFKit.PDFDocument {
 
   // ---------------------------------------------------------- tabela de cotas
   const tabelaCotas = (rel: any) => {
-    const cotas = Array.isArray(rel.cotas) ? rel.cotas : [];
-    // Uma coluna "Encontrado" por peca inspecionada, como no formulario.
-    // Limite de 10 colunas: acima disso a tabela nao cabe na folha A4.
-    const qtdPecas = Math.min(
-      10,
-      Math.max(
-        1,
-        Number(rel.qtdInspecionada) || 0,
-        ...cotas.map((c: any) =>
-          Array.isArray(c.pecas) ? c.pecas.length : 0,
-        ),
-      ),
-    );
-
-    const fixasEsq = [
-      { titulo: 'Localização', w: 78, campo: 'localizacao' },
-      { titulo: 'Especificado', w: 48, campo: 'especificado' },
-      { titulo: 'Tolerância', w: 44, campo: 'tolerancia' },
-      { titulo: 'Upper', w: 34, campo: 'upper' },
-      { titulo: 'Lower', w: 34, campo: 'lower' },
-    ];
-    const fixasDir = [
-      { titulo: 'Instrumento', w: 66, campo: 'instrumento' },
-      { titulo: 'Desv. Mín.', w: 38, campo: 'desvioMin' },
-      { titulo: 'Desv. Máx.', w: 38, campo: 'desvioMax' },
-    ];
-    const usada =
-      fixasEsq.reduce((s, c) => s + c.w, 0) +
-      fixasDir.reduce((s, c) => s + c.w, 0);
-    const wPeca = Math.max(24, (W - usada) / qtdPecas);
-
-    const cabecalhoTabela = () => {
-      espaco(28);
-      doc.rect(X0, y, W, 24).fill('#F0F0F0');
-      let x = X0;
-      const box = (largura: number, titulo: string) => {
-        doc.lineWidth(0.5).strokeColor('#999999').rect(x, y, largura, 24).stroke();
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(6.5)
-          .fillColor(PRETO)
-          .text(titulo, x + 2, y + 8, {
-            width: largura - 4,
-            align: 'center',
-            lineBreak: false,
-          });
-        x += largura;
-      };
-      for (const c of fixasEsq) box(c.w, c.titulo);
-      // "Encontrado" e um titulo unico cobrindo todas as pecas, com o numero da
-      // peca na linha de baixo — igual ao formulario em papel. Repetir a palavra
-      // em cada coluna nao caberia a partir de 4 pecas.
-      const wBloco = wPeca * qtdPecas;
-      doc.lineWidth(0.5).strokeColor('#999999').rect(x, y, wBloco, 12).stroke();
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(6.5)
-        .fillColor(PRETO)
-        .text('Encontrado', x + 2, y + 3.5, {
-          width: wBloco - 4,
-          align: 'center',
-          lineBreak: false,
-        });
-      for (let p = 0; p < qtdPecas; p++) {
-        doc
-          .lineWidth(0.5)
-          .strokeColor('#999999')
-          .rect(x, y + 12, wPeca, 12)
-          .stroke();
-        doc
-          .font('Helvetica')
-          .fontSize(5.5)
-          .fillColor(CINZA)
-          .text(`PEÇA ${String(p + 1).padStart(2, '0')}`, x + 1, y + 15.5, {
-            width: wPeca - 2,
-            align: 'center',
-            lineBreak: false,
-          });
-        x += wPeca;
-      }
-      for (const c of fixasDir) box(c.w, c.titulo);
-      y += 24;
-    };
-    cabecalhoTabela();
-
-    if (!cotas.length) {
-      espaco(18);
-      doc
-        .font('Helvetica-Oblique')
-        .fontSize(8)
-        .fillColor(CINZA)
-        .text('Nenhuma cota registrada.', X0 + 4, y + 4, { width: W - 8 });
-      y += 18;
-      return;
-    }
-
-    for (const cota of cotas) {
-      if (y + 16 > doc.page.height - RODAPE) {
-        doc.addPage();
-        y = M;
-        cabecalhoTabela();
-      }
-      let x = X0;
-      const celula = (largura: number, valor: string, negrito = false) => {
-        doc.lineWidth(0.5).strokeColor('#CCCCCC').rect(x, y, largura, 16).stroke();
-        doc
-          .font(negrito ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(7)
-          .fillColor(PRETO)
-          .text(valor, x + 2, y + 5, {
-            width: largura - 4,
-            lineBreak: false,
-            ellipsis: true,
-          });
-        x += largura;
-      };
-      for (const c of fixasEsq) celula(c.w, txt(cota[c.campo]));
-      const pecas = Array.isArray(cota.pecas) ? cota.pecas : [];
-      for (let p = 0; p < qtdPecas; p++) celula(wPeca, txt(pecas[p]));
-      for (const c of fixasDir) celula(c.w, txt(cota[c.campo]));
-      y += 16;
-    }
+    y = desenharTabelaCotas(doc, rel.cotas, {
+      x0: X0,
+      largura: W,
+      y,
+      margem: M,
+      rodape: RODAPE,
+    });
   };
 
   // ---------------------------------------------------------- uma tentativa
@@ -446,11 +333,16 @@ export function gerarPdfRelatorioDimensional(insp: any): PDFKit.PDFDocument {
     ]);
 
     linha([
-      { w: 110, label: 'QTD. INSPECIONADA', valor: txt(rel.qtdInspecionada) },
-      { w: 110, label: 'QTD. TOTAL', valor: txt(rel.qtdTotal) },
-      { w: 130, label: 'INSPETOR', valor: txt(rel.inspetor?.nome) },
+      { w: 95, label: 'QTD. INSPECIONADA', valor: txt(rel.qtdInspecionada) },
+      { w: 85, label: 'QTD. TOTAL', valor: txt(rel.qtdTotal) },
       {
-        w: W - 110 - 110 - 130,
+        w: 120,
+        label: 'TOLERÂNCIAS / NORMA',
+        valor: labelNorma(rel.toleranciasNorm),
+      },
+      { w: 120, label: 'INSPETOR', valor: txt(rel.inspetor?.nome) },
+      {
+        w: W - 95 - 85 - 120 - 120,
         label: 'TENTATIVA',
         valor: String(rel.tentativa),
       },
