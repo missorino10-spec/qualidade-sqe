@@ -15,6 +15,7 @@ import InspecaoManufaturaDetalhe from './pages/manufatura/InspecaoManufaturaDeta
 import Cnq from './pages/manufatura/Cnq';
 import OitoD from './pages/manufatura/OitoD';
 import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
+import Alertas from './pages/manufatura/Alertas';
 import Maquinas from './pages/manufatura/Maquinas';
 import ProducaoDiaria from './pages/manufatura/ProducaoDiaria';
 import PainelSqd from './pages/sqd/PainelSqd';
@@ -60,6 +61,7 @@ export default function App() {
       <Route path="/manufatura/cnq" element={<Privado><Cnq /></Privado>} />
       <Route path="/manufatura/8d" element={<Privado><OitoD /></Privado>} />
       <Route path="/manufatura/8d/:id" element={<Privado><OitoDDetalhe /></Privado>} />
+      <Route path="/manufatura/alertas" element={<Privado><Alertas /></Privado>} />
       <Route path="/manufatura/maquinas" element={<Privado><Maquinas /></Privado>} />
       <Route path="/manufatura/producao" element={<Privado><ProducaoDiaria /></Privado>} />
 

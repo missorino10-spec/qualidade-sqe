@@ -486,6 +486,9 @@ export const EVID = {
   manufaturaVisual: 'RELATORIO_DIMENSIONAL_VIS',
   homologacaoItemDimensional: 'HOMOLOGACAO_ITEM_AMOSTRAS',
   homologacaoItemVisual: 'HOMOLOGACAO_ITEM_VISUAL',
+  // Os dois paineis de foto do Alerta da Qualidade.
+  alertaErrado: 'ALERTA_QUALIDADE_ERRADO',
+  alertaCerto: 'ALERTA_QUALIDADE_CERTO',
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -51,6 +51,9 @@ model Usuario {
   cnqs                   Cnq[]                  @relation("CnqCriadoPor")
   oitoDsCriados          OitoD[]                @relation("OitoDCriadoPor")
   oitoDsAprovados        OitoD[]                @relation("OitoDAprovadoPor")
+  alertasCriados         AlertaQualidade[]      @relation("AlertaCriadoPor")
+  alertasEncerrados      AlertaQualidade[]      @relation("AlertaEncerradoPor")
+  renovacoesAlerta       RenovacaoAlerta[]      @relation("RenovacaoAlertaCriadoPor")
 
   // SQD
   homologacoes        HomologacaoFornecedor[]  @relation("HomologacaoCriadoPor")
@@ -514,6 +517,7 @@ model Maquina {
   inspecoes      InspecaoManufatura[]
   cnqs           Cnq[]
   historico      HistoricoMaquina[]
+  alertas        AlertaQualidade[]
 }
 
 // Apontamento diario que os operadores entregam em papel e a Qualidade digita.
@@ -827,6 +831,80 @@ model OitoD {
   createdAt   DateTime @default(now())
 
   @@unique([ano, sequencial])
+}
+
+// ALERTA DA QUALIDADE - espelha o .docx "Alerta da Qualidade - Rebarba
+// (Puncionadeiras)": tarja com titulo e data, "Descricao do problema", o texto
+// da acao obrigatoria e dois paineis de foto (ERRADO / CERTO), com
+// "Elaborado por" no rodape.
+//
+// ABERTO e RENOVADO sao as duas situacoes em que o alerta ainda esta valendo.
+// VENCIDO nao e status gravado: e calculado (prazo passado com o alerta ainda
+// em aberto), justamente para que um alerta encerrado fora do prazo nao fique
+// marcado como vencido para sempre.
+enum StatusAlertaQualidade {
+  ABERTO
+  RENOVADO
+  ENCERRADO
+}
+
+model AlertaQualidade {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // ALQ0001/2026
+  ano        Int
+  sequencial Int
+
+  data   DateTime @db.Date // data que sai ao lado do titulo do alerta
+  titulo String // "Descricao do problema" (ex: REBARBA NAS PECAS)
+  acao   String // texto da acao obrigatoria, no corpo do alerta
+
+  // Onde o alerta se aplica. A maquina e opcional porque o alerta costuma
+  // valer para um grupo inteiro ("Puncionadeiras").
+  setor     String?
+  maquinaId Int?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id])
+
+  // Legendas opcionais dos dois paineis de foto.
+  legendaErrado String?
+  legendaCerto  String?
+
+  prazo  DateTime              @db.Date // prazo para corrigir
+  status StatusAlertaQualidade @default(ABERTO)
+
+  elaboradoPor String?
+
+  dataEncerramento       DateTime? @db.Date
+  observacaoEncerramento String?
+  encerradoPorId         Int?
+  encerradoPor           Usuario?  @relation("AlertaEncerradoPor", fields: [encerradoPorId], references: [id])
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("AlertaCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  renovacoes RenovacaoAlerta[]
+
+  @@unique([ano, sequencial])
+  @@index([data])
+}
+
+// Historico das prorrogacoes: cada renovacao guarda o prazo que venceu e o
+// novo, para o alerta nunca perder a data original.
+model RenovacaoAlerta {
+  id       Int             @id @default(autoincrement())
+  alertaId Int
+  alerta   AlertaQualidade @relation(fields: [alertaId], references: [id], onDelete: Cascade)
+
+  prazoAnterior DateTime @db.Date
+  prazoNovo     DateTime @db.Date
+  motivo        String?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("RenovacaoAlertaCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([alertaId])
 }
 
 // Snapshot do trimestre fiscal por maquina: o fechamento congela os numeros

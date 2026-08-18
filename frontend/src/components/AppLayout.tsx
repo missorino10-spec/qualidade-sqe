@@ -16,6 +16,7 @@ import {
   FileProtectOutlined,
   ClusterOutlined,
   LineChartOutlined,
+  NotificationOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -69,6 +70,11 @@ const itensMenu: {
       },
       { key: '/manufatura/cnq', icon: <DollarOutlined />, label: 'CNQ' },
       { key: '/manufatura/8d', icon: <FileProtectOutlined />, label: '8D' },
+      {
+        key: '/manufatura/alertas',
+        icon: <NotificationOutlined />,
+        label: 'Alerta da Qualidade',
+      },
       {
         key: '/manufatura/maquinas',
         icon: <ClusterOutlined />,

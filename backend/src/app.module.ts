@@ -21,6 +21,7 @@ import { DefeitosModule } from './manufatura/defeitos/defeitos.module';
 import { InspecoesManufaturaModule } from './manufatura/inspecoes/inspecoes-manufatura.module';
 import { CnqModule } from './manufatura/cnq/cnq.module';
 import { OitoDModule } from './manufatura/oitod/oitod.module';
+import { AlertasModule } from './manufatura/alertas/alertas.module';
 import { PainelManufaturaModule } from './manufatura/painel/painel.module';
 import { HomologacoesModule } from './sqd/homologacoes/homologacoes.module';
 import { HomologacoesItensModule } from './sqd/homologacoes-itens/homologacoes-itens.module';
@@ -63,6 +64,7 @@ const servirFrontend = existsSync(frontendDir);
     InspecoesManufaturaModule,
     CnqModule,
     OitoDModule,
+    AlertasModule,
     PainelManufaturaModule,
     HomologacoesModule,
     HomologacoesItensModule,
