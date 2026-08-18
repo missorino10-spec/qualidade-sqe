@@ -47,29 +47,6 @@ export class InspecoesManufaturaService {
     return insp;
   }
 
-  // Todo setup e inspecionado. O contador conta os setups da maquina para
-  // disparar a inspecao de PRODUCAO: 1 producao a cada N setups. Uma producao
-  // feita antes de fechar o ciclo e marcada como extra.
-  async avaliarProducao(maquinaId: number) {
-    const maquina = await this.prisma.maquina.findUnique({
-      where: { id: maquinaId },
-    });
-    if (!maquina) throw new NotFoundException('Máquina não encontrada');
-    const frequenciaN = maquina.frequenciaProducaoN || 1;
-    return {
-      maquina: {
-        id: maquina.id,
-        codigo: maquina.codigo,
-        nome: maquina.nome,
-        area: maquina.area,
-        classificacao: maquina.classificacao,
-      },
-      frequenciaN,
-      contadorAtual: maquina.contadorSetups,
-      precisaInspecionar: maquina.contadorSetups >= frequenciaN,
-    };
-  }
-
   // Setups da maquina ainda sem inspecao de producao vinculada: e a lista que
   // a tela de producao oferece para amarrar a producao ao setup que a liberou.
   setupsDisponiveis(maquinaId: number) {
@@ -165,13 +142,6 @@ export class InspecoesManufaturaService {
     const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
     const { semana, ano } = semanaAno(data);
 
-    // Producao antes de fechar o ciclo de setups da maquina = inspecao extra.
-    const frequenciaN = maquina.frequenciaProducaoN || 1;
-    const extra =
-      tipo === 'PRODUCAO'
-        ? (dto.extra ?? maquina.contadorSetups < frequenciaN)
-        : false;
-
     const inspecao = await this.prisma.inspecaoManufatura.create({
       data: {
         tipo,
@@ -181,7 +151,6 @@ export class InspecoesManufaturaService {
         itemDescricao: dto.itemDescricao ?? null,
         po: dto.po ?? null,
         setupId: tipo === 'PRODUCAO' ? (dto.setupId ?? null) : null,
-        extra,
         status: 'PENDENTE',
         dataInspecao: data,
         semana,
@@ -208,7 +177,7 @@ export class InspecoesManufaturaService {
       },
     });
 
-    await this.contabilizar(maquina.id, tipo, extra, relatorio.resultado);
+    await this.contabilizar(maquina.id, tipo, relatorio.resultado);
     return this.detalhe(inspecao.id);
   }
 
@@ -253,18 +222,11 @@ export class InspecoesManufaturaService {
   private async contabilizar(
     maquinaId: number,
     tipo: 'SETUP' | 'PRODUCAO',
-    extra: boolean,
     resultado: string,
   ) {
     const data: any = {};
-    if (tipo === 'SETUP') {
-      data.setupsRealizados = { increment: 1 };
-      data.contadorSetups = { increment: 1 };
-    } else {
-      data.producoesRealizadas = { increment: 1 };
-      // A producao fecha o ciclo de setups, mesmo quando foi antecipada.
-      if (!extra) data.contadorSetups = 0;
-    }
+    if (tipo === 'SETUP') data.setupsRealizados = { increment: 1 };
+    else data.producoesRealizadas = { increment: 1 };
     if (resultado === 'REPROVADO') data.inspecoesReprovadas = { increment: 1 };
     await this.prisma.maquina.update({ where: { id: maquinaId }, data });
   }
@@ -294,10 +256,6 @@ export class InspecoesManufaturaService {
         setupsRealizados:
           insp.tipo === 'SETUP'
             ? Math.max(0, maquina.setupsRealizados - 1)
-            : undefined,
-        contadorSetups:
-          insp.tipo === 'SETUP'
-            ? Math.max(0, maquina.contadorSetups - 1)
             : undefined,
         producoesRealizadas:
           insp.tipo === 'PRODUCAO'

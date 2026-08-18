@@ -16,6 +16,7 @@ import Cnq from './pages/manufatura/Cnq';
 import OitoD from './pages/manufatura/OitoD';
 import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
 import Maquinas from './pages/manufatura/Maquinas';
+import ProducaoDiaria from './pages/manufatura/ProducaoDiaria';
 import PainelSqd from './pages/sqd/PainelSqd';
 import Homologacoes from './pages/sqd/Homologacoes';
 import HomologacaoDetalhe from './pages/sqd/HomologacaoDetalhe';
@@ -60,6 +61,7 @@ export default function App() {
       <Route path="/manufatura/8d" element={<Privado><OitoD /></Privado>} />
       <Route path="/manufatura/8d/:id" element={<Privado><OitoDDetalhe /></Privado>} />
       <Route path="/manufatura/maquinas" element={<Privado><Maquinas /></Privado>} />
+      <Route path="/manufatura/producao" element={<Privado><ProducaoDiaria /></Privado>} />
 
       {/* SQD - Desenvolvimento de Fornecedores */}
       <Route path="/sqd" element={<Privado><PainelSqd /></Privado>} />

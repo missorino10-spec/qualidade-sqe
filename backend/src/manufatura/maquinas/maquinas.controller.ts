@@ -13,11 +13,9 @@ import {
 import {
   IsBoolean,
   IsIn,
-  IsInt,
   IsNumber,
   IsOptional,
   IsString,
-  Min,
 } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -29,10 +27,6 @@ class MaquinaDto {
   @IsOptional() @IsString() codigo?: string;
   @IsOptional() @IsString() nome?: string;
   @IsOptional() @IsIn(['FABRICACAO', 'MONTAGEM']) area?: any;
-  // A classificacao de prioridade e definida manualmente pela Qualidade.
-  @IsOptional() @IsIn(['A', 'B', 'C', 'D']) classificacao?: any;
-  // 1 inspecao de producao a cada N setups da maquina.
-  @IsOptional() @IsInt() @Min(1) frequenciaProducaoN?: number;
   @IsOptional() @IsString() descricao?: string;
   @IsOptional() @IsBoolean() ativa?: boolean;
 }

@@ -501,15 +501,6 @@ model Maquina {
   nome   String
   area   AreaManufatura @default(FABRICACAO)
 
-  // Prioridade/criticidade definida manualmente pela Qualidade (nao e
-  // recalculada pelo sistema, ao contrario da classificacao do fornecedor).
-  classificacao Classificacao @default(C)
-
-  // Todo setup e inspecionado. O contador conta os setups para cobrar a
-  // inspecao de PRODUCAO: a cada N setups, a producao precisa ser inspecionada.
-  frequenciaProducaoN Int @default(1)
-  contadorSetups      Int @default(0)
-
   // Acumulados do trimestre corrente (zerados no fechamento)
   setupsRealizados    Int @default(0)
   producoesRealizadas Int @default(0)
@@ -596,9 +587,6 @@ model InspecaoManufatura {
   setupId   Int?
   setup     InspecaoManufatura?  @relation("ProducaoDoSetup", fields: [setupId], references: [id])
   producoes InspecaoManufatura[] @relation("ProducaoDoSetup")
-
-  // Producao inspecionada antes de o contador de setups atingir o N da maquina.
-  extra Boolean @default(false)
 
   status       StatusInspecaoManufatura @default(PENDENTE)
   dataInspecao DateTime                 @default(now())
@@ -801,9 +789,8 @@ model OitoD {
   @@unique([ano, sequencial])
 }
 
-// Snapshot do trimestre fiscal por maquina. A classificacao NAO e recalculada
-// (e manual, definida pela Qualidade): o fechamento congela os numeros do
-// periodo e zera os contadores.
+// Snapshot do trimestre fiscal por maquina: o fechamento congela os numeros
+// do periodo e zera os contadores.
 model HistoricoMaquina {
   id        Int     @id @default(autoincrement())
   maquinaId Int
@@ -813,7 +800,6 @@ model HistoricoMaquina {
   periodoInicio   DateTime
   periodoFim      DateTime
 
-  classificacao       Classificacao
   pecasProduzidas     Float
   pecasComDefeito     Float
   ppm                 Float

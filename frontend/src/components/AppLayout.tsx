@@ -15,6 +15,7 @@ import {
   DollarOutlined,
   FileProtectOutlined,
   ClusterOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -71,7 +72,12 @@ const itensMenu: {
       {
         key: '/manufatura/maquinas',
         icon: <ClusterOutlined />,
-        label: 'Máquinas',
+        label: 'Cadastro de Máquinas',
+      },
+      {
+        key: '/manufatura/producao',
+        icon: <LineChartOutlined />,
+        label: 'Produção Diária / PPM',
       },
     ],
   },

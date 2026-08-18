@@ -12,7 +12,6 @@ import {
 } from '@nestjs/common';
 import {
   IsArray,
-  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -41,7 +40,6 @@ const ORIGENS = ORIGENS_INSPECAO.map((o) => o.value);
 class RelatorioDto {
   @IsOptional() @IsInt() maquinaId?: number;
   @IsOptional() @IsInt() setupId?: number;
-  @IsOptional() @IsBoolean() extra?: boolean;
   @IsOptional() @IsString() dataInspecao?: string;
   // Revisao do proprio relatorio, digitada pelo inspetor. Comeca em "01".
   @IsOptional() @IsString() revisao?: string;
@@ -87,12 +85,6 @@ export class InspecoesManufaturaController {
       tipo,
       maquinaId ? Number(maquinaId) : undefined,
     );
-  }
-
-  // Diz se a maquina ja fechou o ciclo de setups e a producao esta vencida.
-  @Get('avaliar')
-  avaliar(@Query('maquinaId', ParseIntPipe) maquinaId: number) {
-    return this.service.avaliarProducao(maquinaId);
   }
 
   @Get('setups')

@@ -105,7 +105,6 @@ export class PainelManufaturaService {
         maquinas: maquinas.length,
         inspecoesSetup: setups.length,
         inspecoesProducao: producoes.length,
-        inspecoesExtra: inspecoes.filter((i) => i.extra).length,
         inspecoesPendentes: inspecoes.filter((i) => i.status === 'PENDENTE')
           .length,
         // Cada relatorio alem do primeiro e uma reinspecao.
@@ -148,9 +147,6 @@ export class PainelManufaturaService {
         codigo: m.codigo,
         nome: m.nome,
         area: m.area,
-        classificacao: m.classificacao,
-        frequenciaProducaoN: m.frequenciaProducaoN,
-        contadorSetups: m.contadorSetups,
         setupsRealizados: m.setupsRealizados,
         producoesRealizadas: m.producoesRealizadas,
         inspecoesReprovadas: m.inspecoesReprovadas,
@@ -163,8 +159,7 @@ export class PainelManufaturaService {
   }
 
   // Fecha o trimestre fiscal: guarda o retrato do periodo por maquina e zera
-  // os contadores. A classificacao NAO e recalculada — ela e definida
-  // manualmente pela Qualidade.
+  // os contadores.
   async fecharTrimestre() {
     const { label, inicio, fim } = trimestreFiscal(new Date());
     const maquinas = await this.prisma.maquina.findMany({
@@ -189,7 +184,6 @@ export class PainelManufaturaService {
           trimestreFiscal: label,
           periodoInicio: inicio,
           periodoFim: fim,
-          classificacao: m.classificacao,
           pecasProduzidas: produzidas,
           pecasComDefeito: defeitos,
           ppm: calcularPpm(produzidas, defeitos),

@@ -14,8 +14,7 @@ export class MaquinasService {
       },
       orderBy: [{ area: 'asc' }, { nome: 'asc' }],
     });
-    // O PPM do trimestre corrente ajuda a Qualidade a decidir a classificacao,
-    // que nesta versao e definida manualmente.
+    // PPM acumulado de cada maquina, calculado a partir da producao diaria.
     const totais = await this.prisma.producaoDiaria.groupBy({
       by: ['maquinaId'],
       _sum: { qtdProduzida: true, qtdDefeito: true },
@@ -62,8 +61,6 @@ export class MaquinasService {
         codigo: dto.codigo,
         nome: dto.nome,
         area: dto.area ?? 'FABRICACAO',
-        classificacao: dto.classificacao ?? 'C',
-        frequenciaProducaoN: dto.frequenciaProducaoN ?? 1,
         descricao: dto.descricao,
         ativa: dto.ativa ?? true,
       },

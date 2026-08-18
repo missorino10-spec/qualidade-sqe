@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -154,7 +153,6 @@ export function CamposRelatorio({
   setDefeitos,
   tipo,
   setups,
-  avaliacao,
   fotosDimensional,
   setFotosDimensional,
   fotosVisual,
@@ -169,7 +167,6 @@ export function CamposRelatorio({
   setDefeitos: (d: any[]) => void;
   tipo: 'SETUP' | 'PRODUCAO';
   setups?: any[];
-  avaliacao?: any;
   fotosDimensional: any[];
   setFotosDimensional: (f: any[]) => void;
   fotosVisual: any[];
@@ -213,33 +210,19 @@ export function CamposRelatorio({
       </Row>
 
       {tipo === 'PRODUCAO' && (
-        <>
-          {avaliacao && (
-            <Alert
-              style={{ marginBottom: 12 }}
-              type={avaliacao.precisaInspecionar ? 'info' : 'warning'}
-              showIcon
-              message={
-                avaliacao.precisaInspecionar
-                  ? `Ciclo fechado: ${avaliacao.contadorAtual} de ${avaliacao.frequenciaN} setups. Inspeção de produção prevista.`
-                  : `Ciclo em andamento: ${avaliacao.contadorAtual} de ${avaliacao.frequenciaN} setups. Esta inspeção será registrada como EXTRA.`
-              }
-            />
-          )}
-          <Form.Item
-            name="setupId"
-            label="Setup que liberou esta produção (opcional)"
-          >
-            <Select
-              allowClear
-              placeholder="Vincular a um setup"
-              options={(setups ?? []).map((s) => ({
-                value: s.id,
-                label: `${s.numero} — ${s.itemCodigo ?? s.itemDescricao ?? 'sem item'}`,
-              }))}
-            />
-          </Form.Item>
-        </>
+        <Form.Item
+          name="setupId"
+          label="Setup que liberou esta produção (opcional)"
+        >
+          <Select
+            allowClear
+            placeholder="Vincular a um setup"
+            options={(setups ?? []).map((s) => ({
+              value: s.id,
+              label: `${s.numero} — ${s.itemCodigo ?? s.itemDescricao ?? 'sem item'}`,
+            }))}
+          />
+        </Form.Item>
       )}
 
       <Row gutter={12}>

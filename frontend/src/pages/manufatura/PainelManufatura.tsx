@@ -9,7 +9,6 @@ import {
   Space,
   Statistic,
   Table,
-  Tag,
   Typography,
   message,
 } from 'antd';
@@ -27,13 +26,6 @@ import { useAuth } from '../../auth';
 import { separadoresBR } from '../../formatos';
 
 const { RangePicker } = DatePicker;
-
-const corClasse: Record<string, string> = {
-  A: 'green',
-  B: 'blue',
-  C: 'orange',
-  D: 'red',
-};
 
 const moeda = (v: number) =>
   (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -171,7 +163,6 @@ export default function PainelManufatura() {
           { t: 'Máquinas ativas', v: cont.maquinas },
           { t: 'Inspeções de setup', v: cont.inspecoesSetup },
           { t: 'Inspeções de produção', v: cont.inspecoesProducao },
-          { t: 'Inspeções extra', v: cont.inspecoesExtra, cor: '#d46b08' },
           {
             t: 'Pendentes de reinspeção',
             v: cont.inspecoesPendentes,
@@ -286,7 +277,7 @@ export default function PainelManufatura() {
                 Modal.confirm({
                   title: 'Fechar trimestre fiscal',
                   content:
-                    'Isto vai registrar o histórico do período de cada máquina e zerar os contadores do trimestre. A classificação continua definida manualmente. Deseja continuar?',
+                    'Isto vai registrar o histórico do período de cada máquina e zerar os contadores do trimestre. Deseja continuar?',
                   okText: 'Fechar trimestre',
                   cancelText: 'Cancelar',
                   onOk: () => fecharTrimestre.mutate(),
@@ -308,20 +299,6 @@ export default function PainelManufatura() {
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 100 },
             { title: 'Máquina / Linha', dataIndex: 'nome' },
-            {
-              title: 'Classificação',
-              dataIndex: 'classificacao',
-              width: 120,
-              align: 'center',
-              render: (c: string) => <Tag color={corClasse[c]}>{c}</Tag>,
-            },
-            {
-              title: 'Setups no ciclo',
-              width: 130,
-              align: 'center',
-              render: (_: any, r: any) =>
-                `${r.contadorSetups} / ${r.frequenciaProducaoN}`,
-            },
             {
               title: 'Setups',
               dataIndex: 'setupsRealizados',

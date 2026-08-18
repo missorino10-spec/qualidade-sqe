@@ -309,7 +309,7 @@ export function gerarPdfRelatorioDimensional(
         },
         { w: 62, label: 'DATA', valor: fmtData(rel.dataInspecao) },
         {
-          w: 118,
+          w: W - 92 - 62 - 90,
           label: 'CENTRO DE TRABALHO',
           valor: txt(insp.maquina?.nome),
         },
@@ -317,11 +317,6 @@ export function gerarPdfRelatorioDimensional(
           w: 90,
           label: 'TIPO',
           valor: insp.tipo === 'SETUP' ? 'Setup' : 'Produção',
-        },
-        {
-          w: W - 92 - 62 - 118 - 90,
-          label: 'INSPEÇÃO',
-          valor: insp.extra ? 'Extra' : 'Ciclo',
         },
       ],
       30,

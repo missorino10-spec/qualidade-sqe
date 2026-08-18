@@ -60,15 +60,7 @@ export default function InspecoesManufatura({
     queryFn: async () => (await api.get('/tipos-defeito')).data,
   });
 
-  // So na producao: contador de setups e vinculo com o setup que a liberou.
-  const { data: avaliacao } = useQuery<any>({
-    queryKey: ['manufatura-avaliar', maquinaId],
-    queryFn: async () =>
-      (await api.get('/manufatura/inspecoes/avaliar', { params: { maquinaId } }))
-        .data,
-    enabled: tipo === 'PRODUCAO' && !!maquinaId,
-  });
-
+  // So na producao: vinculo opcional com o setup que a liberou.
   const { data: setups } = useQuery<any[]>({
     queryKey: ['manufatura-setups', maquinaId],
     queryFn: async () =>
@@ -185,13 +177,6 @@ export default function InspecoesManufatura({
               render: (_: any, r: any) => r.relatorios?.length ?? 0,
             },
             {
-              title: 'Tipo',
-              width: 90,
-              align: 'center',
-              render: (_: any, r: any) =>
-                r.extra ? <Tag color="orange">Extra</Tag> : <Tag>Ciclo</Tag>,
-            },
-            {
               title: 'Status',
               dataIndex: 'status',
               width: 190,
@@ -229,7 +214,6 @@ export default function InspecoesManufatura({
             setDefeitos={setDefeitos}
             tipo={tipo}
             setups={setups}
-            avaliacao={avaliacao}
             fotosDimensional={fotosDimensional}
             setFotosDimensional={setFotosDimensional}
             fotosVisual={fotosVisual}

@@ -311,7 +311,6 @@ export default function InspecaoManufaturaDetalhe() {
             <Tag color={corStatusInspecao[data.status]}>
               {labelStatusInspecao[data.status] ?? data.status}
             </Tag>
-            {data.extra && <Tag color="orange">Extra</Tag>}
           </Space>
         }
         extra={
