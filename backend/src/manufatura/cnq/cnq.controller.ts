@@ -8,14 +8,17 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { CnqService } from './cnq.service';
+import { gerarPdfCnq } from './cnq-pdf';
 
 // Espelha a aba "Defeitos e CNQ" da planilha de indicadores.
 class CnqDto {
@@ -46,6 +49,25 @@ export class CnqController {
       ate,
       maquinaId ? Number(maquinaId) : undefined,
     );
+  }
+
+  // PDF do recorte que a tela esta mostrando (mesmo filtro da listagem).
+  // Precisa vir antes de ':id', senao "pdf" cai na rota do detalhe.
+  @Get('pdf')
+  async pdf(
+    @Res() res: Response,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+    @Query('maquinaId') maquinaId?: string,
+  ) {
+    const id = maquinaId ? Number(maquinaId) : undefined;
+    const lancamentos = await this.service.listar(de, ate, id);
+    const maquina = id ? await this.service.nomeMaquina(id) : undefined;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="cnq.pdf"');
+    const doc = gerarPdfCnq(lancamentos, { de, ate, maquina });
+    doc.pipe(res);
+    doc.end();
   }
 
   @Get(':id')

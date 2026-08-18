@@ -31,6 +31,13 @@ export class CnqService {
     });
   }
 
+  // Nome da maquina para escrever o filtro no cabecalho do PDF (o recorte
+  // pode nao ter nenhum lancamento e ainda assim precisa dizer qual maquina).
+  async nomeMaquina(id: number) {
+    const m = await this.prisma.maquina.findUnique({ where: { id } });
+    return m ? `${m.codigo} — ${m.nome}` : undefined;
+  }
+
   async detalhe(id: number) {
     const c = await this.prisma.cnq.findUnique({
       where: { id },
