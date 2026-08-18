@@ -111,7 +111,14 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           entidadeId={rel.id}
         />
       </Card>
-      <Card size="small" title="Evidências do visual" style={{ marginTop: 12 }}>
+      {/* A inspecao visual e opcional: a descricao so aparece quando houve. */}
+      <Card size="small" title="Inspeção visual" style={{ marginTop: 12 }}>
+        <Typography.Paragraph
+          type={rel.inspecaoVisual ? undefined : 'secondary'}
+          style={{ whiteSpace: 'pre-wrap' }}
+        >
+          {rel.inspecaoVisual || 'Sem inspeção visual registrada.'}
+        </Typography.Paragraph>
         <FotosEvidenciaSalvas
           entidadeTipo={EVID.manufaturaVisual}
           entidadeId={rel.id}

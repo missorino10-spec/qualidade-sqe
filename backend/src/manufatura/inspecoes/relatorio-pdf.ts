@@ -376,7 +376,25 @@ export function gerarPdfRelatorioDimensional(
       });
     };
     evidencias('EVIDÊNCIAS DO DIMENSIONAL', fotosRel.dimensional);
-    evidencias('EVIDÊNCIAS DO VISUAL', fotosRel.visual);
+
+    // A inspecao visual e opcional: o bloco so vai para o papel quando houve
+    // descricao ou foto. E campo aberto, sem checklist.
+    if (txt(rel.inspecaoVisual) || fotosRel.visual.length) {
+      y += 6;
+      faixa('INSPEÇÃO VISUAL');
+      if (txt(rel.inspecaoVisual)) {
+        bloco('O que foi observado', txt(rel.inspecaoVisual), 44);
+      }
+      if (fotosRel.visual.length) {
+        y = desenharFotosEvidencia(doc, fotosRel.visual, {
+          x0: X0,
+          largura: W,
+          y: y + 4,
+          margem: M,
+          rodape: RODAPE,
+        });
+      }
+    }
 
     // Bloco visual opcional no fim do relatorio (defeitos encontrados).
     const defeitos = Array.isArray(rel.defeitos) ? rel.defeitos : [];

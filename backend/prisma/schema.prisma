@@ -646,6 +646,11 @@ model RelatorioDimensional {
   //    conformeAuto, conformeManual, conforme }]
   cotas Json
 
+  // INSPECAO VISUAL - opcional no setup e na producao. Campo aberto: o
+  // inspetor descreve o que observou. As fotos vao no bloco de evidencias do
+  // visual (EVID.manufaturaVisual), que ja existe.
+  inspecaoVisual String?
+
   observacoesFinais   String?
   resultado           ResultadoManufatura @default(APROVADO)
   // Texto obrigatorio quando o resultado e APROVADO_COM_OBSERVACAO

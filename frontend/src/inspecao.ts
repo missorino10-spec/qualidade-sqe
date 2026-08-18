@@ -27,6 +27,33 @@ export const NORMAS_TOLERANCIA: Record<NormaTolerancia, string> = {
   NA: 'N/A (tolerância informada)',
 };
 
+// Rotulo curto: a norma tambem e mostrada por cota, numa coluna estreita da
+// tabela, onde o texto cheio nao cabe.
+export const NORMAS_CURTAS: Record<NormaTolerancia, string> = {
+  ISO2768: 'ISO 2768-m',
+  DIN7168: 'DIN 7168-m',
+  NA: 'N/A',
+};
+
+// Opcoes do campo "Tolerâncias / Norma" (cabecalho do relatorio e coluna da
+// tabela de cotas). ISO 2768 e DIN 7168 usam a MESMA tabela (classe m); em
+// N/A o inspetor digita a tolerancia.
+export const OPCOES_NORMA: { value: NormaTolerancia; label: string }[] = (
+  Object.keys(NORMAS_TOLERANCIA) as NormaTolerancia[]
+).map((value) => ({ value, label: NORMAS_TOLERANCIA[value] }));
+
+// Registros antigos guardavam a norma como texto livre; nesse caso sai o que
+// esta gravado, sem inventar um codigo que o inspetor nao escolheu.
+export function labelNorma(valor: unknown): string {
+  if (valor == null || valor === '') return '';
+  return NORMAS_TOLERANCIA[valor as NormaTolerancia] ?? String(valor);
+}
+
+export function normaCurta(valor: unknown): string {
+  if (valor == null || valor === '') return '';
+  return NORMAS_CURTAS[valor as NormaTolerancia] ?? String(valor);
+}
+
 // A empresa trabalha sempre na classe "m" (media), por decisao do processo.
 // Faixa e "acima do limite anterior ATE o limite, inclusive" - por isso 6 mm
 // cai na faixa de 0,1 e nao na de 0,2.

@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button, Input, Radio, Select, Table, Tag, Tooltip } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   CotaMaxMin,
   CotaPecas,
+  NORMAS_TOLERANCIA,
   NormaTolerancia,
+  OPCOES_NORMA,
   UnidadeCota,
   calcularCotaMaxMin,
   calcularCotaPecas,
+  normaCurta,
   toleranciaPadrao,
 } from '../inspecao';
 
@@ -23,20 +26,16 @@ const OPCOES_UNIDADE = [
   { value: 'graus', label: 'graus' },
 ];
 
-// Opcoes do campo "Tolerâncias / Norma" do cabecalho. ISO 2768 e DIN 7168
-// usam a MESMA tabela (classe m); em N/A o inspetor digita a tolerancia.
-export const OPCOES_NORMA = [
-  { value: 'ISO2768', label: 'ISO 2768 - m (média)' },
-  { value: 'DIN7168', label: 'DIN 7168 - m (média)' },
-  { value: 'NA', label: 'N/A (tolerância informada)' },
-];
+// A lista de normas vem do arquivo compartilhado (espelho do backend), para
+// nao existir uma segunda lista aqui.
+export { OPCOES_NORMA };
 
-export function cotaVaziaMaxMin(): CotaMaxMin {
+export function cotaVaziaMaxMin(norma: NormaTolerancia = 'ISO2768'): CotaMaxMin {
   return {
     localizacao: '',
     especificado: '',
     unidade: 'mm',
-    norma: 'ISO2768',
+    norma,
     tolerancia: '',
     upper: '',
     lower: '',
@@ -51,12 +50,12 @@ export function cotaVaziaMaxMin(): CotaMaxMin {
   };
 }
 
-export function cotaVaziaPecas(): CotaPecas {
+export function cotaVaziaPecas(norma: NormaTolerancia = 'ISO2768'): CotaPecas {
   return {
     localizacao: '',
     especificado: '',
     unidade: 'mm',
-    norma: 'ISO2768',
+    norma,
     tolerancia: '',
     upper: '',
     lower: '',
@@ -88,6 +87,20 @@ function toleranciaEditavel(cota: CotaMaxMin | CotaPecas): boolean {
   const especificado = Number(String(cota.especificado ?? '').replace(',', '.'));
   if (!Number.isFinite(especificado) || !especificado) return true;
   return toleranciaPadrao(especificado, cota.unidade ?? 'mm') === null;
+}
+
+// Trocar a norma refaz a tolerancia: nas normas ela volta da tabela, em N/A
+// ela e digitada e por isso o que ja estava escrito e preservado.
+function trocarNorma<T extends CotaMaxMin | CotaPecas>(
+  cota: T,
+  norma: NormaTolerancia,
+  calcular: (c: T) => T,
+): T {
+  return calcular({
+    ...cota,
+    norma,
+    tolerancia: norma === 'NA' ? cota.tolerancia : '',
+  });
 }
 
 // Colunas iguais nas duas variantes, montadas com o recalculo ja embutido.
@@ -133,6 +146,27 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
           options={OPCOES_UNIDADE}
           onChange={(v) => edit(i, 'unidade', v)}
         />
+      ),
+    },
+    // Cada cota tem a sua norma: a mesma peca pode ter uma cota pela ISO 2768
+    // e outra com tolerancia de desenho (N/A). O campo do cabecalho continua
+    // valendo como padrao do relatorio.
+    norma: {
+      title: 'NORMA',
+      width: 120,
+      render: (_: any, r: any, i: number) => (
+        <Tooltip title={NORMAS_TOLERANCIA[(r.norma ?? 'ISO2768') as NormaTolerancia]}>
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            value={r.norma ?? 'ISO2768'}
+            options={OPCOES_NORMA.map((o) => ({
+              value: o.value,
+              label: normaCurta(o.value),
+            }))}
+            onChange={(v) => edit(i, 'norma', v)}
+          />
+        </Tooltip>
       ),
     },
     tolerancia: {
@@ -254,7 +288,7 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
       rowKey={(_, i) => String(i)}
       dataSource={linhas}
       pagination={false}
-      scroll={{ x: 1100 + pecas * 90 }}
+      scroll={{ x: 1200 + pecas * 90 }}
       locale={{ emptyText: 'Nenhuma cota registrada' }}
       columns={[
         { title: 'LOCALIZAÇÃO', dataIndex: 'localizacao', width: 150 },
@@ -263,6 +297,11 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
           width: 120,
           render: (_: any, r: any) =>
             `${br(r.especificado)}${sufixo(r.unidade)}`,
+        },
+        {
+          title: 'NORMA',
+          width: 100,
+          render: (_: any, r: any) => normaCurta(r.norma) || '-',
         },
         {
           title: 'TOLERÂNCIA',
@@ -318,21 +357,16 @@ export function TabelaCotasMaxMin({
   setCotas: (c: CotaMaxMin[]) => void;
   norma?: NormaTolerancia;
 }) {
-  // A norma vem do cabecalho e vale para o relatorio inteiro. Trocar a norma
-  // refaz as tolerancias de todas as cotas.
+  // A norma do cabecalho e o padrao do relatorio: quando o inspetor a troca,
+  // todas as cotas acompanham. Depois disso cada cota pode ser mudada na sua
+  // propria coluna, e a troca individual nao e desfeita.
+  const normaAnterior = useRef(norma);
   useEffect(() => {
+    if (normaAnterior.current === norma) return;
+    normaAnterior.current = norma;
     if (!cotas.length) return;
-    if (cotas.every((c) => c.norma === norma)) return;
-    setCotas(
-      cotas.map((c) =>
-        calcularCotaMaxMin({
-          ...c,
-          norma,
-          tolerancia: norma === 'NA' ? c.tolerancia : '',
-        }),
-      ),
-    );
-  }, [norma, cotas]);
+    setCotas(cotas.map((c) => trocarNorma(c, norma, calcularCotaMaxMin)));
+  }, [norma]);
 
   function edit(idx: number, campo: string, valor: any) {
     if (campo === '__remover') {
@@ -340,8 +374,13 @@ export function TabelaCotasMaxMin({
       return;
     }
     const copia = cotas.map((c) => ({ ...c }));
+    if (campo === 'norma') {
+      copia[idx] = trocarNorma(copia[idx], valor, calcularCotaMaxMin);
+      setCotas(copia);
+      return;
+    }
     (copia[idx] as any)[campo] = valor;
-    copia[idx] = calcularCotaMaxMin({ ...copia[idx], norma });
+    copia[idx] = calcularCotaMaxMin(copia[idx]);
     setCotas(copia);
   }
 
@@ -354,12 +393,13 @@ export function TabelaCotasMaxMin({
         rowKey={(_, i) => String(i)}
         dataSource={cotas}
         pagination={false}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1520 }}
         locale={{ emptyText: 'Nenhuma cota adicionada' }}
         columns={[
           c.localizacao,
           c.especificado,
           c.unidade,
+          c.norma,
           c.tolerancia,
           c.upper,
           c.lower,
@@ -400,7 +440,7 @@ export function TabelaCotasMaxMin({
         type="dashed"
         block
         icon={<PlusOutlined />}
-        onClick={() => setCotas([...cotas, cotaVaziaMaxMin()])}
+        onClick={() => setCotas([...cotas, cotaVaziaMaxMin(norma)])}
         style={{ marginTop: 8 }}
       >
         Adicionar cota
@@ -427,19 +467,14 @@ export function TabelaCotasPecas({
     return cotas.map((c) => ({ ...c, pecas: [...(c.pecas ?? [])] }));
   }
 
+  // Igual a variante do lote: o cabecalho e o padrao, a coluna manda na cota.
+  const normaAnterior = useRef(norma);
   useEffect(() => {
+    if (normaAnterior.current === norma) return;
+    normaAnterior.current = norma;
     if (!cotas.length) return;
-    if (cotas.every((c) => c.norma === norma)) return;
-    setCotas(
-      copiar().map((c) =>
-        calcularCotaPecas({
-          ...c,
-          norma,
-          tolerancia: norma === 'NA' ? c.tolerancia : '',
-        }),
-      ),
-    );
-  }, [norma, cotas]);
+    setCotas(copiar().map((c) => trocarNorma(c, norma, calcularCotaPecas)));
+  }, [norma]);
 
   function edit(idx: number, campo: string, valor: any) {
     if (campo === '__remover') {
@@ -447,8 +482,13 @@ export function TabelaCotasPecas({
       return;
     }
     const copia = copiar();
+    if (campo === 'norma') {
+      copia[idx] = trocarNorma(copia[idx], valor, calcularCotaPecas);
+      setCotas(copia);
+      return;
+    }
     (copia[idx] as any)[campo] = valor;
-    copia[idx] = calcularCotaPecas({ ...copia[idx], norma });
+    copia[idx] = calcularCotaPecas(copia[idx]);
     setCotas(copia);
   }
   function editPeca(idx: number, p: number, valor: any) {
@@ -479,12 +519,13 @@ export function TabelaCotasPecas({
         rowKey={(_, i) => String(i)}
         dataSource={cotas}
         pagination={false}
-        scroll={{ x: 1300 + pecas * 90 }}
+        scroll={{ x: 1420 + pecas * 90 }}
         locale={{ emptyText: 'Nenhuma cota adicionada' }}
         columns={[
           c.localizacao,
           c.especificado,
           c.unidade,
+          c.norma,
           c.tolerancia,
           c.upper,
           c.lower,
@@ -499,7 +540,7 @@ export function TabelaCotasPecas({
         type="dashed"
         block
         icon={<PlusOutlined />}
-        onClick={() => setCotas([...copiar(), cotaVaziaPecas()])}
+        onClick={() => setCotas([...copiar(), cotaVaziaPecas(norma)])}
         style={{ marginTop: 8 }}
       >
         Adicionar cota

@@ -54,9 +54,13 @@ class RelatorioDto {
   @IsOptional() @IsString() po?: string;
   @IsOptional() @IsNumber() qtdInspecionada?: number;
   @IsOptional() @IsNumber() qtdTotal?: number;
-  // [{ localizacao, especificado, tolerancia, upper, lower, pecas: [],
+  // Norma padrao do relatorio. Cada cota pode ter a sua, na coluna NORMA.
+  @IsOptional() @IsString() toleranciasNorm?: string;
+  // [{ localizacao, especificado, norma, tolerancia, upper, lower, pecas: [],
   //    instrumento, desvioMin, desvioMax }]
   @IsOptional() @IsArray() cotas?: any[];
+  // Inspecao visual, opcional no setup e na producao.
+  @IsOptional() @IsString() inspecaoVisual?: string;
   @IsOptional() @IsString() observacoesFinais?: string;
   @IsOptional()
   @IsIn(['APROVADO', 'APROVADO_COM_OBSERVACAO', 'REPROVADO'])

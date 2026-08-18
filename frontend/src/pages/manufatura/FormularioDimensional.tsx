@@ -267,9 +267,12 @@ export function CamposRelatorio({
         </Col>
       </Row>
 
-      {/* A norma escolhida aqui puxa as tolerancias da tabela em todas as
-          cotas do relatorio. */}
-      <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
+      {/* Norma padrao do relatorio: trocar aqui refaz as tolerancias de todas
+          as cotas. Cada cota ainda pode ter a sua, na coluna NORMA. */}
+      <Form.Item
+        name="toleranciasNorm"
+        label="Tolerâncias / Norma (padrão do relatório)"
+      >
         <Select options={OPCOES_NORMA} />
       </Form.Item>
 
@@ -297,9 +300,21 @@ export function CamposRelatorio({
         setFotos={setFotosDimensional}
       />
 
+      {/* Inspecao visual: opcional no setup e na producao. E campo aberto -
+          nao ha checklist aqui -, com as fotos do que foi observado. */}
       <Divider orientation="left" plain>
-        Evidências do visual (opcional)
+        Inspeção visual (opcional)
       </Divider>
+      <Form.Item
+        name="inspecaoVisual"
+        label="O que foi observado"
+        style={{ marginBottom: 8 }}
+      >
+        <Input.TextArea
+          rows={3}
+          placeholder="Descreva a inspeção visual (acabamento, solda, pintura, rebarba...)"
+        />
+      </Form.Item>
       <UploadFotosEvidencia fotos={fotosVisual} setFotos={setFotosVisual} />
 
       <Divider orientation="left" plain>

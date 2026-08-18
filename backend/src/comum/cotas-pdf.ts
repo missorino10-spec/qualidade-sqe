@@ -2,6 +2,8 @@
 // no PDF. E a MESMA tabela nos tres modulos; so muda a coluna do que foi
 // encontrado: Max/Min no lote e uma coluna por peca nas amostras.
 
+import { normaCurta } from './inspecao';
+
 const PRETO = '#000000';
 const CINZA = '#555555';
 const VERDE = '#237804';
@@ -47,6 +49,9 @@ function colunas(cotas: any[]): Coluna[] {
       valor: (c) => (br(c.especificado) ? `${br(c.especificado)}${un(c)}` : ''),
     },
     { titulo: 'UN.', peso: 26, valor: (c) => (c.unidade === 'graus' ? 'graus' : 'mm') },
+    // A norma e por cota: a mesma peca pode ter cota pela ISO 2768 e cota com
+    // tolerancia de desenho.
+    { titulo: 'NORMA', peso: 48, valor: (c) => normaCurta(c.norma) },
     {
       titulo: 'TOLER.',
       peso: 42,
