@@ -15,6 +15,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -25,17 +26,20 @@ import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import type { Response } from 'express';
 import { OitoDService } from './oitod.service';
-import { gerarPdfOitoD } from './oitod-pdf';
+import { gerarPdfOitoD, FotosOitoD } from './oitod-pdf';
+import { EVID_8D } from '../../comum/oitod';
+import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../../anexos/storage.service';
 
-// Formulario 8D / Registro de Melhoria - Doc BDBR.QUA.FMR.007.01.
+// Analise de Problemas da Qualidade / 8D - Doc BDBR.QUA.FMR.007.01.
 class OitoDDto {
   @IsOptional() @IsInt() inspecaoId?: number;
   @IsOptional() @IsInt() cnqId?: number;
-  @IsOptional() @IsString() dataAbertura?: string;
   @IsOptional()
   @IsIn(['AGUARDANDO', 'EM_ANDAMENTO', 'CONCLUIDO'])
   status?: any;
-  // 1. Dados / cabecalho
+  // Cabecalho
+  @IsOptional() @IsString() dataAbertura?: string;
   @IsOptional() @IsString() produtoItem?: string;
   @IsOptional() @IsString() codigoDesenho?: string;
   @IsOptional()
@@ -48,26 +52,70 @@ class OitoDDto {
   @IsOptional() @IsString() qtdAfetada?: string;
   @IsOptional() @IsString() responsavel?: string;
   @IsOptional() @IsString() equipe?: string;
+  @IsOptional() @IsString() departamento?: string;
+  @IsOptional() @IsString() areaAplicacao?: string;
+  // Passo 1 - Problema
   @IsOptional() @IsString() descricaoProblema?: string;
-  // 2. Analise de causa raiz (6M + 5 porques)
+  @IsOptional() @IsString() objetivos?: string;
+  @IsOptional() @IsString() perdaAtacada?: string;
+  @IsOptional() @IsNumber() perdaValorAno?: number;
+  @IsOptional() @IsObject() descricao5W1H?: any;
+  @IsOptional() @IsString() situacaoAtual?: string;
+  @IsOptional() @IsString() estratificacao?: string;
+  // Passo 2 - Metodo 5G / Passo 3 - cronograma
+  @IsOptional() @IsArray() metodo5G?: any[];
+  @IsOptional() @IsArray() cronograma?: any[];
+  // Passo 4 - causa raiz (6M + 1D)
   @IsOptional() @IsString() efeito?: string;
   @IsOptional() @IsObject() causas6M?: any;
-  @IsOptional() @IsArray() porques?: any[];
-  // 3. Causa raiz confirmada
+  @IsOptional() @IsArray() causasPotenciais?: any[];
   @IsOptional() @IsString() causaRaiz?: string;
-  // 4. Plano de acao corretiva
+  // Passo 5 - plano de acao
   @IsOptional() @IsArray() planoAcao?: any[];
-  // 5. Padronizacao
   @IsOptional() @IsObject() padronizacao?: any;
-  // 7. Verificacao da eficacia
+  // Passo 6 - verificacao dos resultados
+  @IsOptional() @IsString() verificacaoResultados?: string;
   @IsOptional() @IsObject() verificacaoEficacia?: any;
+  // Conclusao / fechamento
+  @IsOptional() @IsString() dataTermino?: string;
+  @IsOptional() @IsString() custosInvestimentos?: string;
+  @IsOptional() @IsString() beneficiosGanhos?: string;
+  @IsOptional() @IsString() resultadosIndices?: string;
+  @IsOptional() @IsString() verificacaoGerente?: string;
   @IsOptional() @IsString() aprovacaoProducao?: string;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('manufatura/8d')
 export class OitoDController {
-  constructor(private service: OitoDService) {}
+  constructor(
+    private service: OitoDService,
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
+
+  // Cada passo da planilha tem o seu quadro de imagem: as fotos sao buscadas
+  // por entidadeTipo e entregues ao PDF ja em bytes (o Storage e remoto).
+  private async fotosDoOitoD(id: number): Promise<FotosOitoD> {
+    const tipos = Object.values(EVID_8D);
+    const anexos = await this.prisma.anexo.findMany({
+      where: { entidadeTipo: { in: tipos as any }, entidadeId: id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const fotos: FotosOitoD = {};
+    for (const [passo, tipo] of Object.entries(EVID_8D)) {
+      const imagens = anexos
+        .filter((a) => a.entidadeTipo === tipo && a.mimeType?.startsWith('image/'))
+        .slice(0, 4);
+      const baixadas = await Promise.all(
+        imagens.map((a) => this.storage.baixarOuNulo(a.caminho)),
+      );
+      const validas = baixadas.filter((b): b is Buffer => b !== null);
+      if (validas.length) fotos[passo as keyof typeof EVID_8D] = validas;
+    }
+    return fotos;
+  }
 
   @Get()
   listar(@Query('status') status?: string) {
@@ -82,10 +130,11 @@ export class OitoDController {
   @Get(':id/pdf')
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const d8 = await this.service.detalhe(id);
+    const fotos = await this.fotosDoOitoD(id);
     const nomeArquivo = `${(d8.numero ?? `8d-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfOitoD(d8);
+    const doc = gerarPdfOitoD(d8, fotos);
     doc.pipe(res);
     doc.end();
   }

@@ -20,9 +20,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { dataBR } from '../../formatos';
 
-// Formulario 8D / Registro de Melhoria — Doc BDBR.QUA.FMR.007.01.
+// Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
 // A abertura pode vir de uma inspecao reprovada ou de um lancamento de CNQ:
 // nesses casos a tela e chamada com ?inspecaoId= ou ?cnqId= e ja abre o modal.
+// Aqui so entra o cabecalho: os Passos 1 a 6 sao preenchidos no detalhe.
 
 export const ORIGENS_8D = [
   { value: 'RELATORIO_RO', label: 'Relatório R.O' },
@@ -105,7 +106,7 @@ export default function OitoD() {
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card
-        title="8D / Registro de Melhoria"
+        title="Análise de Problemas da Qualidade (8D)"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
             Novo 8D
@@ -158,7 +159,7 @@ export default function OitoD() {
 
       <Modal
         open={open}
-        title="Novo 8D — Doc. BDBR.QUA.FMR.007.01"
+        title="Nova análise de problemas — Doc. BDBR.QUA.FMR.007.01"
         width={760}
         okText="Abrir 8D"
         cancelText="Cancelar"
@@ -214,7 +215,7 @@ export default function OitoD() {
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="responsavel" label="Responsável">
+              <Form.Item name="responsavel" label="Coordenador">
                 <Input />
               </Form.Item>
             </Col>
@@ -224,7 +225,19 @@ export default function OitoD() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="descricaoProblema" label="Descrição do problema">
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="departamento" label="Departamento">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="areaAplicacao" label="Área de aplicação">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="descricaoProblema" label="Problema">
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>

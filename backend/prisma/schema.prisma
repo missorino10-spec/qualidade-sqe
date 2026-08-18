@@ -734,7 +734,7 @@ model OitoD {
   cnqId      Int?
   cnq        Cnq?                @relation(fields: [cnqId], references: [id])
 
-  // 1. Dados / cabecalho
+  // Cabecalho
   empresaUnidade    String          @default("Big Dutchman Brasil")
   dataAbertura      DateTime        @default(now())
   status            StatusOitoD     @default(AGUARDANDO)
@@ -746,34 +746,69 @@ model OitoD {
   equipamento       String?
   turno             TurnoManufatura @default(COMERCIAL)
   qtdAfetada        String?
+  // "responsavel" e o Coordenador e "equipe" e o Grupo de Trabalho da planilha.
   responsavel       String?
   equipe            String?
+  departamento      String?
+  areaAplicacao     String?
+  // Passo 1 - Problema (o enunciado)
   descricaoProblema String?
 
-  // 2. Analise de causa raiz
-  efeito   String?
-  // 6M: { maquina, metodo, material, maoDeObra, medicao, meioAmbiente }
-  causas6M Json?
-  // 5 Porques: ["...", "...", ...]
-  porques  Json?
+  // Passo 1.1 - Objetivos (SMART, medidos contra a perda causal)
+  objetivos     String?
+  perdaAtacada  String?
+  perdaValorAno Float?
 
-  // 3. Causa raiz confirmada
+  // Passo 1.2 - Descricao do problema (5W 1H)
+  // { oQue, quando, onde, quem, qual, como }
+  descricao5W1H Json?
+
+  // Passo 1.3 e 1.4 (as imagens vao como anexo)
+  situacaoAtual  String?
+  estratificacao String?
+
+  // Passo 2 - Reestabelecer as condicoes normais pelo Metodo 5G
+  // [{ avaliacao, analise4M, objetivo, especificado, verificado, necessitaRestauracao,
+  //    comoRestaurar, responsavel, prazo, status, eficaz }]
+  metodo5G Json?
+
+  // Passo 3 - Planejar as atividades (cronograma e responsabilidades)
+  // [{ atividade, responsavel, inicio, fim, status }]
+  cronograma Json?
+
+  // Passo 4 - Analise de causa raiz (6M + 1D)
+  efeito   String?
+  // Espinha de peixe: { medicao, maquina, meioAmbiente, metodo, material, maoDeObra, projeto }
+  causas6M Json?
+  // Matriz Causas Potenciais x Porque 1..5
+  // [{ causa, porque1, porque2, porque3, porque4, porque5 }]
+  causasPotenciais Json?
+  // 5 Porques do formulario antigo (mantido para nao perder registro ja gravado)
+  porques          Json?
+
+  // Causa raiz confirmada
   causaRaiz String?
 
-  // 4. Plano de acao corretiva
-  // [{ id, acao, tipo, responsavel, prazo, status, evidencia, observacoes }]
+  // Passo 5 - Plano de acao
+  // [{ oQue, porQue, como, quem, quando, custo, situacao }]
   planoAcao Json?
 
-  // 5. Padronizacao
-  // [{ documento, alteracao, responsavel, prazo, treinamento, registro, status, observacoes }]
+  // Padronizacao (documentos e treinamentos decorrentes do plano)
+  // { documentos, treinamentos, observacoes }
   padronizacao Json?
 
-  // 6. Evidencias antes/depois: anexos com entidadeTipo
-  //    "OITOD_ANTES" e "OITOD_DEPOIS" (1 foto cada)
+  // Passo 6 - Verificacao dos resultados (monitorar por pelo menos 3 meses)
+  verificacaoResultados String?
+  // Bloco estruturado de eficacia do formulario antigo
+  // { criterio, metodo, amostra, resultadoEsperado, resultadoObtido, data, responsavel, eficaz }
+  verificacaoEficacia   Json?
 
-  // 7. Verificacao da eficacia
-  // [{ criterio, metodo, amostra, esperado, obtido, data, responsavel, eficaz }]
-  verificacaoEficacia Json?
+  // Conclusao / Fechamento
+  dataTermino         DateTime?
+  custosInvestimentos String?
+  beneficiosGanhos    String?
+  resultadosIndices   String?
+  verificacaoGerente  String?
 
   // Aprovacoes: so a Qualidade aprova no sistema (com registro de quem e
   // quando). O campo da Producao continua no PDF, identico ao papel.
