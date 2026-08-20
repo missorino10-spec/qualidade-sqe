@@ -1,11 +1,13 @@
 // Base COMPARTILHADA do 8D / Analise de Problemas da Qualidade.
 //
 // O conteudo fixo da planilha "Analise de Problemas da Qualidade - Padrao"
-// mora aqui: as espinhas do diagrama 6M + 1D, as 9 avaliacoes do Metodo 5G e
-// as situacoes das acoes. O frontend tem um espelho em frontend/src/oitod.ts.
+// mora aqui: as espinhas do diagrama 6M + 1D e as situacoes das acoes. O
+// frontend tem um espelho em frontend/src/oitod.ts.
+//
+// O Metodo 5G nao mora mais aqui: virou documento proprio (comum/cincog.ts).
 
 // ---------------------------------------------------------------------------
-// Passo 4 - espinha de peixe (6M + 1D)
+// Passo 2 - espinha de peixe (6M + 1D)
 // A planilha tem SETE espinhas: os 6M classicos mais "Projeto" (o 1D).
 // A ordem e a mesma do desenho, de cima para baixo e da esquerda para a
 // direita: as tres primeiras saem por cima, as quatro ultimas por baixo.
@@ -27,112 +29,7 @@ export const ESPINHAS_6M: Espinha[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Passo 2 - Metodo 5G
-// Os 5G, na ordem da aba "MÉTODO 5G" da planilha.
-// ---------------------------------------------------------------------------
-export const CINCO_G: { sigla: string; tema: string; acao: string }[] = [
-  { sigla: 'GEMBA', tema: 'Fábrica', acao: 'Vá ao posto de trabalho' },
-  { sigla: 'GEMBUTSU', tema: 'Material', acao: 'Examine o fenômeno' },
-  { sigla: 'GENJITSU', tema: 'Contexto', acao: 'Verifique os fatos e os dados' },
-  { sigla: 'GENRI', tema: 'Teoria', acao: 'Siga a teoria' },
-  {
-    sigla: 'GENSOKU',
-    tema: 'Regras e princípios',
-    acao: 'Siga os padrões operacionais',
-  },
-];
-
-// As 9 avaliacoes fixas da aba "MÉTODO 5G". O inspetor nao cria nem apaga
-// linha: ele preenche as colunas de cada avaliacao, como no papel.
-export const AVALIACOES_5G: {
-  avaliacao: string;
-  analise4M: string;
-  objetivo: string;
-}[] = [
-  {
-    avaliacao: 'Limpeza e organização',
-    analise4M: 'Método',
-    objetivo: 'Local limpo e organizado',
-  },
-  {
-    avaliacao: 'Instrumentos de medição',
-    analise4M: 'Método',
-    objetivo: 'Instrumentos limpos, organizados e calibrados',
-  },
-  {
-    avaliacao: 'Documentação do processo regularizada',
-    analise4M: 'Método',
-    objetivo: 'Normas, desenhos e parâmetros ok',
-  },
-  {
-    avaliacao: 'Norma Técnica Operacional é clara e objetiva',
-    analise4M: 'Método',
-    objetivo:
-      'Norma atualizada e disponível na máquina para o operador',
-  },
-  {
-    avaliacao: 'Condições de manuseio e armazenamento',
-    analise4M: 'Material',
-    objetivo:
-      'Operador conta com local adequado para armazenamento de material bruto',
-  },
-  {
-    avaliacao: 'Operador tem conhecimento e habilidade na atividade',
-    analise4M: 'Mão de Obra',
-    objetivo: '',
-  },
-  {
-    avaliacao: 'Operador segue instruções de trabalho',
-    analise4M: 'Mão de Obra',
-    objetivo: '',
-  },
-  {
-    avaliacao: 'Tratamento de não conformidades',
-    analise4M: 'Método',
-    objetivo: '',
-  },
-  {
-    avaliacao: 'Ferramentas disponíveis e adequadas no posto de trabalho',
-    analise4M: 'Máquina',
-    objetivo: '',
-  },
-];
-
-export const NOTA_5G =
-  'Para as não conformidades encontradas, incluir evidências do processo investigado sempre que aplicável (foto ou vídeo).';
-
-// Checklist 5G em branco, com as 9 avaliacoes ja postas.
-export function checklist5GInicial(): any[] {
-  return AVALIACOES_5G.map((a) => ({
-    avaliacao: a.avaliacao,
-    analise4M: a.analise4M,
-    objetivo: a.objetivo,
-    especificado: '',
-    verificado: '',
-    necessitaRestauracao: '',
-    comoRestaurar: '',
-    responsavel: '',
-    prazo: '',
-    status: 'PENDENTE',
-    eficaz: '',
-  }));
-}
-
-// As 9 avaliacoes sao fixas: um checklist gravado incompleto (por exemplo, por
-// uma chamada direta da API) volta completo, com o que ja foi preenchido no
-// lugar certo. Assim nenhuma avaliacao da planilha some do registro.
-export function checklist5G(salvo: unknown): any[] {
-  const linhas = Array.isArray(salvo) ? salvo : [];
-  if (!linhas.length) return checklist5GInicial();
-  return checklist5GInicial().map((base, i) => {
-    const gravada =
-      linhas.find((l: any) => l?.avaliacao === base.avaliacao) ?? linhas[i];
-    return gravada ? { ...base, ...gravada, avaliacao: base.avaliacao } : base;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Situacao das acoes (Passo 5 e Passo 2)
+// Situacao das acoes (usada tambem pelo checklist do 5G)
 // ---------------------------------------------------------------------------
 export const SITUACOES_ACAO: { value: string; label: string }[] = [
   { value: 'PENDENTE', label: 'Pendente' },
@@ -230,16 +127,9 @@ export function acaoPendente(acao: any): boolean {
   return acao.situacao !== 'CONCLUIDA' && acao.situacao !== 'CANCELADA';
 }
 
-// Acoes que impedem o fechamento do 8D (Passo 5 e restauracoes do Passo 2).
-export function acoesPendentes(planoAcao: unknown, metodo5G?: unknown): any[] {
-  const acoes = Array.isArray(planoAcao) ? planoAcao : [];
-  const restauracoes = (Array.isArray(metodo5G) ? metodo5G : []).filter(
-    (l: any) =>
-      String(l?.necessitaRestauracao ?? '').toUpperCase() === 'SIM' &&
-      l?.status !== 'CONCLUIDA' &&
-      l?.status !== 'CANCELADA',
-  );
-  return [...acoes.filter(acaoPendente), ...restauracoes];
+// Acoes que impedem o fechamento do 8D (Passo 3 - Plano de Acao).
+export function acoesPendentes(planoAcao: unknown): any[] {
+  return (Array.isArray(planoAcao) ? planoAcao : []).filter(acaoPendente);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +140,5 @@ export const EVID_8D = {
   geral: 'OITO_D',
   situacaoAtual: 'OITO_D_SITUACAO',
   estratificacao: 'OITO_D_PARETO',
-  metodo5G: 'OITO_D_5G',
   resultados: 'OITO_D_RESULTADOS',
 } as const;

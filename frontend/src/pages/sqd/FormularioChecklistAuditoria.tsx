@@ -180,6 +180,7 @@ export function ChecklistAuditoria({
               rowKey="codigo"
               size="small"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={b.perguntas}
               columns={[
                 { title: 'Nº', dataIndex: 'codigo', width: 70 },
@@ -236,6 +237,7 @@ export function ResumoAuditoria({ calculo }: { calculo: any }) {
         rowKey="codigo"
         size="small"
         pagination={false}
+        scroll={{ x: 'max-content' }}
         dataSource={calculo.blocos}
         columns={[
           {

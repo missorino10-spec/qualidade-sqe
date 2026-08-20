@@ -37,22 +37,19 @@ import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataInput } from '../../formatos';
 import { AuthImage } from '../../components/AuthImage';
 import {
-  CINCO_G,
   ESPINHAS_6M,
   EVID_8D,
-  NOTA_5G,
   SITUACOES_ACAO,
   acoesPendentes,
   causasPotenciaisNormalizadas,
-  checklist5G,
-  checklist5GInicial,
   planoAcaoNormalizado,
 } from '../../oitod';
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 
 // Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
 // A tela segue passo a passo a planilha "Analise de Problemas da Qualidade -
-// Padrao": Passos 1 a 6 e o bloco de Conclusao / Fechamento.
+// Padrao": Passos 1 a 4 e o bloco de Conclusao / Fechamento. O Metodo 5G saiu
+// daqui e virou documento proprio (tela /manufatura/5g/:id).
 
 const CINCO_W_1H = [
   { chave: 'oQue', label: 'O quê?' },
@@ -61,11 +58,6 @@ const CINCO_W_1H = [
   { chave: 'quem', label: 'Quem?' },
   { chave: 'qual', label: 'Qual?' },
   { chave: 'como', label: 'Como?' },
-];
-
-const SIM_NAO = [
-  { value: 'SIM', label: 'Sim' },
-  { value: 'NAO', label: 'Não' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -80,23 +72,25 @@ const TOPO_Y = 45;
 const BASE_Y = 295;
 
 // Quebra o texto da causa em linhas curtas para caber na cunha da espinha.
+// Cada modo de falha digitado pelo usuario ocupa a sua propria linha: primeiro
+// respeitamos as quebras de linha do campo e so depois quebramos por largura.
 function quebrarTexto(texto: any, maxChars: number, maxLinhas: number) {
-  const palavras = String(texto ?? '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
   const linhas: string[] = [];
-  let atual = '';
-  for (const p of palavras) {
-    const teste = atual ? `${atual} ${p}` : p;
-    if (teste.length <= maxChars) {
-      atual = teste;
-    } else {
-      if (atual) linhas.push(atual);
-      atual = p;
+  for (const bruta of String(texto ?? '').split(/\r?\n/)) {
+    const palavras = bruta.trim().split(/\s+/).filter(Boolean);
+    if (!palavras.length) continue;
+    let atual = '';
+    for (const p of palavras) {
+      const teste = atual ? `${atual} ${p}` : p;
+      if (teste.length <= maxChars) {
+        atual = teste;
+      } else {
+        if (atual) linhas.push(atual);
+        atual = p;
+      }
     }
+    if (atual) linhas.push(atual);
   }
-  if (atual) linhas.push(atual);
   if (linhas.length <= maxLinhas) return linhas;
   const cortadas = linhas.slice(0, maxLinhas);
   cortadas[maxLinhas - 1] = `${cortadas[maxLinhas - 1]}…`;
@@ -179,7 +173,7 @@ function EspinhaDePeixe({
             >
               {e.label}
             </text>
-            {quebrarTexto(causas?.[e.chave], 26, 4).map((l, i) => (
+            {quebrarTexto(causas?.[e.chave], 26, 6).map((l, i) => (
               <text
                 key={i}
                 x={pontaX + 14 + i * 6}
@@ -219,7 +213,7 @@ function EspinhaDePeixe({
             >
               {e.label}
             </text>
-            {quebrarTexto(causas?.[e.chave], 22, 4).map((l, i) => (
+            {quebrarTexto(causas?.[e.chave], 22, 6).map((l, i) => (
               <text
                 key={i}
                 x={pontaX + 58 - i * 6}
@@ -239,7 +233,7 @@ function EspinhaDePeixe({
 
 // ---------------------------------------------------------------------------
 // Quadro de fotos do passo. Cada passo da planilha tem o seu proprio quadro de
-// imagem (situacao atual, Pareto, evidencias do 5G, resultados).
+// imagem (situacao atual, Pareto, resultados).
 // ---------------------------------------------------------------------------
 function QuadroFotos({
   entidadeTipo,
@@ -312,7 +306,7 @@ function QuadroFotos({
 }
 
 // ---------------------------------------------------------------------------
-// Colunas editaveis das tabelas dos passos 2, 3, 4 e 5.
+// Colunas editaveis das tabelas dos passos 2 e 3.
 // ---------------------------------------------------------------------------
 function criarEditor(linhas: any[], setLinhas: (v: any[]) => void) {
   const mudar = (i: number, campo: string, valor: any) =>
@@ -415,8 +409,6 @@ export default function OitoDDetalhe() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form] = Form.useForm();
-  const [metodo5G, setMetodo5G] = useState<any[]>(checklist5GInicial());
-  const [cronograma, setCronograma] = useState<any[]>([]);
   const [causasPotenciais, setCausasPotenciais] = useState<any[]>([]);
   const [planoAcao, setPlanoAcao] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
@@ -444,10 +436,6 @@ export default function OitoDDetalhe() {
         data: dataInput(data.verificacaoEficacia?.data),
       },
     });
-    // O checklist 5G tem 9 linhas fixas: um registro antigo, sem checklist,
-    // abre ja com as avaliacoes da planilha prontas para preencher.
-    setMetodo5G(checklist5G(data.metodo5G));
-    setCronograma(Array.isArray(data.cronograma) ? data.cronograma : []);
     // Os 8D abertos antes desta tela abrem com o que ja foi preenchido: o
     // plano antigo e os 5 porques soltos sao traduzidos para o formato da
     // planilha na leitura, sem apagar nada.
@@ -468,7 +456,7 @@ export default function OitoDDetalhe() {
       </Card>
     );
 
-  const pendentes = acoesPendentes(planoAcao, metodo5G);
+  const pendentes = acoesPendentes(planoAcao);
   const podeFechar = pendentes.length === 0;
 
   async function salvar() {
@@ -483,8 +471,6 @@ export default function OitoDDetalhe() {
     try {
       await api.patch(`/manufatura/8d/${id}`, {
         ...v,
-        metodo5G,
-        cronograma,
         causasPotenciais,
         planoAcao,
       });
@@ -507,8 +493,6 @@ export default function OitoDDetalhe() {
     }
   }
 
-  const ed5G = criarEditor(metodo5G, setMetodo5G);
-  const edCron = criarEditor(cronograma, setCronograma);
   const edCausas = criarEditor(causasPotenciais, setCausasPotenciais);
   const edPlano = criarEditor(planoAcao, setPlanoAcao);
 
@@ -572,7 +556,7 @@ export default function OitoDDetalhe() {
               showIcon
               style={{ marginBottom: 16 }}
               message={`${pendentes.length} ação(ões) em aberto`}
-              description="Enquanto houver ação pendente no Plano de Ação ou restauração do 5G sem baixa, o 8D não pode ser concluído nem aprovado."
+              description="Enquanto houver ação pendente no plano de ação, o 8D não pode ser concluído nem aprovado."
             />
           )}
 
@@ -740,93 +724,7 @@ export default function OitoDDetalhe() {
           />
         </Card>
 
-        <Card title="Passo 2 — Reestabelecer as condições normais do processo (Método 5G)">
-          <Space wrap size={4} style={{ marginBottom: 12 }}>
-            {CINCO_G.map((g) => (
-              <Tag key={g.sigla} color="orange">
-                <b>{g.sigla}</b> ({g.tema}): {g.acao}
-              </Tag>
-            ))}
-          </Space>
-          <Table
-            size="small"
-            rowKey={(_, i) => String(i)}
-            dataSource={metodo5G}
-            pagination={false}
-            scroll={{ x: 1650 }}
-            columns={[
-              {
-                title: 'Nº',
-                width: 40,
-                render: (_: any, __: any, i: number) => i + 1,
-              },
-              ed5G.fixo('avaliacao', 'Avaliação', 175),
-              ed5G.fixo('analise4M', 'Análise 4M', 85),
-              ed5G.fixo('objetivo', 'Objetivo', 175),
-              ed5G.area('especificado', 'Especificado', 150),
-              ed5G.area('verificado', 'Verificado', 150),
-              ed5G.opcoes('necessitaRestauracao', 'Necessita restauração?', 110, SIM_NAO),
-              ed5G.area('comoRestaurar', 'Como fazer a restauração?', 190),
-              ed5G.texto('responsavel', 'Responsável', 130),
-              ed5G.data('prazo', 'Prazo', 130),
-              ed5G.opcoes('status', 'Status', 130, SITUACOES_ACAO),
-              ed5G.opcoes('eficaz', 'Solução foi eficaz?', 110, SIM_NAO),
-            ]}
-          />
-          <Typography.Text type="secondary" italic style={{ display: 'block', marginTop: 8 }}>
-            * {NOTA_5G}
-          </Typography.Text>
-          <div style={{ marginTop: 12 }}>
-            <QuadroFotos
-              entidadeTipo={EVID_8D.metodo5G}
-              entidadeId={id}
-              rotulo="Evidências do processo investigado"
-            />
-          </div>
-        </Card>
-
-        <Card
-          title="Passo 3 — Planejar as atividades (cronograma e responsabilidades)"
-          extra={
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                setCronograma([
-                  ...cronograma,
-                  {
-                    atividade: '',
-                    responsavel: '',
-                    inicio: '',
-                    fim: '',
-                    status: 'PENDENTE',
-                  },
-                ])
-              }
-            >
-              Adicionar atividade
-            </Button>
-          }
-        >
-          <Table
-            size="small"
-            rowKey={(_, i) => String(i)}
-            dataSource={cronograma}
-            pagination={false}
-            scroll={{ x: 900 }}
-            locale={{ emptyText: 'Nenhuma atividade planejada' }}
-            columns={[
-              edCron.area('atividade', 'Atividade', 300),
-              edCron.texto('responsavel', 'Responsável', 160),
-              edCron.data('inicio', 'Início', 140),
-              edCron.data('fim', 'Fim', 140),
-              edCron.opcoes('status', 'Status', 130, SITUACOES_ACAO),
-              edCron.remover(),
-            ]}
-          />
-        </Card>
-
-        <Card title="Passo 4 — Análise de causa raiz (6M + 1D)">
+        <Card title="Passo 2 — Análise de causa raiz (6M + 1D)">
           <Form.Item name="efeito" label="Efeito (problema no fim da espinha)">
             <Input />
           </Form.Item>
@@ -882,11 +780,11 @@ export default function OitoDDetalhe() {
             locale={{ emptyText: 'Nenhuma causa potencial registrada' }}
             columns={[
               edCausas.area('causa', 'Causa potencial', 220),
-              edCausas.area('porque1', 'Por quê 1', 165),
-              edCausas.area('porque2', 'Por quê 2', 165),
-              edCausas.area('porque3', 'Por quê 3', 165),
-              edCausas.area('porque4', 'Por quê 4', 165),
-              edCausas.area('porque5', 'Por quê 5', 165),
+              edCausas.area('porque1', 'Porquê 1', 165),
+              edCausas.area('porque2', 'Porquê 2', 165),
+              edCausas.area('porque3', 'Porquê 3', 165),
+              edCausas.area('porque4', 'Porquê 4', 165),
+              edCausas.area('porque5', 'Porquê 5', 165),
               edCausas.remover(),
             ]}
           />
@@ -901,7 +799,7 @@ export default function OitoDDetalhe() {
         </Card>
 
         <Card
-          title="Passo 5 — Plano de ação"
+          title="Passo 3 — Plano de ação"
           extra={
             <Button
               size="small"
@@ -972,7 +870,7 @@ export default function OitoDDetalhe() {
           </Row>
         </Card>
 
-        <Card title="Passo 6 — Verificação dos resultados">
+        <Card title="Passo 4 — Verificação dos resultados">
           <Alert
             type="info"
             showIcon

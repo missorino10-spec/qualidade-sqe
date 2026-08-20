@@ -495,6 +495,7 @@ export default function AuditoriaDetalhe() {
                   rowKey="rodada"
                   size="small"
                   pagination={false}
+                  scroll={{ x: 'max-content' }}
                   dataSource={rodadas}
                   columns={[
                     { title: 'Rev.', dataIndex: 'revisao', width: 70 },
@@ -587,7 +588,7 @@ export default function AuditoriaDetalhe() {
                     </Space>
                   }
                 >
-                  <Descriptions column={2} bordered size="small">
+                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
                     <Descriptions.Item label="Data da auditoria">
                       {dataBR(recente.dataAuditoria)}
                     </Descriptions.Item>
@@ -606,6 +607,7 @@ export default function AuditoriaDetalhe() {
                     rowKey="codigo"
                     size="small"
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     style={{ marginTop: 16 }}
                     dataSource={(recente.blocos ?? []) as any[]}
                     columns={[
@@ -655,6 +657,7 @@ export default function AuditoriaDetalhe() {
                     rowKey="codigo"
                     size="small"
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     style={{ marginTop: 16 }}
                     dataSource={(recente.respostas ?? []) as any[]}
                     columns={[

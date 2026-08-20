@@ -45,7 +45,7 @@ const corEficacia: Record<string, string> = {
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
   APROVADO: 'Satisfatório',
-  REPROVADO: 'Não Satisfatório',
+  REPROVADO: 'Não satisfatório',
   NAO_APLICAVEL: 'N/A',
 };
 
@@ -222,6 +222,28 @@ export default function RncLista() {
               <Tag color={corEficacia[e]}>{labelEficacia[e] ?? e}</Tag>
             ),
           },
+          // Lead time INTERNO: da abertura ao envio do documento ao
+          // fornecedor. So existe na tela; nao entra no PDF da RNC.
+          {
+            title: 'Envio ao fornecedor',
+            dataIndex: 'enviadaFornecedor',
+            width: 150,
+            filters: [
+              { text: 'Enviada', value: true },
+              { text: 'Não enviada', value: false },
+            ],
+            onFilter: (v: any, r: any) => !!r.enviadaFornecedor === v,
+            render: (_: any, r: any) =>
+              r.enviadaFornecedor ? (
+                <Tag color="green">
+                  {r.leadTimeEnvioDias != null
+                    ? `Enviada — ${r.leadTimeEnvioDias} dia(s)`
+                    : 'Enviada'}
+                </Tag>
+              ) : (
+                <Tag color="orange">Não enviada</Tag>
+              ),
+          },
         ]}
       />
 
@@ -283,7 +305,7 @@ export default function RncLista() {
             </Col>
           </Row>
           <Form.Item name="itemCodigo" label="Código do item">
-            <Input placeholder="opcional" />
+            <Input placeholder="Opcional" />
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>

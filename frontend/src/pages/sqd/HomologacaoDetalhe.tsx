@@ -516,6 +516,7 @@ export default function HomologacaoDetalhe() {
               rowKey="letra"
               size="small"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={blocos}
               summary={() => (
                 <Table.Summary.Row>
@@ -579,6 +580,7 @@ export default function HomologacaoDetalhe() {
               rowKey="codigo"
               size="small"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={reprovadas}
               locale={{ emptyText: 'Nenhuma pergunta reprovada.' }}
               columns={[
@@ -590,7 +592,7 @@ export default function HomologacaoDetalhe() {
           </Card>
 
           <Card title="Autoavaliação preenchida" style={{ marginTop: 16 }}>
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
               <Descriptions.Item label="Fornecedor" span={2}>
                 {h.fornecedorNome}
               </Descriptions.Item>
@@ -628,6 +630,7 @@ export default function HomologacaoDetalhe() {
                     rowKey="codigo"
                     size="small"
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     dataSource={b.perguntas}
                     columns={[
                       { title: 'Nº', dataIndex: 'codigo', width: 60 },

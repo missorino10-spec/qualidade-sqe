@@ -47,6 +47,16 @@ export class MaquinasController {
     return this.service.listar(area, todas === 'true');
   }
 
+  // Precisa vir ANTES de @Get(':id'), senao "producao" cai na rota do id.
+  @Get('producao/resumo')
+  resumoProducao(@Query('ano') ano?: string, @Query('mes') mes?: string) {
+    const hoje = new Date();
+    return this.service.resumoMensal(
+      ano ? Number(ano) : hoje.getFullYear(),
+      mes ? Number(mes) : hoje.getMonth() + 1,
+    );
+  }
+
   @Get(':id')
   detalhe(@Param('id', ParseIntPipe) id: number) {
     return this.service.detalhe(id);

@@ -33,7 +33,7 @@ function colunas(cotas: any[]): Coluna[] {
   const encontrado: Coluna[] = pecas
     ? Array.from({ length: pecas }, (_, p) => ({
         titulo: `PEÇA ${String(p + 1).padStart(2, '0')}`,
-        peso: 30,
+        peso: 34,
         valor: (c: any) => br(c.pecas?.[p]),
       }))
     : [
@@ -61,16 +61,69 @@ function colunas(cotas: any[]): Coluna[] {
     { titulo: 'LOWER', peso: 38, valor: (c) => br(c.lower) },
     ...encontrado,
     { titulo: 'INSTRUMENTO', peso: 58, valor: (c) => String(c.instrumento ?? '') },
-    { titulo: 'DESV. Mín.', peso: 36, valor: (c) => br(c.desvioMin) },
-    { titulo: 'DESV. Máx.', peso: 36, valor: (c) => br(c.desvioMax) },
+    { titulo: 'DESV. Mín.', peso: 42, valor: (c) => br(c.desvioMin) },
+    { titulo: 'DESV. Máx.', peso: 42, valor: (c) => br(c.desvioMax) },
     {
       titulo: 'CONFORME',
-      peso: 40,
+      peso: 52,
       valor: (c) =>
         c.conforme === false ? 'Não' : c.conforme === true ? 'Sim' : '-',
     },
   ];
 }
+
+// Escreve o valor da celula numa linha so, encolhendo a fonte ate caber. O
+// pdfkit quebra a linha mesmo com lineBreak:false quando o texto passa da
+// largura, e a sobra caia por cima da linha de baixo da tabela (com 5 colunas
+// de peca as celulas ficam bem estreitas).
+function celula(
+  doc: PDFKit.PDFDocument,
+  texto: string,
+  x: number,
+  y: number,
+  largura: number,
+  tamanho: number,
+) {
+  let fs = tamanho;
+  while (fs > 4 && doc.fontSize(fs).widthOfString(texto) > largura) {
+    fs -= 0.25;
+  }
+  doc.fontSize(fs).text(texto, x, y, {
+    width: largura,
+    height: fs * 1.3,
+    lineBreak: false,
+    ellipsis: true,
+  });
+}
+
+// Titulo do cabecalho: pode quebrar entre palavras ("DESV." / "Máx."), mas
+// nunca no meio de uma palavra. O pdfkit parte "INSTRUMENTO" em "INSTRUMENT" +
+// "O" quando a celula e estreita, entao a fonte encolhe ate a maior palavra
+// caber inteira.
+function tituloCabecalho(
+  doc: PDFKit.PDFDocument,
+  titulo: string,
+  x: number,
+  y: number,
+  largura: number,
+) {
+  let fs = 5.5;
+  const palavras = titulo.split(' ');
+  while (
+    fs > 3.5 &&
+    palavras.some((p) => doc.fontSize(fs).widthOfString(p) > largura)
+  ) {
+    fs -= 0.25;
+  }
+  doc.fontSize(fs).text(titulo, x, y, {
+    width: largura,
+    height: ALTURA_CABECALHO - 7,
+    ellipsis: true,
+  });
+}
+
+const ALTURA_CABECALHO = 22; // duas linhas: "PEÇA" / "01", "DESV." / "Máx."
+const ALTURA_LINHA = 16;
 
 export function desenharTabelaCotas(
   doc: PDFKit.PDFDocument,
@@ -94,26 +147,25 @@ export function desenharTabelaCotas(
   const larguras = cols.map((c) => (c.peso / total) * largura);
 
   const cabecalho = () => {
-    if (y + 30 > doc.page.height - rodape) {
+    if (y + ALTURA_CABECALHO + ALTURA_LINHA > doc.page.height - rodape) {
       doc.addPage();
       y = margem;
     }
-    doc.rect(x0, y, largura, 15).fill('#F0F0F0');
+    doc.rect(x0, y, largura, ALTURA_CABECALHO).fill('#F0F0F0');
     let x = x0;
     cols.forEach((c, i) => {
-      doc.lineWidth(0.5).strokeColor('#999999').rect(x, y, larguras[i], 15).stroke();
       doc
-        .font('Helvetica-Bold')
-        .fontSize(5.5)
-        .fillColor(PRETO)
-        .text(c.titulo, x + 2, y + 5, {
-          width: larguras[i] - 4,
-          lineBreak: false,
-          ellipsis: true,
-        });
+        .lineWidth(0.5)
+        .strokeColor('#999999')
+        .rect(x, y, larguras[i], ALTURA_CABECALHO)
+        .stroke();
+      // Aqui a quebra em duas linhas e desejada: o titulo fica inteiro dentro
+      // da celula em vez de sair cortado no meio da palavra.
+      doc.font('Helvetica-Bold').fillColor(PRETO);
+      tituloCabecalho(doc, c.titulo, x + 2, y + 5, larguras[i] - 4);
       x += larguras[i];
     });
-    y += 15;
+    y += ALTURA_CABECALHO;
   };
   cabecalho();
 
@@ -127,33 +179,32 @@ export function desenharTabelaCotas(
   }
 
   for (const cota of cotas) {
-    if (y + 16 > doc.page.height - rodape) {
+    if (y + ALTURA_LINHA > doc.page.height - rodape) {
       doc.addPage();
       y = margem;
       cabecalho();
     }
     let x = x0;
     cols.forEach((c, i) => {
-      doc.lineWidth(0.5).strokeColor('#CCCCCC').rect(x, y, larguras[i], 16).stroke();
+      doc
+        .lineWidth(0.5)
+        .strokeColor('#CCCCCC')
+        .rect(x, y, larguras[i], ALTURA_LINHA)
+        .stroke();
       const conformeCol = c.titulo === 'CONFORME';
       doc
         .font(conformeCol ? 'Helvetica-Bold' : 'Helvetica')
-        .fontSize(6.5)
         .fillColor(
           conformeCol
             ? cota.conforme === false
               ? VERMELHO
               : VERDE
             : PRETO,
-        )
-        .text(c.valor(cota), x + 2, y + 5, {
-          width: larguras[i] - 4,
-          lineBreak: false,
-          ellipsis: true,
-        });
+        );
+      celula(doc, c.valor(cota), x + 2, y + 5, larguras[i] - 4, 6.5);
       x += larguras[i];
     });
-    y += 16;
+    y += ALTURA_LINHA;
   }
 
   return y;

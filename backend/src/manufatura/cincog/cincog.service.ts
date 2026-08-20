@@ -5,10 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { acoesPendentes, planoAcaoNormalizado } from '../../comum/oitod';
+import { checklist5G, restauracoesPendentes } from '../../comum/cincog';
 import { numeroManufatura } from '../manufatura-utils';
 
-const includeOitoD = {
+const includeCincoG = {
   inspecao: {
     select: {
       id: true,
@@ -22,73 +22,51 @@ const includeOitoD = {
   aprovadoPor: { select: { id: true, nome: true } },
 };
 
-// Campos gravaveis do 8D, na ordem da planilha. Esta lista tem de cobrir TODOS
-// os campos do DTO: um campo que fica de fora e aceito pela API e descartado em
-// silencio - foi assim que a data de abertura deixou de salvar.
+// Campos gravaveis do 5G. Esta lista tem de cobrir TODOS os campos do DTO: um
+// campo que fica de fora e aceito pela API e descartado em silencio, porque o
+// ValidationPipe global roda com whitelist.
 const CAMPOS = [
-  // Cabecalho
+  'status',
+  'origem',
+  'turno',
   'produtoItem',
   'codigoDesenho',
-  'origem',
   'local',
   'processoOperacao',
   'equipamento',
-  'turno',
-  'qtdAfetada',
   'responsavel',
   'equipe',
   'departamento',
   'areaAplicacao',
-  'status',
-  // Passo 1
   'descricaoProblema',
-  'objetivos',
-  'perdaAtacada',
-  'perdaValorAno',
-  'descricao5W1H',
-  'situacaoAtual',
-  'estratificacao',
-  // Passo 2
-  'efeito',
-  'causas6M',
-  'causasPotenciais',
-  'causaRaiz',
-  // Passo 3
-  'planoAcao',
-  'padronizacao',
-  // Passo 4
-  'verificacaoResultados',
-  'verificacaoEficacia',
-  // Conclusao
-  'custosInvestimentos',
-  'beneficiosGanhos',
-  'resultadosIndices',
+  'avaliacoes',
+  'conclusao',
   'verificacaoGerente',
-  'aprovacaoProducao',
 ] as const;
 
-// Campos de data: chegam como "AAAA-MM-DD" e precisam virar Date.
 const CAMPOS_DATA = ['dataAbertura', 'dataTermino'] as const;
 
 @Injectable()
-export class OitoDService {
+export class CincoGService {
   constructor(private prisma: PrismaService) {}
 
   listar(status?: string) {
-    return this.prisma.oitoD.findMany({
+    return this.prisma.cincoG.findMany({
       where: { status: status ? (status as any) : undefined },
       orderBy: { dataAbertura: 'desc' },
-      include: includeOitoD,
+      include: includeCincoG,
     });
   }
 
   async detalhe(id: number) {
-    const d = await this.prisma.oitoD.findUnique({
+    const d = await this.prisma.cincoG.findUnique({
       where: { id },
-      include: includeOitoD,
+      include: includeCincoG,
     });
-    if (!d) throw new NotFoundException('8D não encontrado');
-    return d;
+    if (!d) throw new NotFoundException('5G não encontrado');
+    // As 9 avaliacoes sao fixas: o registro sempre volta com o checklist
+    // completo, mesmo que tenha sido gravado pela metade.
+    return { ...d, avaliacoes: checklist5G(d.avaliacoes) };
   }
 
   private dadosDoDto(dto: any) {
@@ -103,16 +81,14 @@ export class OitoDService {
     return data;
   }
 
-  // O 8D so fecha quando nao ha acao em aberto no plano: com acao pendente o
-  // registro nao pode ser marcado como concluido nem aprovado.
-  private exigirPlanoConcluido(atual: any, dto: any = {}) {
-    // O plano passa pelo normalizador para que um 8D do formato antigo, com
-    // acao ainda em aberto, tambem seja barrado.
-    const planoAcao = planoAcaoNormalizado(dto.planoAcao ?? atual.planoAcao);
-    const pendentes = acoesPendentes(planoAcao);
+  // O 5G so fecha quando nao ha restauracao em aberto: uma avaliacao marcada
+  // como "necessita restauracao" e sem baixa impede concluir e aprovar.
+  private exigirRestauracoesConcluidas(atual: any, dto: any = {}) {
+    const avaliacoes = checklist5G(dto.avaliacoes ?? atual.avaliacoes);
+    const pendentes = restauracoesPendentes(avaliacoes);
     if (pendentes.length) {
       throw new BadRequestException(
-        `Ainda há ${pendentes.length} ação(ões) em aberto no plano. Conclua ou cancele cada uma antes de fechar o 8D.`,
+        `Ainda há ${pendentes.length} restauração(ões) em aberto no checklist. Conclua ou cancele cada uma antes de fechar o 5G.`,
       );
     }
   }
@@ -122,15 +98,15 @@ export class OitoDService {
     const ano = data.getFullYear();
 
     for (let i = 0; i < 5; i++) {
-      const ultimo = await this.prisma.oitoD.findFirst({
+      const ultimo = await this.prisma.cincoG.findFirst({
         where: { ano },
         orderBy: { sequencial: 'desc' },
       });
       const sequencial = (ultimo?.sequencial ?? 0) + 1;
       try {
-        const criado = await this.prisma.oitoD.create({
+        const criado = await this.prisma.cincoG.create({
           data: {
-            numero: numeroManufatura('8D', sequencial, ano),
+            numero: numeroManufatura('5G', sequencial, ano),
             ano,
             sequencial,
             dataAbertura: data,
@@ -138,6 +114,8 @@ export class OitoDService {
             cnqId: dto.cnqId ?? null,
             criadoPorId: usuarioId,
             ...this.dadosDoDto(dto),
+            // O checklist ja nasce com as 9 avaliacoes da planilha.
+            avaliacoes: checklist5G(dto.avaliacoes),
           },
         });
         return this.detalhe(criado.id);
@@ -146,26 +124,24 @@ export class OitoDService {
       }
     }
     throw new ConflictException(
-      'Não foi possível numerar o 8D. Tente salvar novamente.',
+      'Não foi possível numerar o 5G. Tente salvar novamente.',
     );
   }
 
   async atualizar(id: number, dto: any) {
     const atual = await this.detalhe(id);
-    if (dto.status === 'CONCLUIDO') this.exigirPlanoConcluido(atual, dto);
-    await this.prisma.oitoD.update({
+    if (dto.status === 'CONCLUIDO') this.exigirRestauracoesConcluidas(atual, dto);
+    await this.prisma.cincoG.update({
       where: { id },
       data: this.dadosDoDto(dto),
     });
     return this.detalhe(id);
   }
 
-  // Quem aprova no sistema e a Qualidade; o campo de Producao continua no PDF
-  // para o documento sair igual ao formulario em papel.
   async aprovar(id: number, usuarioId: number) {
     const atual = await this.detalhe(id);
-    this.exigirPlanoConcluido(atual);
-    await this.prisma.oitoD.update({
+    this.exigirRestauracoesConcluidas(atual);
+    await this.prisma.cincoG.update({
       where: { id },
       data: {
         aprovadoPorId: usuarioId,
@@ -179,7 +155,7 @@ export class OitoDService {
 
   async remover(id: number) {
     await this.detalhe(id);
-    await this.prisma.oitoD.delete({ where: { id } });
+    await this.prisma.cincoG.delete({ where: { id } });
     return { ok: true };
   }
 }

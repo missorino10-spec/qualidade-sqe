@@ -69,7 +69,7 @@ const itensMenu: {
         label: 'Inspeção de Produção',
       },
       { key: '/manufatura/cnq', icon: <DollarOutlined />, label: 'CNQ' },
-      { key: '/manufatura/8d', icon: <FileProtectOutlined />, label: '8D' },
+      { key: '/manufatura/8d', icon: <FileProtectOutlined />, label: '8D / 5G' },
       {
         key: '/manufatura/alertas',
         icon: <NotificationOutlined />,
@@ -120,13 +120,24 @@ const rotasMenu = itensMenu
   .filter((k) => k.startsWith('/'))
   .sort((a, b) => b.length - a.length);
 
+// Telas que nao tem item proprio no menu e devem acender o item de outra rota.
+// O 5G e um documento a parte, mas mora no mesmo submenu "8D / 5G".
+const ALIAS_MENU: Record<string, string> = {
+  '/manufatura/5g': '/manufatura/8d',
+};
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { usuario, logout } = useAuth();
 
-  const selecionado =
-    location.pathname === '/'
+  const alias = Object.keys(ALIAS_MENU).find(
+    (r) => location.pathname === r || location.pathname.startsWith(`${r}/`),
+  );
+
+  const selecionado = alias
+    ? ALIAS_MENU[alias]
+    : location.pathname === '/'
       ? '/'
       : (rotasMenu.find(
           (r) =>

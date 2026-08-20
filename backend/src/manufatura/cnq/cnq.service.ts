@@ -11,6 +11,7 @@ const includeCnq = {
   tipoDefeito: { select: { id: true, nome: true } },
   criadoPor: { select: { id: true, nome: true } },
   oitoDs: { select: { id: true, numero: true, status: true } },
+  cincoGs: { select: { id: true, numero: true, status: true } },
 };
 
 @Injectable()
@@ -126,6 +127,10 @@ export class CnqService {
     if (c.oitoDs.length)
       throw new ConflictException(
         'Este CNQ tem um 8D vinculado. Exclua o 8D antes.',
+      );
+    if (c.cincoGs.length)
+      throw new ConflictException(
+        'Este CNQ tem um 5G vinculado. Exclua o 5G antes.',
       );
     await this.prisma.cnq.delete({ where: { id } });
     return { ok: true };

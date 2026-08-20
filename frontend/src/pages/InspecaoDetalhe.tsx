@@ -101,7 +101,7 @@ function Formulario({
       }
       style={{ marginBottom: 16 }}
     >
-      <Descriptions size="small" bordered column={3} style={{ marginBottom: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }} style={{ marginBottom: 12 }}>
         <Descriptions.Item label="Data">
           {dados.dataInspecao
             ? dayjs(dados.dataInspecao).format('DD/MM/YYYY')
@@ -193,7 +193,7 @@ export default function InspecaoDetalhe() {
           </Space>
         }
       >
-        <Descriptions size="small" bordered column={3}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }}>
           <Descriptions.Item label="Data">
             {data.dataInspecao
               ? dayjs(data.dataInspecao).format('DD/MM/YYYY')
@@ -253,7 +253,7 @@ export default function InspecaoDetalhe() {
 
       {data.visual && (
         <Formulario
-          titulo="Inspeção Visual"
+          titulo="Inspeção visual"
           doc="Doc. BDBR.QUA.FMR.06.07"
           dados={data.visual}
         >
@@ -273,7 +273,7 @@ export default function InspecaoDetalhe() {
 
       {data.lote && (
         <Formulario
-          titulo="Inspeção de Lote / Dimensional"
+          titulo="Inspeção de lote / dimensional"
           doc="Doc. BDBR.QUA.FMR.011.06"
           dados={data.lote}
         >

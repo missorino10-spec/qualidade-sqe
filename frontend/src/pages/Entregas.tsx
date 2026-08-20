@@ -54,7 +54,7 @@ export default function Entregas() {
       if (entrega.passivelInspecao) {
         avisarInspecao(entrega);
       } else {
-        message.success('Entrega registrada. Nesta entrega não há inspeção.');
+        message.success('Entrega registrada. Esta entrega não requer inspeção.');
       }
     },
     onError: () => message.error('Não foi possível registrar a entrega.'),
@@ -104,7 +104,7 @@ export default function Entregas() {
             setOpen(true);
           }}
         >
-          Registrar Entrega
+          Registrar entrega
         </Button>
       }
     >
@@ -112,6 +112,7 @@ export default function Entregas() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        scroll={{ x: 'max-content' }}
         columns={[
           {
             title: 'Data',
@@ -159,7 +160,7 @@ export default function Entregas() {
         ]}
       />
       <Modal
-        title="Registrar Entrega (Portaria)"
+        title="Registrar entrega (portaria)"
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}

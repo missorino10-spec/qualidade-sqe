@@ -602,6 +602,7 @@ export default function HomologacaoItemDetalhe() {
                   rowKey="tentativa"
                   size="small"
                   pagination={false}
+                  scroll={{ x: 'max-content' }}
                   dataSource={relatorios}
                   columns={[
                     { title: 'Rev.', dataIndex: 'revisao', width: 70 },
@@ -699,7 +700,7 @@ export default function HomologacaoItemDetalhe() {
                     </Space>
                   }
                 >
-                  <Descriptions column={2} bordered size="small">
+                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
                     <Descriptions.Item label="Data da inspeção">
                       {dataBR(recente.dataInspecao)}
                     </Descriptions.Item>
@@ -765,6 +766,7 @@ export default function HomologacaoItemDetalhe() {
                           rowKey="texto"
                           size="small"
                           pagination={false}
+                          scroll={{ x: 'max-content' }}
                           dataSource={g.itens}
                           columns={[
                             { title: 'Item', dataIndex: 'texto' },

@@ -82,10 +82,11 @@ export function BlocoDefeitos({
         rowKey={(_, i) => String(i)}
         dataSource={defeitos}
         pagination={false}
+        scroll={{ x: 'max-content' }}
         locale={{ emptyText: 'Nenhum defeito registrado' }}
         columns={[
           {
-            title: 'Descrição do Defeito',
+            title: 'Descrição do defeito',
             render: (_: any, r: any, i: number) => (
               <Select
                 size="small"
@@ -182,8 +183,8 @@ export function CamposRelatorio({
         <Col span={10}>
           <Form.Item
             name="maquinaId"
-            label="Centro de Trabalho (máquina)"
-            rules={[{ required: true, message: 'Selecione a máquina' }]}
+            label="Centro de trabalho (máquina)"
+            rules={[{ required: true, message: 'Selecione a máquina.' }]}
           >
             <Select
               showSearch
@@ -227,7 +228,7 @@ export function CamposRelatorio({
 
       <Row gutter={12}>
         <Col span={7}>
-          <Form.Item name="itemCodigo" label="Nº Item">
+          <Form.Item name="itemCodigo" label="Nº do item">
             <Input />
           </Form.Item>
         </Col>
@@ -329,14 +330,14 @@ export function CamposRelatorio({
       <Divider orientation="left" plain>
         Resultado
       </Divider>
-      <Form.Item name="observacoesFinais" label="Observações Finais">
+      <Form.Item name="observacoesFinais" label="Observações finais">
         <Input.TextArea rows={2} />
       </Form.Item>
 
       <Form.Item
         name="resultado"
         label="Resultado"
-        rules={[{ required: true, message: 'Informe o resultado' }]}
+        rules={[{ required: true, message: 'Informe o resultado.' }]}
       >
         <Radio.Group optionType="button" buttonStyle="solid">
           <Radio.Button value="APROVADO">Aprovado</Radio.Button>
@@ -351,7 +352,7 @@ export function CamposRelatorio({
         <Form.Item
           name="observacaoResultado"
           label="Observação (obrigatória)"
-          rules={[{ required: true, message: 'Descreva a ressalva' }]}
+          rules={[{ required: true, message: 'Descreva a ressalva.' }]}
         >
           <Input.TextArea rows={2} />
         </Form.Item>

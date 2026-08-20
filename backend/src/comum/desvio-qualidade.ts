@@ -50,11 +50,11 @@ export async function dadosAberturaDesvio(
     throw new BadRequestException('Informe a data de abertura do desvio.');
   if (quantidade == null && !prazoFim)
     throw new BadRequestException(
-      'Informe a quantidade de pecas, o prazo do desvio, ou os dois.',
+      'Informe a quantidade de peças, o prazo do desvio ou ambos.',
     );
   if (quantidade != null && quantidade <= 0)
     throw new BadRequestException(
-      'A quantidade de pecas do desvio deve ser maior que zero.',
+      'A quantidade de peças do desvio deve ser maior que zero.',
     );
 
   const documentos = await prisma.anexo.count({
@@ -83,9 +83,9 @@ export function dadosEncerramentoDesvio(
   dados: EncerrarDesvioDados,
 ) {
   if (!atual.desvioQualidade)
-    throw new BadRequestException('Nao ha desvio de qualidade aberto.');
+    throw new BadRequestException('Não há desvio de qualidade aberto.');
   if (atual.desvioEncerradoEm)
-    throw new BadRequestException('O desvio de qualidade ja foi encerrado.');
+    throw new BadRequestException('O desvio de qualidade já foi encerrado.');
   if (!dados.encerradoEm)
     throw new BadRequestException(
       'Informe a data de encerramento do desvio.',

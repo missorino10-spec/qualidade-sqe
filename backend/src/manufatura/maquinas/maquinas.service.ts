@@ -74,6 +74,55 @@ export class MaquinasService {
 
   // ------------------------------------------------- grade de producao diaria
 
+  // Resumo do mes, uma linha por maquina. E por onde a tela abre: primeiro se
+  // ve o mes inteiro de todas as maquinas e so depois se entra numa delas para
+  // apontar dia a dia. "Dias apontados" mostra o que ainda falta lancar.
+  async resumoMensal(ano: number, mes: number) {
+    const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+    const fim = new Date(Date.UTC(ano, mes, 0));
+    const [maquinas, dias] = await Promise.all([
+      this.prisma.maquina.findMany({
+        where: { ativa: true },
+        orderBy: [{ area: 'asc' }, { nome: 'asc' }],
+      }),
+      this.prisma.producaoDiaria.groupBy({
+        by: ['maquinaId'],
+        where: { data: { gte: inicio, lte: fim } },
+        _sum: { qtdProduzida: true, qtdDefeito: true },
+        _count: { _all: true },
+      }),
+    ]);
+    const porMaquina = new Map(dias.map((d) => [d.maquinaId, d]));
+
+    const linhas = maquinas.map((m) => {
+      const t = porMaquina.get(m.id);
+      const produzidas = t?._sum.qtdProduzida ?? 0;
+      const defeitos = t?._sum.qtdDefeito ?? 0;
+      return {
+        maquinaId: m.id,
+        codigo: m.codigo,
+        nome: m.nome,
+        area: m.area,
+        pecasProduzidas: produzidas,
+        pecasComDefeito: defeitos,
+        ppm: calcularPpm(produzidas, defeitos),
+        diasApontados: t?._count._all ?? 0,
+      };
+    });
+
+    const produzidas = linhas.reduce((s, l) => s + l.pecasProduzidas, 0);
+    const defeitos = linhas.reduce((s, l) => s + l.pecasComDefeito, 0);
+    return {
+      ano,
+      mes,
+      diasNoMes: fim.getUTCDate(),
+      linhas,
+      pecasProduzidas: produzidas,
+      pecasComDefeito: defeitos,
+      ppm: calcularPpm(produzidas, defeitos),
+    };
+  }
+
   // A grade e a mesma da planilha: uma linha por dia do mes, com quantidade
   // produzida e quantidade com defeito digitadas pela Qualidade.
   async producaoDoMes(maquinaId: number, ano: number, mes: number) {

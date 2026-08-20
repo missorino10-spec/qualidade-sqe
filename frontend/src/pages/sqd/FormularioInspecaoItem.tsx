@@ -123,6 +123,7 @@ export function ChecklistVisual({
             rowKey={(_, i) => `${gi}-${i}`}
             size="small"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             dataSource={grupo.itens}
             columns={[
               { title: 'Item', dataIndex: 'texto' },

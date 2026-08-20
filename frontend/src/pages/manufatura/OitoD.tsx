@@ -7,6 +7,7 @@ import {
   Input,
   Modal,
   Row,
+  Segmented,
   Select,
   Space,
   Table,
@@ -20,15 +21,41 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { dataBR } from '../../formatos';
 
-// Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
+// Analise de Problemas da Qualidade — Doc BDBR.QUA.FMR.007.01.
+// A tela reune os dois documentos do formulario: o 8D (analise completa) e o
+// Metodo 5G (reestabelecimento das condicoes normais do processo). Cada um tem
+// a sua numeracao propria — 8D0001/2026 e 5G0001/2026 — e o filtro no topo
+// escolhe qual dos dois esta sendo listado.
 // A abertura pode vir de uma inspecao reprovada ou de um lancamento de CNQ:
-// nesses casos a tela e chamada com ?inspecaoId= ou ?cnqId= e ja abre o modal.
-// Aqui so entra o cabecalho: os Passos 1 a 6 sao preenchidos no detalhe.
+// nesses casos a tela e chamada com ?inspecaoId= ou ?cnqId= (e ?tipo=5G quando
+// for o caso) e ja abre o modal. Aqui so entra o cabecalho: o restante do
+// documento e preenchido no detalhe.
+
+type TipoDoc = '8D' | '5G';
+
+// Cada tipo tem a sua rota de API e a sua rota de tela.
+const DOCS: Record<
+  TipoDoc,
+  { rota: string; titulo: string; novo: string; okText: string }
+> = {
+  '8D': {
+    rota: '8d',
+    titulo: 'Análise de Problemas da Qualidade (8D)',
+    novo: 'Novo 8D',
+    okText: 'Abrir 8D',
+  },
+  '5G': {
+    rota: '5g',
+    titulo: 'Método 5G — Reestabelecimento das condições normais do processo',
+    novo: 'Novo 5G',
+    okText: 'Abrir 5G',
+  },
+};
 
 export const ORIGENS_8D = [
   { value: 'RELATORIO_RO', label: 'Relatório R.O' },
   { value: 'PRODUCAO', label: 'Produção' },
-  { value: 'INSPECAO_EXTRA', label: 'Inspeção Extra' },
+  { value: 'INSPECAO_EXTRA', label: 'Inspeção extra' },
   { value: 'SETUP', label: 'Setup' },
 ];
 
@@ -53,16 +80,19 @@ export default function OitoD() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [tipo, setTipo] = useState<TipoDoc>('8D');
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
 
+  const doc = DOCS[tipo];
   const inspecaoId = params.get('inspecaoId');
   const cnqId = params.get('cnqId');
+  const tipoParam = params.get('tipo');
 
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['manufatura-8d'],
-    queryFn: async () => (await api.get('/manufatura/8d')).data,
+    queryKey: ['manufatura-doc', tipo],
+    queryFn: async () => (await api.get(`/manufatura/${doc.rota}`)).data,
   });
 
   function abrir(origemVinculo?: { inspecaoId?: number; cnqId?: number }) {
@@ -76,28 +106,32 @@ export default function OitoD() {
     setOpen(true);
   }
 
-  // Abertura vinda da inspecao ou do CNQ: ja chega com o vinculo preenchido.
+  // Abertura vinda da inspecao ou do CNQ: ja chega com o vinculo preenchido e
+  // com o tipo de documento escolhido la na origem.
   useEffect(() => {
     if (!inspecaoId && !cnqId) return;
+    if (tipoParam === '5G' || tipoParam === '8D') setTipo(tipoParam);
     abrir({
       inspecaoId: inspecaoId ? Number(inspecaoId) : undefined,
       cnqId: cnqId ? Number(cnqId) : undefined,
     });
     setParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inspecaoId, cnqId]);
+  }, [inspecaoId, cnqId, tipoParam]);
 
   async function salvar() {
     const v = await form.validateFields();
     setSalvando(true);
     try {
-      const res = await api.post('/manufatura/8d', v);
-      message.success(`8D ${res.data.numero} aberto.`);
-      qc.invalidateQueries({ queryKey: ['manufatura-8d'] });
+      const res = await api.post(`/manufatura/${doc.rota}`, v);
+      message.success(`${tipo} ${res.data.numero} aberto.`);
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
       setOpen(false);
-      navigate(`/manufatura/8d/${res.data.id}`);
+      navigate(`/manufatura/${doc.rota}/${res.data.id}`);
     } catch (e: any) {
-      message.error(e?.response?.data?.message ?? 'Não foi possível abrir o 8D.');
+      message.error(
+        e?.response?.data?.message ?? `Não foi possível abrir o ${tipo}.`,
+      );
     } finally {
       setSalvando(false);
     }
@@ -106,11 +140,21 @@ export default function OitoD() {
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card
-        title="Análise de Problemas da Qualidade (8D)"
+        title={doc.titulo}
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-            Novo 8D
-          </Button>
+          <Space wrap>
+            <Segmented
+              value={tipo}
+              onChange={(v) => setTipo(v as TipoDoc)}
+              options={[
+                { value: '8D', label: '8D' },
+                { value: '5G', label: '5G' },
+              ]}
+            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
+              {doc.novo}
+            </Button>
+          </Space>
         }
       >
         <Table
@@ -120,7 +164,7 @@ export default function OitoD() {
           dataSource={data}
           scroll={{ x: 1100 }}
           onRow={(r) => ({
-            onClick: () => navigate(`/manufatura/8d/${r.id}`),
+            onClick: () => navigate(`/manufatura/${doc.rota}/${r.id}`),
             style: { cursor: 'pointer' },
           })}
           columns={[
@@ -159,9 +203,9 @@ export default function OitoD() {
 
       <Modal
         open={open}
-        title="Nova análise de problemas — Doc. BDBR.QUA.FMR.007.01"
+        title={`Novo ${tipo} — Doc. BDBR.QUA.FMR.007.01`}
         width={760}
-        okText="Abrir 8D"
+        okText={doc.okText}
         cancelText="Cancelar"
         confirmLoading={salvando}
         onOk={salvar}
@@ -195,7 +239,7 @@ export default function OitoD() {
               <Form.Item
                 name="origem"
                 label="Origem"
-                rules={[{ required: true, message: 'Informe a origem' }]}
+                rules={[{ required: true, message: 'Informe a origem.' }]}
               >
                 <Select options={ORIGENS_8D} />
               </Form.Item>

@@ -1,3 +1,4 @@
+import { fraseFaltas } from '../../comum/pendencias';
 import {
   BadRequestException,
   ConflictException,
@@ -382,7 +383,7 @@ export class AuditoriasService {
     const faltas = await this.pendenciasFinalizacao(atual);
     if (faltas.length) {
       throw new BadRequestException(
-        `Ainda falta ${faltas.join(', ')} para encerrar a auditoria.`,
+        `${fraseFaltas(faltas)} para encerrar a auditoria.`,
       );
     }
 

@@ -2,12 +2,9 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import {
-  CINCO_G,
   ESPINHAS_6M,
   EVID_8D,
-  NOTA_5G,
   causasPotenciaisNormalizadas,
-  checklist5G,
   labelSituacaoAcao,
   planoAcaoNormalizado,
 } from '../../comum/oitod';
@@ -76,10 +73,6 @@ function moeda(v: any): string {
   const n = Number(v);
   if (!Number.isFinite(n) || n === 0) return '';
   return `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-}
-
-function lista(v: unknown): any[] {
-  return Array.isArray(v) ? v : [];
 }
 
 // As fotos chegam ja baixadas do Storage, separadas pelo passo a que pertencem
@@ -549,99 +542,7 @@ export function gerarPdfOitoD(
 
   // ------------------------------------------------------------- passo 2
   y += 5;
-  faixa(
-    'PASSO 2 — REESTABELECER AS CONDIÇÕES NORMAIS DO PROCESSO (MÉTODO 5G)',
-  );
-  const legenda5G = CINCO_G.map(
-    (g) => `${g.sigla} (${g.tema}): ${g.acao}.`,
-  ).join('  ');
-  espaco(alturaTexto(legenda5G, W - 10, 6.5) + 10);
-  doc
-    .font('Helvetica-Oblique')
-    .fontSize(6.5)
-    .fillColor(CINZA)
-    .text(legenda5G, X0 + 5, y + 3, { width: W - 10 });
-  y += alturaTexto(legenda5G, W - 10, 6.5) + 7;
-
-  const linhas5G = checklist5G(d8.metodo5G);
-  // As onze colunas da aba "MÉTODO 5G" nao cabem na largura do A4 em pe: o
-  // quadro e partido em dois - a avaliacao e, embaixo, a restauracao - com o
-  // mesmo numero de linha ligando os dois.
-  const dados5G = linhas5G.map((l: any, i: number) => ({
-    ...l,
-    _n: String(i + 1),
-    prazo: fmtData(l.prazo) || txt(l.prazo),
-    _status: labelSituacaoAcao[l.status] ?? txt(l.status),
-  }));
-
-  tabela(
-    [
-      { titulo: 'Nº', w: 18, campo: '_n' },
-      { titulo: 'Avaliação', w: 120, campo: 'avaliacao' },
-      { titulo: 'Análise 4M', w: 50, campo: 'analise4M' },
-      { titulo: 'Objetivo', w: 120, campo: 'objetivo' },
-      { titulo: 'Especificado', w: 100, campo: 'especificado' },
-      { titulo: 'Verificado', w: 80, campo: 'verificado' },
-      {
-        titulo: 'Necessita restauração?',
-        w: W - 18 - 120 - 50 - 120 - 100 - 80,
-        campo: 'necessitaRestauracao',
-      },
-    ],
-    dados5G,
-    'Checklist 5G não preenchido.',
-  );
-
-  y += 4;
-  subtitulo('Restauração das condições normais');
-  tabela(
-    [
-      { titulo: 'Nº', w: 18, campo: '_n' },
-      { titulo: 'Como fazer a restauração?', w: 231, campo: 'comoRestaurar' },
-      { titulo: 'Responsável', w: 90, campo: 'responsavel' },
-      { titulo: 'Prazo', w: 60, campo: 'prazo' },
-      { titulo: 'Status', w: 78, campo: '_status' },
-      {
-        titulo: 'Solução foi eficaz?',
-        w: W - 18 - 231 - 90 - 60 - 78,
-        campo: 'eficaz',
-      },
-    ],
-    dados5G,
-    '',
-  );
-  espaco(14);
-  doc
-    .font('Helvetica-Oblique')
-    .fontSize(6)
-    .fillColor(CINZA)
-    .text(`* ${NOTA_5G}`, X0 + 3, y + 3, { width: W - 6 });
-  y += alturaTexto(`* ${NOTA_5G}`, W - 6, 6) + 6;
-  quadroFotos('Evidências do processo investigado (5G)', fotos.metodo5G);
-
-  // ------------------------------------------------------------- passo 3
-  y += 4;
-  faixa('PASSO 3 — PLANEJAR AS ATIVIDADES (CRONOGRAMA E RESPONSABILIDADES)');
-  tabela(
-    [
-      { titulo: 'Atividade', w: 236, campo: 'atividade' },
-      { titulo: 'Responsável', w: 120, campo: 'responsavel' },
-      { titulo: 'Início', w: 60, campo: '_inicio' },
-      { titulo: 'Fim', w: 60, campo: '_fim' },
-      { titulo: 'Status', w: W - 236 - 120 - 120, campo: '_status' },
-    ],
-    lista(d8.cronograma).map((l: any) => ({
-      ...l,
-      _inicio: fmtData(l.inicio) || txt(l.inicio),
-      _fim: fmtData(l.fim) || txt(l.fim),
-      _status: labelSituacaoAcao[l.status] ?? txt(l.status),
-    })),
-    'Nenhuma atividade planejada.',
-  );
-
-  // ------------------------------------------------------------- passo 4
-  y += 5;
-  faixa('PASSO 4 — ANÁLISE DE CAUSA RAIZ (6M + 1D)');
+  faixa('PASSO 2 — ANÁLISE DE CAUSA RAIZ (6M + 1D)');
   espinhaDePeixe(txt(d8.efeito), d8.causas6M ?? {});
 
   y += 4;
@@ -663,11 +564,11 @@ export function gerarPdfOitoD(
   tabela(
     [
       { titulo: 'Causa potencial', w: 125, campo: 'causa' },
-      { titulo: 'Por quê 1', w: 80, campo: 'porque1' },
-      { titulo: 'Por quê 2', w: 80, campo: 'porque2' },
-      { titulo: 'Por quê 3', w: 80, campo: 'porque3' },
-      { titulo: 'Por quê 4', w: 80, campo: 'porque4' },
-      { titulo: 'Por quê 5', w: W - 125 - 80 * 4, campo: 'porque5' },
+      { titulo: 'Porquê 1', w: 80, campo: 'porque1' },
+      { titulo: 'Porquê 2', w: 80, campo: 'porque2' },
+      { titulo: 'Porquê 3', w: 80, campo: 'porque3' },
+      { titulo: 'Porquê 4', w: 80, campo: 'porque4' },
+      { titulo: 'Porquê 5', w: W - 125 - 80 * 4, campo: 'porque5' },
     ],
     causasPotenciaisNormalizadas(d8.causasPotenciais, d8.porques, d8.causaRaiz),
     'Nenhuma causa potencial registrada.',
@@ -676,9 +577,9 @@ export function gerarPdfOitoD(
   y += 4;
   bloco('Causa raiz confirmada', txt(d8.causaRaiz), 34);
 
-  // ------------------------------------------------------------- passo 5
+  // ------------------------------------------------------------- passo 3
   y += 5;
-  faixa('PASSO 5 — PLANO DE AÇÃO');
+  faixa('PASSO 3 — PLANO DE AÇÃO');
   tabela(
     [
       {
@@ -717,9 +618,9 @@ export function gerarPdfOitoD(
   y += 4;
   bloco('Padronização (documentos e treinamentos)', padronizacao, 30);
 
-  // ------------------------------------------------------------- passo 6
+  // ------------------------------------------------------------- passo 4
   y += 5;
-  faixa('PASSO 6 — VERIFICAÇÃO DOS RESULTADOS');
+  faixa('PASSO 4 — VERIFICAÇÃO DOS RESULTADOS');
   espaco(14);
   doc
     .font('Helvetica-Oblique')

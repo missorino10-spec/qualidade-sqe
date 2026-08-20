@@ -1,3 +1,4 @@
+import { fraseFaltas } from '../../comum/pendencias';
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -452,7 +453,7 @@ export function gerarPdfRegistroHomologacao(h: any): PDFKit.PDFDocument {
     h.statusHomologacao === 'FINALIZADO'
       ? `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`
       : pendencias.length
-        ? `Ainda falta ${pendencias.join(', ')}.`
+        ? `${fraseFaltas(pendencias)}.`
         : 'Nenhuma pendência: o ciclo pode ser encerrado.',
     30,
   );

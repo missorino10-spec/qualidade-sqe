@@ -51,6 +51,8 @@ model Usuario {
   cnqs                   Cnq[]                  @relation("CnqCriadoPor")
   oitoDsCriados          OitoD[]                @relation("OitoDCriadoPor")
   oitoDsAprovados        OitoD[]                @relation("OitoDAprovadoPor")
+  cincoGsCriados         CincoG[]               @relation("CincoGCriadoPor")
+  cincoGsAprovados       CincoG[]               @relation("CincoGAprovadoPor")
   alertasCriados         AlertaQualidade[]      @relation("AlertaCriadoPor")
   alertasEncerrados      AlertaQualidade[]      @relation("AlertaEncerradoPor")
   renovacoesAlerta       RenovacaoAlerta[]      @relation("RenovacaoAlertaCriadoPor")
@@ -448,6 +450,13 @@ model Rnc {
   valorUnitario   Float?
   valorTotal      Float? // = quantidadePecas * valorUnitario
 
+  // Envio do documento ao fornecedor. E o que fecha o lead time INTERNO da
+  // Qualidade: da abertura da RNC ate o dia em que o documento saiu para o
+  // fornecedor. A data e informada pelo usuario (retroativa e permitida) e o
+  // tempo em dias e calculado na leitura, nunca gravado.
+  enviadaFornecedor   Boolean   @default(false)
+  dataEnvioFornecedor DateTime?
+
   // Plano de acao
   disposicao            String? // texto livre
   houveRetorno          Boolean?
@@ -603,6 +612,7 @@ model InspecaoManufatura {
 
   relatorios RelatorioDimensional[]
   oitoDs     OitoD[]
+  cincoGs    CincoG[]
 
   @@index([tipo, dataInspecao])
 }
@@ -706,7 +716,8 @@ model Cnq {
   criadoPor   Usuario? @relation("CnqCriadoPor", fields: [criadoPorId], references: [id])
   createdAt   DateTime @default(now())
 
-  oitoDs OitoD[]
+  oitoDs  OitoD[]
+  cincoGs CincoG[]
 
   @@unique([ano, sequencial])
   @@index([data])
@@ -776,16 +787,13 @@ model OitoD {
   situacaoAtual  String?
   estratificacao String?
 
-  // Passo 2 - Reestabelecer as condicoes normais pelo Metodo 5G
-  // [{ avaliacao, analise4M, objetivo, especificado, verificado, necessitaRestauracao,
-  //    comoRestaurar, responsavel, prazo, status, eficaz }]
-  metodo5G Json?
-
-  // Passo 3 - Planejar as atividades (cronograma e responsabilidades)
-  // [{ atividade, responsavel, inicio, fim, status }]
+  // HISTORICO: o Metodo 5G e o cronograma sairam do 8D quando o 5G virou
+  // documento proprio (model CincoG). As colunas continuam no banco para nao
+  // perder o que ja foi gravado, mas nao sao mais preenchidas pela tela.
+  metodo5G   Json?
   cronograma Json?
 
-  // Passo 4 - Analise de causa raiz (6M + 1D)
+  // Passo 2 - Analise de causa raiz (6M + 1D)
   efeito   String?
   // Espinha de peixe: { medicao, maquina, meioAmbiente, metodo, material, maoDeObra, projeto }
   causas6M Json?
@@ -798,7 +806,7 @@ model OitoD {
   // Causa raiz confirmada
   causaRaiz String?
 
-  // Passo 5 - Plano de acao
+  // Passo 3 - Plano de acao
   // [{ oQue, porQue, como, quem, quando, custo, situacao }]
   planoAcao Json?
 
@@ -806,7 +814,7 @@ model OitoD {
   // { documentos, treinamentos, observacoes }
   padronizacao Json?
 
-  // Passo 6 - Verificacao dos resultados (monitorar por pelo menos 3 meses)
+  // Passo 4 - Verificacao dos resultados (monitorar por pelo menos 3 meses)
   verificacaoResultados String?
   // Bloco estruturado de eficacia do formulario antigo
   // { criterio, metodo, amostra, resultadoEsperado, resultadoObtido, data, responsavel, eficaz }
@@ -831,6 +839,62 @@ model OitoD {
   createdAt   DateTime @default(now())
 
   @@unique([ano, sequencial])
+}
+
+// METODO 5G - espelha a aba "MÉTODO 5G" da planilha "Analise de Problemas da
+// Qualidade - Padrao". E um documento proprio, numerado 5G0001/2026: nem todo
+// problema vira 8D, muitos sao resolvidos so com a ida ao posto de trabalho.
+// O corpo e o checklist fixo das 9 avaliacoes - o inspetor nao cria nem apaga
+// linha, so preenche as colunas de cada avaliacao, como no papel.
+model CincoG {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // 5G0001/2026
+  ano        Int
+  sequencial Int
+
+  // Opcional: nasce de uma inspecao com desvio OU de um lancamento de CNQ
+  inspecaoId Int?
+  inspecao   InspecaoManufatura? @relation(fields: [inspecaoId], references: [id])
+  cnqId      Int?
+  cnq        Cnq?                @relation(fields: [cnqId], references: [id])
+
+  // Cabecalho (mesmos campos do 8D, para o documento ser reconhecivel)
+  dataAbertura     DateTime        @default(now())
+  status           StatusOitoD     @default(AGUARDANDO)
+  origem           OrigemOitoD     @default(PRODUCAO)
+  turno            TurnoManufatura @default(COMERCIAL)
+  produtoItem      String?
+  codigoDesenho    String?
+  local            String?
+  processoOperacao String?
+  equipamento      String?
+  responsavel      String?
+  equipe           String?
+  departamento     String?
+  areaAplicacao    String?
+
+  descricaoProblema String?
+
+  // Checklist das 9 avaliacoes da aba "MÉTODO 5G"
+  // [{ avaliacao, analise4M, objetivo, especificado, verificado, necessitaRestauracao,
+  //    comoRestaurar, responsavel, prazo, status, eficaz }]
+  avaliacoes Json?
+
+  // Fechamento
+  conclusao          String?
+  dataTermino        DateTime?
+  verificacaoGerente String?
+
+  aprovadoPorId Int?
+  aprovadoPor   Usuario?  @relation("CincoGAprovadoPor", fields: [aprovadoPorId], references: [id])
+  aprovadoEm    DateTime?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("CincoGCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([ano, sequencial])
+  @@index([dataAbertura])
 }
 
 // ALERTA DA QUALIDADE - espelha o .docx "Alerta da Qualidade - Rebarba

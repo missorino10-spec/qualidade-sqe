@@ -29,7 +29,7 @@ function simNao(v?: boolean | null): string {
 // As fotos chegam como bytes (e nao como caminho de arquivo) porque ficam
 // guardadas no Supabase Storage, nao no disco do servidor.
 export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument {
-  const doc = new PDFDocument({ size: 'A4', margin: M });
+  const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
 
   // ---------- Celula bilingue com borda ----------
   const cell = (
@@ -107,19 +107,22 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   // Caixa de codigo (topo direito)
   const cbX = 400;
   const cbW = X1 - cbX;
-  doc.lineWidth(0.8).strokeColor(PRETO).rect(cbX, 34, cbW, 46).stroke();
+  // 17 pt por linha: com 15 o valor encostava na divisoria da linha seguinte e
+  // saia riscado no PDF.
+  const cbLinhaH = 17;
+  doc.lineWidth(0.8).strokeColor(PRETO).rect(cbX, 34, cbW, cbLinhaH * 3).stroke();
   const codLinha = (i: number, pt: string, en: string, v: string) => {
-    const yy = 36 + i * 15;
-    if (i > 0) doc.moveTo(cbX, 34 + i * 15).lineTo(X1, 34 + i * 15).stroke();
+    const topo = 34 + i * cbLinhaH;
+    if (i > 0) doc.lineWidth(0.5).moveTo(cbX, topo).lineTo(X1, topo).stroke();
     doc
       .font('Helvetica-Bold')
-      .fontSize(6)
+      .fontSize(5.5)
       .fillColor(PRETO)
-      .text(`${pt} / ${en}:`, cbX + 3, yy + 1, { width: cbW - 6, lineBreak: false });
+      .text(`${pt} / ${en}:`, cbX + 3, topo + 2, { width: cbW - 6, lineBreak: false });
     doc
       .font('Helvetica')
       .fontSize(7)
-      .text(v, cbX + 3, yy + 7, { width: cbW - 6, lineBreak: false });
+      .text(v, cbX + 3, topo + 8.5, { width: cbW - 6, lineBreak: false });
   };
   codLinha(0, 'Código', 'Code', 'BDBR.QUA.FMR.003.05');
   codLinha(1, 'Data Rev.', 'Rev. Date', '03/12/2025');
@@ -140,38 +143,42 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   let y = 92;
 
   // ---------- Linha 1: identificacao ----------
+  // As celulas tem 44 pt (e nao 34) para o valor caber em duas linhas: nomes de
+  // fornecedor e numeros de PO duplos estavam sendo cortados com reticencias, o
+  // que e inaceitavel num documento oficial.
+  const ALTURA_ID = 44;
   const r1 = [
-    { w: 70, pt: 'RNC Nº', en: 'NCR Nº', v: rnc.numero, orange: true },
-    { w: 78, pt: 'Data de Abertura', en: 'Opening Date', v: fmtData(rnc.dataAbertura) },
-    { w: 95, pt: 'Responsável', en: 'Responsible', v: rnc.solicitante ?? 'Qualidade' },
-    { w: 82, pt: 'Setor', en: 'Department', v: 'Qualidade / Quality' },
-    { w: 110, pt: 'Fornecedor', en: 'Vendor', v: rnc.fornecedor?.nome ?? '' },
+    { w: 76, pt: 'RNC Nº', en: 'NCR Nº', v: rnc.numero, orange: true },
+    { w: 74, pt: 'Data de Abertura', en: 'Opening Date', v: fmtData(rnc.dataAbertura) },
+    { w: 90, pt: 'Responsável', en: 'Responsible', v: rnc.solicitante ?? 'Qualidade' },
+    { w: 80, pt: 'Setor', en: 'Department', v: 'Qualidade / Quality' },
+    { w: 115, pt: 'Fornecedor', en: 'Vendor', v: rnc.fornecedor?.nome ?? '' },
     { w: 80, pt: 'Código', en: 'Code', v: rnc.fornecedor?.codigo ?? '' },
   ];
   let x = X0;
   for (const c of r1) {
-    cell(x, y, c.w, 34, c.pt, c.en, c.v ?? '', {
+    cell(x, y, c.w, ALTURA_ID, c.pt, c.en, c.v ?? '', {
       valorColor: c.orange ? LARANJA : PRETO,
-      valorSize: c.orange ? 9.5 : 8.5,
+      valorSize: c.orange ? 9 : 8,
     });
     x += c.w;
   }
-  y += 34;
+  y += ALTURA_ID;
 
   // ---------- Linha 2: item ----------
   const r2 = [
     { w: 80, pt: 'Código do Item', en: 'Item Code', v: rnc.item?.codigo ?? '' },
     { w: 80, pt: 'Quantidade do Lote', en: 'Batch Quantity', v: String(rnc.quantidadeLote ?? '') },
     { w: 70, pt: 'NF', en: 'Invoice', v: rnc.notaFiscal ?? '' },
-    { w: 70, pt: 'PO', en: 'PO', v: rnc.po ?? '' },
-    { w: 215, pt: 'Descrição Item', en: 'Item Description', v: rnc.item?.descricao ?? '' },
+    { w: 75, pt: 'PO', en: 'PO', v: rnc.po ?? '' },
+    { w: 210, pt: 'Descrição Item', en: 'Item Description', v: rnc.item?.descricao ?? '' },
   ];
   x = X0;
   for (const c of r2) {
-    cell(x, y, c.w, 34, c.pt, c.en, c.v);
+    cell(x, y, c.w, ALTURA_ID, c.pt, c.en, c.v, { valorSize: 8 });
     x += c.w;
   }
-  y += 34;
+  y += ALTURA_ID;
 
   // ---------- Linha 3: qtd afetada / reincidencia (destaque laranja) ----------
   cell(X0, y, 257, 30, 'Quantidade Afetada', 'Quantity Affected', String(rnc.quantidadePecas ?? ''), {
@@ -242,20 +249,6 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       });
   }
 
-  // ---------- Rodape ----------
-  const rodape = () =>
-    doc
-      .font('Helvetica')
-      .fontSize(7)
-      .fillColor(CINZA)
-      .text(
-        `Big Dutchman Brasil — Sistema de Qualidade · Emitido em ${new Date().toLocaleString('pt-BR')}`,
-        X0,
-        doc.page.height - 45,
-        { width: W, align: 'center' },
-      );
-  rodape();
-
   // ---------- Anexo: cotas reprovadas ----------
   // O formulario oficial e de uma pagina so, entao a tabela do dimensional
   // entra como anexo. As cotas vem da inspecao vinculada (leitura ao vivo),
@@ -288,7 +281,25 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       margem: M,
       rodape: 60,
     });
-    rodape();
+  }
+
+  // ---------- Rodape ----------
+  // O rodape fica abaixo da margem inferior: sem zerar a margem, o pdfkit
+  // entende que o texto "transbordou" e cria uma pagina em branco extra.
+  const paginas = doc.bufferedPageRange();
+  for (let i = 0; i < paginas.count; i++) {
+    doc.switchToPage(paginas.start + i);
+    doc.page.margins.bottom = 0;
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .fillColor(CINZA)
+      .text(
+        `Big Dutchman Brasil — Sistema de Qualidade · RNC ${rnc.numero ?? ''} · Página ${i + 1} de ${paginas.count}`,
+        X0,
+        doc.page.height - 40,
+        { width: W, align: 'center' },
+      );
   }
 
   return doc;

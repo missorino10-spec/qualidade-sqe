@@ -43,11 +43,11 @@ export default function Itens() {
       return api.post('/itens', values);
     },
     onSuccess: () => {
-      message.success('Item salvo');
+      message.success('Item salvo.');
       qc.invalidateQueries({ queryKey: ['itens'] });
       fechar();
     },
-    onError: () => message.error('Erro ao salvar'),
+    onError: () => message.error('Não foi possível salvar o item.'),
   });
 
   function abrir(i?: Item) {
@@ -68,7 +68,7 @@ export default function Itens() {
       title="Itens / Peças"
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-          Novo Item
+          Novo item
         </Button>
       }
     >
@@ -76,6 +76,7 @@ export default function Itens() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        scroll={{ x: 'max-content' }}
         columns={[
           { title: 'Código', dataIndex: 'codigo', width: 130 },
           { title: 'Descrição', dataIndex: 'descricao' },
@@ -96,7 +97,7 @@ export default function Itens() {
         ]}
       />
       <Modal
-        title={editando ? 'Editar Item' : 'Novo Item'}
+        title={editando ? 'Editar item' : 'Novo item'}
         open={open}
         onCancel={fechar}
         onOk={() => form.submit()}

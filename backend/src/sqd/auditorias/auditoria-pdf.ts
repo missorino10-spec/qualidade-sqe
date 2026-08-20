@@ -1,3 +1,4 @@
+import { fraseFaltas } from '../../comum/pendencias';
 import PDFDocument from 'pdfkit';
 import {
   CINZA,
@@ -297,7 +298,7 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
     a.statusAuditoria === 'FINALIZADO'
       ? `Auditoria encerrada em ${fmtData(a.dataFinalizacao)}.`
       : pendencias.length
-        ? `Ainda falta ${pendencias.join(', ')}.`
+        ? `${fraseFaltas(pendencias)}.`
         : 'Nenhuma pendência: o ciclo pode ser encerrado.',
     30,
   );
@@ -488,33 +489,42 @@ export function gerarPdfChecklistAuditoria(
   // ------------------------------------------------ resumo por bloco
   t.estado.y += 8;
   t.faixa('RESUMO POR BLOCO');
+  // Colunas de numero enxutas para sobrar largura ao nome do bloco: com as
+  // larguras antigas "4.5 Materiais e logistica (recebimento/armazenagem/
+  // expedicao)" quebrava e a segunda linha caia por cima do bloco seguinte.
   const colResumo = [
-    { titulo: 'BLOCO', w: W - 60 - 70 - 80 - 100 },
-    { titulo: 'PESO', w: 60 },
-    { titulo: 'SCORE DO BLOCO', w: 70 },
-    { titulo: 'PONTOS PONDERADOS', w: 80 },
-    { titulo: 'CLASSIFICAÇÃO', w: 100 },
+    { titulo: 'BLOCO', w: W - 40 - 62 - 72 - 76 },
+    { titulo: 'PESO', w: 40 },
+    { titulo: 'SCORE DO BLOCO', w: 62 },
+    { titulo: 'PONTOS PONDERADOS', w: 72 },
+    { titulo: 'CLASSIFICAÇÃO', w: 76 },
   ];
+  // 24 pt cabem as duas linhas de "SCORE DO BLOCO" e "PONTOS PONDERADOS": com
+  // 20 pt so cabia uma linha e os titulos saiam como "SCORE DO..." e
+  // "PONTOS...".
+  const ALTURA_CAB_RESUMO = 24;
   const cabecalhoResumo = () => {
-    t.espaco(15);
+    t.espaco(ALTURA_CAB_RESUMO + 15);
     let x = X0;
     for (const c of colResumo) {
       doc
         .lineWidth(0.5)
         .strokeColor(PRETO)
-        .rect(x, t.estado.y, c.w, 14)
+        .rect(x, t.estado.y, c.w, ALTURA_CAB_RESUMO)
         .stroke();
+      // Quebra em duas linhas dentro da celula (nao para fora dela).
       doc
         .font('Helvetica-Bold')
-        .fontSize(6.5)
+        .fontSize(6)
         .fillColor(CINZA)
-        .text(c.titulo, x + 3, t.estado.y + 4, {
+        .text(c.titulo, x + 3, t.estado.y + 5, {
           width: c.w - 6,
-          lineBreak: false,
+          height: ALTURA_CAB_RESUMO - 7,
+          ellipsis: true,
         });
       x += c.w;
     }
-    t.estado.y += 14;
+    t.estado.y += ALTURA_CAB_RESUMO;
   };
   cabecalhoResumo();
 
@@ -546,6 +556,7 @@ export function gerarPdfChecklistAuditoria(
         .fillColor(i === 4 && !naoAvaliado ? corClassificacao(calc.classificacao) : PRETO)
         .text(valores[i], x + 3, t.estado.y + 4, {
           width: c.w - 6,
+          height: 11,
           lineBreak: false,
           ellipsis: true,
         });

@@ -69,7 +69,7 @@ export default function Fornecedores() {
       title="Fornecedores"
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-          Novo Fornecedor
+          Novo fornecedor
         </Button>
       }
     >
@@ -77,6 +77,7 @@ export default function Fornecedores() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        scroll={{ x: 'max-content' }}
         columns={[
           { title: 'Código', dataIndex: 'codigo', width: 110 },
           { title: 'Nome', dataIndex: 'nome' },
@@ -127,7 +128,7 @@ export default function Fornecedores() {
         ]}
       />
       <Modal
-        title={editando ? 'Editar Fornecedor' : 'Novo Fornecedor'}
+        title={editando ? 'Editar fornecedor' : 'Novo fornecedor'}
         open={open}
         onCancel={fechar}
         onOk={() => form.submit()}

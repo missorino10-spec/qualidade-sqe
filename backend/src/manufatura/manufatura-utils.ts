@@ -2,10 +2,10 @@
 // A semana e o trimestre fiscal sao os mesmos do SQE (regra da empresa),
 // entao reaproveitamos de sqe-utils em vez de duplicar a regra.
 
-export type PrefixoManufatura = 'SET' | 'PROD' | 'CNQ' | '8D';
+export type PrefixoManufatura = 'SET' | 'PROD' | 'CNQ' | '8D' | '5G';
 
 // Numeracao dos documentos da manufatura, no mesmo padrao do SQE:
-// SET0001/2026, PROD0001/2026, CNQ0001/2026, 8D0001/2026.
+// SET0001/2026, PROD0001/2026, CNQ0001/2026, 8D0001/2026, 5G0001/2026.
 export function numeroManufatura(
   prefixo: PrefixoManufatura,
   sequencial: number,

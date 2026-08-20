@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Col,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -298,7 +299,7 @@ export default function Cnq() {
                 [r.itemCodigo, r.itemDescricao].filter(Boolean).join(' — ') || '-',
             },
             {
-              title: 'Descrição do Defeito',
+              title: 'Descrição do defeito',
               width: 200,
               render: (_: any, r: any) => r.tipoDefeito?.nome ?? '-',
             },
@@ -325,16 +326,29 @@ export default function Cnq() {
             { title: 'Ação', dataIndex: 'acao', width: 200 },
             {
               title: '',
-              width: 110,
+              width: 140,
               fixed: 'right',
               render: (_: any, r: any) => (
                 <Space size={0}>
-                  <Button
-                    type="text"
-                    icon={<FileTextOutlined />}
-                    title="Abrir 8D a partir deste CNQ"
-                    onClick={() => navigate(`/manufatura/8d?cnqId=${r.id}`)}
-                  />
+                  {/* Nem todo CNQ vira 8D: a maioria e resolvida com o 5G, no
+                      posto de trabalho. Quem lanca escolhe o documento. */}
+                  <Dropdown
+                    trigger={['click']}
+                    menu={{
+                      items: [
+                        { key: '8D', label: 'Abrir 8D a partir deste CNQ' },
+                        { key: '5G', label: 'Abrir 5G a partir deste CNQ' },
+                      ],
+                      onClick: ({ key }) =>
+                        navigate(`/manufatura/8d?cnqId=${r.id}&tipo=${key}`),
+                    }}
+                  >
+                    <Button
+                      type="text"
+                      icon={<FileTextOutlined />}
+                      title="Abrir 8D ou 5G a partir deste CNQ"
+                    />
+                  </Dropdown>
                   <Button
                     type="text"
                     icon={<EditOutlined />}
@@ -376,8 +390,8 @@ export default function Cnq() {
             <Col span={16}>
               <Form.Item
                 name="maquinaId"
-                label="Máquina / Linha"
-                rules={[{ required: true, message: 'Selecione a máquina' }]}
+                label="Máquina / linha"
+                rules={[{ required: true, message: 'Selecione a máquina.' }]}
               >
                 <Select
                   showSearch
@@ -392,7 +406,7 @@ export default function Cnq() {
           </Row>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="itemCodigo" label="Nº Item">
+              <Form.Item name="itemCodigo" label="Nº do item">
                 <Input />
               </Form.Item>
             </Col>
@@ -404,8 +418,8 @@ export default function Cnq() {
           </Row>
           <Form.Item
             name="tipoDefeitoId"
-            label="Descrição do Defeito"
-            rules={[{ required: true, message: 'Selecione o defeito' }]}
+            label="Descrição do defeito"
+            rules={[{ required: true, message: 'Selecione o defeito.' }]}
           >
             <Select
               showSearch

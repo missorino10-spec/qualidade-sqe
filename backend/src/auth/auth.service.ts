@@ -13,11 +13,11 @@ export class AuthService {
   async login(email: string, senha: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { email } });
     if (!usuario || !usuario.ativo) {
-      throw new UnauthorizedException('Usuario ou senha invalidos');
+      throw new UnauthorizedException('Usuário ou senha inválidos');
     }
     const ok = await bcrypt.compare(senha, usuario.senhaHash);
     if (!ok) {
-      throw new UnauthorizedException('Usuario ou senha invalidos');
+      throw new UnauthorizedException('Usuário ou senha inválidos');
     }
     const payload = {
       sub: usuario.id,

@@ -75,7 +75,7 @@ export default function Kanban() {
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
-        Kanban Semanal — Entregas e Inspeções
+        Kanban semanal — entregas e inspeções
       </Typography.Title>
       <Typography.Text type="secondary">
         Entregas agrupadas por semana (domingo a sábado). Clique em um cartão para

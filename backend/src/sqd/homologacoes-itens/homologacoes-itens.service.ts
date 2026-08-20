@@ -1,3 +1,4 @@
+import { fraseFaltas } from '../../comum/pendencias';
 import {
   BadRequestException,
   ConflictException,
@@ -420,7 +421,7 @@ export class HomologacoesItensService {
     const faltas = await this.pendenciasFinalizacao(atual);
     if (faltas.length) {
       throw new BadRequestException(
-        `Ainda falta ${faltas.join(', ')} para finalizar a homologação.`,
+        `${fraseFaltas(faltas)} para finalizar a homologação.`,
       );
     }
 

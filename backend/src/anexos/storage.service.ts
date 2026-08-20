@@ -25,8 +25,8 @@ export class StorageService {
     const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !chave) {
       throw new InternalServerErrorException(
-        'SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY nao configuradas: ' +
-          'nao e possivel gravar nem ler anexos.',
+        'SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY não configuradas: ' +
+          'não é possível gravar nem ler anexos.',
       );
     }
 

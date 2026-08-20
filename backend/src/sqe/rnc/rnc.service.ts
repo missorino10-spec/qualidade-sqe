@@ -24,6 +24,24 @@ function dataBr(d: Date): string {
   return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
+// Lead time INTERNO da Qualidade: da abertura da RNC ate o dia em que o
+// documento saiu para o fornecedor. E calculado na leitura, nunca gravado -
+// assim uma correcao de data corrige o indicador na hora.
+function comLeadTimeEnvio<T extends { dataAbertura: Date; dataEnvioFornecedor: Date | null }>(
+  rnc: T,
+): T & { leadTimeEnvioDias: number | null } {
+  const leadTimeEnvioDias = rnc.dataEnvioFornecedor
+    ? Math.max(
+        0,
+        Math.round(
+          (rnc.dataEnvioFornecedor.getTime() - rnc.dataAbertura.getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+    : null;
+  return { ...rnc, leadTimeEnvioDias };
+}
+
 const includePadrao = {
   fornecedor: { select: { id: true, nome: true, codigo: true } },
   item: { select: { id: true, descricao: true, codigo: true } },
@@ -55,13 +73,13 @@ export class RncService {
     return { numero: numeroDocumento('RNC', sequencial, ano), ano, sequencial };
   }
 
-  findAll(filtros: {
+  async findAll(filtros: {
     status?: string;
     fornecedorId?: number;
     de?: string;
     ate?: string;
   }) {
-    return this.prisma.rnc.findMany({
+    const rncs = await this.prisma.rnc.findMany({
       where: {
         status: filtros.status ? (filtros.status as any) : undefined,
         fornecedorId: filtros.fornecedorId ?? undefined,
@@ -73,6 +91,7 @@ export class RncService {
       include: includePadrao,
       orderBy: { dataAbertura: 'desc' },
     });
+    return rncs.map(comLeadTimeEnvio);
   }
 
   async findOne(id: number) {
@@ -88,13 +107,13 @@ export class RncService {
         },
       },
     });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     const historico = await this.historico.listar(ENTIDADE, id);
     const anexos = await this.prisma.anexo.findMany({
       where: { entidadeTipo: ENTIDADE, entidadeId: id },
       orderBy: { createdAt: 'desc' },
     });
-    return { ...rnc, historico, anexos };
+    return { ...comLeadTimeEnvio(rnc), historico, anexos };
   }
 
   // -------------------------------------------------------------------------
@@ -228,7 +247,7 @@ export class RncService {
   // Analise de uma RNC ja gravada (usada pela tela, que precisa do motivo).
   async reincidenciaDaRnc(id: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     return this.analisarReincidencia({
       fornecedorId: rnc.fornecedorId,
       itemId: rnc.itemId,
@@ -423,7 +442,7 @@ export class RncService {
   // Atualiza os campos de controle/plano de acao (planilha 3)
   async atualizar(id: number, data: any, usuarioId: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
 
     const quantidadePecas = data.quantidadePecas ?? rnc.quantidadePecas;
     const valorUnitario = data.valorUnitario ?? rnc.valorUnitario;
@@ -442,6 +461,25 @@ export class RncService {
             (1000 * 60 * 60 * 24),
         )
       : rnc.tempoRetornoDias;
+
+    // Envio ao fornecedor: marcado como enviado, exige a data (retroativa e
+    // permitida). Desmarcado, a data cai junto para o lead time nao mentir.
+    const enviadaFornecedor = data.enviadaFornecedor ?? rnc.enviadaFornecedor;
+    const dataEnvioFornecedor = !enviadaFornecedor
+      ? null
+      : data.dataEnvioFornecedor !== undefined
+        ? data.dataEnvioFornecedor
+          ? new Date(data.dataEnvioFornecedor)
+          : null
+        : rnc.dataEnvioFornecedor;
+    const mexeuNoEnvio =
+      enviadaFornecedor !== rnc.enviadaFornecedor ||
+      data.dataEnvioFornecedor !== undefined;
+    if (enviadaFornecedor && mexeuNoEnvio && !dataEnvioFornecedor) {
+      throw new BadRequestException(
+        'Informe a data de envio da RNC ao fornecedor.',
+      );
+    }
 
     const statusAnterior = rnc.status;
     const novoStatus = data.status ?? rnc.status;
@@ -468,7 +506,7 @@ export class RncService {
       !dataVerificacao
     ) {
       throw new BadRequestException(
-        'Informe a data da verificacao de eficacia.',
+        'Informe a data da verificação de eficácia.',
       );
     }
 
@@ -501,6 +539,8 @@ export class RncService {
         houveRetorno: data.houveRetorno ?? rnc.houveRetorno,
         dataRetorno,
         tempoRetornoDias,
+        enviadaFornecedor,
+        dataEnvioFornecedor,
         fornecedorAceitou: data.fornecedorAceitou ?? rnc.fornecedorAceitou,
         fornecedorEnviouPlano:
           data.fornecedorEnviouPlano ?? rnc.fornecedorEnviouPlano,
@@ -514,6 +554,19 @@ export class RncService {
       },
       include: includePadrao,
     });
+
+    // O envio ao fornecedor e um marco do processo: entra no historico com a
+    // data informada, mesmo que o status da RNC nao mude.
+    if (enviadaFornecedor && !rnc.enviadaFornecedor && dataEnvioFornecedor) {
+      await this.historico.registrar({
+        entidadeTipo: ENTIDADE,
+        entidadeId: id,
+        statusAnterior: 'ENVIO_FORNECEDOR_NAO',
+        statusNovo: 'ENVIO_FORNECEDOR_SIM',
+        comentario: `Documento enviado ao fornecedor em ${dataBr(dataEnvioFornecedor)}`,
+        usuarioId,
+      });
+    }
 
     if (novoStatus !== statusAnterior) {
       // A data que vale e a informada pelo usuario, nao a hora em que o
@@ -557,7 +610,7 @@ export class RncService {
   // -------------------------------------------------------------------------
   async abrirDesvio(id: number, dados: AbrirDesvioDados, usuarioId: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     const data = await dadosAberturaDesvio(
       this.prisma,
       DESVIO.rnc,
@@ -592,7 +645,7 @@ export class RncService {
     usuarioId: number,
   ) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     const data = dadosEncerramentoDesvio(rnc, dados);
     const atualizada = await this.prisma.rnc.update({
       where: { id },
@@ -620,7 +673,7 @@ export class RncService {
     dataEncerramento?: string,
   ) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     // Mesma regra do PATCH: so a RNC finalizada tem data de encerramento, e
     // ela e sempre informada pelo usuario.
     const encerramento =
@@ -656,7 +709,7 @@ export class RncService {
   // O motivo NAO vai para o historico de status - so aparece ao abrir a RNC.
   async cancelar(id: number, motivo: string, usuarioId: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     if (!motivo || !motivo.trim())
       throw new BadRequestException('Informe o motivo do cancelamento.');
     const atualizada = await this.prisma.rnc.update({
@@ -682,7 +735,7 @@ export class RncService {
   // Reabre a RNC (a partir de FINALIZADA ou CANCELADA) para EM_ANDAMENTO.
   async reabrir(id: number, usuarioId: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     const atualizada = await this.prisma.rnc.update({
       where: { id },
       data: {
@@ -707,7 +760,7 @@ export class RncService {
   // Remove anexos, historico e vinculos antes de apagar a RNC.
   async remover(id: number) {
     const rnc = await this.prisma.rnc.findUnique({ where: { id } });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
     // O documento que autoriza o desvio de qualidade fica em outro
     // entidadeTipo, mas pertence a mesma RNC: sai junto.
     await this.prisma.anexo.deleteMany({

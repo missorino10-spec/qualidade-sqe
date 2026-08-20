@@ -146,14 +146,14 @@ export function CardDesvioQualidade({
 
   return (
     <Card
-      title="Desvio de Qualidade"
+      title="Desvio de qualidade"
       style={{ marginTop: 16 }}
       extra={
         <Tag color={situacao.cor}>{situacao.texto}</Tag>
       }
     >
       {registro.desvioQualidade ? (
-        <Descriptions column={2} bordered size="small">
+        <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
           <Descriptions.Item label="Aberto em">
             {dataBR(registro.desvioAberturaEm)}
           </Descriptions.Item>
@@ -175,7 +175,7 @@ export function CardDesvioQualidade({
           type="info"
           showIcon
           message="Nenhum desvio de qualidade aberto"
-          description="O desvio libera o material fora do especificado dentro de um limite acordado: uma quantidade de peças, um prazo, ou os dois. Anexe o documento que autoriza para poder abri-lo."
+          description="O desvio libera o material fora do especificado dentro de um limite acordado: uma quantidade de peças, um prazo ou os dois. Anexe o documento que autoriza para poder abri-lo."
         />
       )}
 
@@ -265,7 +265,7 @@ export function CardDesvioQualidade({
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Informe a quantidade, o prazo, ou os dois"
+          message="Informe a quantidade, o prazo ou os dois"
           description="É o limite acordado que faz o desvio ter fim. Ao menos um dos dois é obrigatório."
         />
         <Form form={formAbrir} layout="vertical" onFinish={abrir}>

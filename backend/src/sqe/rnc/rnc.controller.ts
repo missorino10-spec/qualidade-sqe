@@ -62,6 +62,10 @@ class AtualizarRncDto {
   @IsOptional() @IsString() disposicao?: string;
   @IsOptional() @IsBoolean() houveRetorno?: boolean;
   @IsOptional() @IsString() dataRetorno?: string;
+  // Envio do documento ao fornecedor: fecha o lead time INTERNO da Qualidade.
+  // Nao sai no PDF - e controle de processo, so aparece na tela do sistema.
+  @IsOptional() @IsBoolean() enviadaFornecedor?: boolean;
+  @IsOptional() @IsString() dataEnvioFornecedor?: string;
   @IsOptional() @IsString() fornecedorAceitou?: string;
   @IsOptional() @IsBoolean() fornecedorEnviouPlano?: boolean;
   @IsOptional()
@@ -172,7 +176,7 @@ export class RncController {
         inspecaoLote: { select: { cotas: true } },
       },
     });
-    if (!rnc) throw new NotFoundException('RNC nao encontrada');
+    if (!rnc) throw new NotFoundException('RNC não encontrada');
 
     // Fotos anexadas a RNC entram no Registro Fotografico do formulario.
     // Elas vivem no Supabase Storage, entao aqui baixamos os bytes. O

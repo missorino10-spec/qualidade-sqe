@@ -20,6 +20,7 @@ const includeInspecao = {
     include: { inspetor: { select: { id: true, nome: true } } },
   },
   oitoDs: { select: { id: true, numero: true, status: true } },
+  cincoGs: { select: { id: true, numero: true, status: true } },
   setup: { select: { id: true, numero: true } },
 };
 
@@ -236,12 +237,20 @@ export class InspecoesManufaturaService {
   async remover(id: number) {
     const insp = await this.prisma.inspecaoManufatura.findUnique({
       where: { id },
-      include: { relatorios: true, oitoDs: { select: { id: true } } },
+      include: {
+        relatorios: true,
+        oitoDs: { select: { id: true } },
+        cincoGs: { select: { id: true } },
+      },
     });
     if (!insp) throw new NotFoundException('Inspeção não encontrada');
     if (insp.oitoDs.length)
       throw new ConflictException(
         'Esta inspeção tem um 8D vinculado. Exclua o 8D antes.',
+      );
+    if (insp.cincoGs.length)
+      throw new ConflictException(
+        'Esta inspeção tem um 5G vinculado. Exclua o 5G antes.',
       );
 
     const reprovados = insp.relatorios.filter(

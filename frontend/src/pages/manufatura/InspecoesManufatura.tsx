@@ -129,7 +129,7 @@ export default function InspecoesManufatura({
   }
 
   const titulo =
-    tipo === 'SETUP' ? 'Inspeção de Setup' : 'Inspeção de Produção';
+    tipo === 'SETUP' ? 'Inspeção de setup' : 'Inspeção de produção';
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>

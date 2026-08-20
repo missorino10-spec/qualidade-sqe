@@ -62,18 +62,15 @@ class OitoDDto {
   @IsOptional() @IsObject() descricao5W1H?: any;
   @IsOptional() @IsString() situacaoAtual?: string;
   @IsOptional() @IsString() estratificacao?: string;
-  // Passo 2 - Metodo 5G / Passo 3 - cronograma
-  @IsOptional() @IsArray() metodo5G?: any[];
-  @IsOptional() @IsArray() cronograma?: any[];
-  // Passo 4 - causa raiz (6M + 1D)
+  // Passo 2 - causa raiz (6M + 1D)
   @IsOptional() @IsString() efeito?: string;
   @IsOptional() @IsObject() causas6M?: any;
   @IsOptional() @IsArray() causasPotenciais?: any[];
   @IsOptional() @IsString() causaRaiz?: string;
-  // Passo 5 - plano de acao
+  // Passo 3 - plano de acao
   @IsOptional() @IsArray() planoAcao?: any[];
   @IsOptional() @IsObject() padronizacao?: any;
-  // Passo 6 - verificacao dos resultados
+  // Passo 4 - verificacao dos resultados
   @IsOptional() @IsString() verificacaoResultados?: string;
   @IsOptional() @IsObject() verificacaoEficacia?: any;
   // Conclusao / fechamento

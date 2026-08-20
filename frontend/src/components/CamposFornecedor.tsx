@@ -71,7 +71,7 @@ export function CamposFornecedor({
       </Form.Item>
 
       <Divider orientation="left" plain>
-        Escopo e Classificação
+        Escopo e classificação
       </Divider>
       <Row gutter={12}>
         <Col span={12}>
@@ -123,7 +123,7 @@ export function CamposFornecedor({
         <Col span={4}>
           <Form.Item
             name="fazVisual"
-            label="Inspeção Visual"
+            label="Inspeção visual"
             valuePropName="checked"
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
@@ -132,7 +132,7 @@ export function CamposFornecedor({
         <Col span={4}>
           <Form.Item
             name="fazLote"
-            label="Inspeção de Lote"
+            label="Inspeção de lote"
             valuePropName="checked"
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
@@ -145,7 +145,7 @@ export function CamposFornecedor({
           name="eventual"
           label="Fornecedor eventual (fora do plano de periodicidade)"
           valuePropName="checked"
-          extra="Marcado, o sistema nunca sugere inspeção por ciclo: toda inspeção dele é extra. Desmarque quando ele for classificado."
+          extra="Se marcado, o sistema nunca sugere inspeção por ciclo: toda inspeção dele é extra. Desmarque quando ele for classificado."
         >
           <Switch checkedChildren="Eventual" unCheckedChildren="No plano" />
         </Form.Item>

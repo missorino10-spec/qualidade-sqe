@@ -59,7 +59,7 @@ const corResultado: Record<string, string> = {
 const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
   REPROVADO: 'Reprovado',
-  SEM_INSPECAO: 'Sem Inspeção Recomendada',
+  SEM_INSPECAO: 'Sem inspeção recomendada',
 };
 
 const labelFormulario: Record<string, string> = {
@@ -96,7 +96,7 @@ function ChecklistVisual({
           extra={
             <Space size={4}>
               <Button size="small" onClick={() => marcarGrupo(gi, 'APROVADO')}>
-                Todos Aprovados
+                Todos aprovados
               </Button>
               <Button
                 size="small"
@@ -552,14 +552,14 @@ export default function Inspecoes() {
 
   return (
     <Card
-      title="Inspeções de Recebimento"
+      title="Inspeções de recebimento"
       extra={
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => novaInspecao()}
         >
-          Nova Inspeção
+          Nova inspeção
         </Button>
       }
     >
@@ -716,7 +716,7 @@ export default function Inspecoes() {
         title={
           numeroInspecao
             ? `Inspeção ${numeroInspecao}`
-            : 'Nova Inspeção de Recebimento'
+            : 'Nova inspeção de recebimento'
         }
         open={open}
         onCancel={() => setOpen(false)}
@@ -727,7 +727,7 @@ export default function Inspecoes() {
             ? 'Registrar recebimento sem inspeção'
             : !ultimoPasso
               ? `Registrar ${labelFormulario[tipo]} e continuar`
-              : 'Concluir Inspeção'
+              : 'Concluir inspeção'
         }
         cancelText="Cancelar"
         width={900}
@@ -767,13 +767,13 @@ export default function Inspecoes() {
                     setOpenFornecedor(true);
                   }}
                 >
-                  Novo Fornecedor
+                  Novo fornecedor
                 </Button>
               </Form.Item>
             </Col>
             <Col span={7}>
               <Form.Item label="Nº da inspeção">
-                <Input value={numeroInspecao ?? 'gerado ao salvar'} disabled />
+                <Input value={numeroInspecao ?? 'Gerado ao salvar'} disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -802,7 +802,7 @@ export default function Inspecoes() {
             <Descriptions
               size="small"
               bordered
-              column={2}
+              column={{ xs: 1, sm: 2, md: 2, lg: 2 }}
               style={{ marginBottom: 12 }}
             >
               <Descriptions.Item label="Classificação">
@@ -880,8 +880,8 @@ export default function Inspecoes() {
                   <Checkbox.Group
                     disabled={passoIdx > 0}
                     options={[
-                      { value: 'VISUAL', label: 'Inspeção Visual' },
-                      { value: 'LOTE', label: 'Inspeção de Lote / Dimensional' },
+                      { value: 'VISUAL', label: 'Inspeção visual' },
+                      { value: 'LOTE', label: 'Inspeção de lote / dimensional' },
                     ]}
                   />
                 </Form.Item>
@@ -914,7 +914,7 @@ export default function Inspecoes() {
                   style={{ marginBottom: 16 }}
                   items={passos.map((p) => ({
                     title:
-                      p === 'VISUAL' ? 'Inspeção Visual' : 'Inspeção de Lote',
+                      p === 'VISUAL' ? 'Inspeção visual' : 'Inspeção de lote',
                   }))}
                 />
               )}
@@ -941,7 +941,7 @@ export default function Inspecoes() {
                 </Col>
                 <Col span={8}>
                   <Form.Item name="itemCodigo" label="Código do item">
-                    <Input placeholder="opcional" />
+                    <Input placeholder="Opcional" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -1007,7 +1007,7 @@ export default function Inspecoes() {
 
               <Divider orientation="left" plain>
                 {tipo === 'VISUAL'
-                  ? 'Checklist Visual (Doc. BDBR.QUA.FMR.06.07)'
+                  ? 'Checklist visual (Doc. BDBR.QUA.FMR.06.07)'
                   : 'Dimensional (Doc. BDBR.QUA.FMR.011.06)'}
               </Divider>
 
@@ -1061,7 +1061,7 @@ export default function Inspecoes() {
 
       {/* Cadastro pontual do fornecedor, sem sair da inspecao */}
       <Modal
-        title="Novo Fornecedor (cadastro pontual)"
+        title="Novo fornecedor (cadastro pontual)"
         open={openFornecedor}
         onCancel={() => setOpenFornecedor(false)}
         onOk={() => formFornecedor.submit()}

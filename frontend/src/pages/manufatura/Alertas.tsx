@@ -201,7 +201,7 @@ export default function Alertas() {
             ? `${Math.abs(dias)} dia(s) de atraso`
             : dias === 0
               ? 'Vence hoje'
-              : `faltam ${dias} dia(s)`}
+              : `Faltam ${dias} dia(s)`}
         </Typography.Text>
       </Space>
     );
@@ -407,7 +407,7 @@ export default function Alertas() {
               <Form.Item
                 name="data"
                 label="Data do alerta"
-                rules={[{ required: true, message: 'Informe a data' }]}
+                rules={[{ required: true, message: 'Informe a data.' }]}
               >
                 <Input type="date" />
               </Form.Item>
@@ -416,7 +416,7 @@ export default function Alertas() {
               <Form.Item
                 name="prazo"
                 label="Prazo para corrigir"
-                rules={[{ required: true, message: 'Informe o prazo' }]}
+                rules={[{ required: true, message: 'Informe o prazo.' }]}
               >
                 <Input type="date" />
               </Form.Item>
@@ -431,7 +431,7 @@ export default function Alertas() {
           <Form.Item
             name="titulo"
             label="Descrição do problema"
-            rules={[{ required: true, message: 'Descreva o problema' }]}
+            rules={[{ required: true, message: 'Descreva o problema.' }]}
           >
             <Input placeholder="Ex.: REBARBA NAS PEÇAS" />
           </Form.Item>
@@ -439,7 +439,7 @@ export default function Alertas() {
           <Form.Item
             name="acao"
             label="Ação obrigatória"
-            rules={[{ required: true, message: 'Descreva a ação' }]}
+            rules={[{ required: true, message: 'Descreva a ação.' }]}
           >
             <Input.TextArea
               rows={3}
@@ -534,7 +534,7 @@ export default function Alertas() {
           <Form.Item
             name="prazo"
             label="Novo prazo"
-            rules={[{ required: true, message: 'Informe o novo prazo' }]}
+            rules={[{ required: true, message: 'Informe o novo prazo.' }]}
           >
             <Input type="date" />
           </Form.Item>
@@ -558,7 +558,7 @@ export default function Alertas() {
           <Form.Item
             name="data"
             label="Data do encerramento"
-            rules={[{ required: true, message: 'Informe a data' }]}
+            rules={[{ required: true, message: 'Informe a data.' }]}
           >
             <Input type="date" />
           </Form.Item>
@@ -600,7 +600,7 @@ export default function Alertas() {
                 description="O prazo passou e o alerta continua em aberto. Renove o prazo ou encerre com o que foi feito."
               />
             )}
-            <Descriptions size="small" column={2} bordered>
+            <Descriptions size="small" column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered>
               <Descriptions.Item label="Data">
                 {dataBR(detalhe.data)}
               </Descriptions.Item>

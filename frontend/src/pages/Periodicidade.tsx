@@ -52,7 +52,7 @@ export default function Periodicidade() {
 
   return (
     <Card
-      title="Periodicidade de Inspeção por Classificação"
+      title="Periodicidade de inspeção por classificação"
       extra={
         <Typography.Text type="secondary">
           Parâmetros que definem quando e como cada fornecedor é inspecionado.
@@ -71,6 +71,7 @@ export default function Periodicidade() {
         loading={isLoading}
         dataSource={data}
         pagination={false}
+        scroll={{ x: 'max-content' }}
         columns={[
           {
             title: 'Classificação',
@@ -135,7 +136,7 @@ export default function Periodicidade() {
       />
 
       <Modal
-        title={`Editar Classificação ${editando?.classificacao ?? ''}`}
+        title={`Editar classificação ${editando?.classificacao ?? ''}`}
         open={!!editando}
         onCancel={() => setEditando(null)}
         onOk={() => form.submit()}

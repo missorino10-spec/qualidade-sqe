@@ -1,0 +1,32 @@
+/* Ajustes globais de layout — o sistema e usado tambem em tablet no chao de
+   fabrica, entao nenhuma tela pode empurrar a pagina para os lados. */
+
+/* O bloco "Descricoes" do Ant Design monta uma tabela HTML sem largura fixa:
+   quando uma celula recebe conteudo largo (a tabela de cotas, por exemplo),
+   ela estica e arrasta a pagina inteira. Prendemos a tabela na largura do
+   cartao e deixamos a rolagem acontecer dentro do proprio bloco. */
+.ant-descriptions-view {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ant-descriptions-view > table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Codigos e descricoes longas quebram dentro da celula em vez de alarga-la. */
+.ant-descriptions-item-label,
+.ant-descriptions-item-content {
+  word-break: break-word;
+}
+
+/* Barra de acoes dos cabecalhos: em tela estreita os botoes descem de linha
+   em vez de espremerem o titulo do cartao. */
+.ant-card-head {
+  flex-wrap: wrap;
+}
+
+.ant-card-extra {
+  max-width: 100%;
+}

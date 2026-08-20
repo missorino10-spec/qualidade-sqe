@@ -82,7 +82,7 @@ export default function Maquinas() {
           scroll={{ x: 800 }}
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 110 },
-            { title: 'Máquina / Linha', dataIndex: 'nome', width: 220 },
+            { title: 'Máquina / linha', dataIndex: 'nome', width: 220 },
             {
               title: 'Área',
               dataIndex: 'area',
@@ -136,7 +136,7 @@ export default function Maquinas() {
               <Form.Item
                 name="codigo"
                 label="Código"
-                rules={[{ required: true, message: 'Informe o código' }]}
+                rules={[{ required: true, message: 'Informe o código.' }]}
               >
                 <Input placeholder="MAQ16" />
               </Form.Item>
@@ -144,8 +144,8 @@ export default function Maquinas() {
             <Col span={16}>
               <Form.Item
                 name="nome"
-                label="Máquina / Linha"
-                rules={[{ required: true, message: 'Informe o nome' }]}
+                label="Máquina / linha"
+                rules={[{ required: true, message: 'Informe o nome.' }]}
               >
                 <Input />
               </Form.Item>

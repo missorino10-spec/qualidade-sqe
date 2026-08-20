@@ -1,3 +1,4 @@
+import { fraseFaltas } from '../../comum/pendencias';
 import PDFDocument from 'pdfkit';
 // Mesmo desenho dos PDFs da homologacao de fornecedores: cabecalho, faixas
 // laranja, celulas rotuladas e rodape com paginacao. Aqui so mudam os campos.
@@ -333,7 +334,7 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
     h.statusHomologacao === 'FINALIZADO'
       ? `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`
       : pendencias.length
-        ? `Ainda falta ${pendencias.join(', ')}.`
+        ? `${fraseFaltas(pendencias)}.`
         : 'Nenhuma pendência: o ciclo pode ser encerrado.',
     30,
   );
@@ -426,20 +427,27 @@ export function gerarPdfRelatorioInspecaoItem(
       valor: txt(h.itemDescricao),
     },
   ]);
-  t.linha([
-    {
-      w: 120,
-      label: 'DESENHO / DRAWING',
-      valor: txt(r.desenho ?? r.desenhoRev),
-    },
-    { w: 50, label: 'REVISÃO / REV.', valor: txt(r.desenhoRevisao) },
-    {
-      w: W - 120 - 50 - 175,
-      label: 'TOLERÂNCIAS / TOLERANCES',
-      valor: labelNorma(r.tolerancias),
-    },
-    { w: 175, label: 'FORNECEDOR / VENDOR', valor: txt(h.fornecedorNome) },
-  ]);
+  // Altura 40 (e nao a padrao 28): o numero do desenho costuma vir duplo
+  // ("05004280 Rev.05 / 05004281 Rev.02") e na razao social do fornecedor. Com
+  // uma linha so o valor saia cortado com reticencias, o que nao serve num
+  // documento oficial.
+  t.linha(
+    [
+      {
+        w: 120,
+        label: 'DESENHO / DRAWING',
+        valor: txt(r.desenho ?? r.desenhoRev),
+      },
+      { w: 50, label: 'REVISÃO / REV.', valor: txt(r.desenhoRevisao) },
+      {
+        w: W - 120 - 50 - 175,
+        label: 'TOLERÂNCIAS / TOLERANCES',
+        valor: labelNorma(r.tolerancias),
+      },
+      { w: 175, label: 'FORNECEDOR / VENDOR', valor: txt(h.fornecedorNome) },
+    ],
+    40,
+  );
   t.linha([
     { w: 110, label: 'NF', valor: txt(r.nf) },
     { w: 110, label: 'PO', valor: txt(r.po) },

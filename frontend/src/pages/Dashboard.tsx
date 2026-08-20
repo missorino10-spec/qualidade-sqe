@@ -229,12 +229,12 @@ export default function Dashboard() {
           {
             // Fora do plano de periodicidade: fornecedor eventual ou pedido
             // pontual da Qualidade. Os desvios contam nos demais indicadores.
-            t: 'Qtde de Inspeção Extra',
+            t: 'Qtde de inspeção extra',
             v: cont.inspecoesExtra,
             cor: '#d46b08',
           },
           {
-            t: 'Recebimentos s/ inspeção',
+            t: 'Recebimentos sem inspeção',
             v: cont.recebimentosSemInspecao,
             cor: '#8c8c8c',
           },
@@ -277,7 +277,7 @@ export default function Dashboard() {
       </Row>
 
       <Card
-        title="Evolução e Histórico dos Fornecedores"
+        title="Evolução e histórico dos fornecedores"
         extra={
           podeAdmin && (
             <Button
@@ -305,6 +305,7 @@ export default function Dashboard() {
           loading={loadingEvo}
           dataSource={evolucao}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 100 },
             { title: 'Fornecedor', dataIndex: 'nome' },
@@ -364,6 +365,7 @@ export default function Dashboard() {
           size="small"
           loading={loadingRnc}
           dataSource={emAndamento}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: 'Nenhuma RNC em andamento' }}
           onRow={(r) => ({
             onClick: () => navigate(`/rnc/${r.id}`),

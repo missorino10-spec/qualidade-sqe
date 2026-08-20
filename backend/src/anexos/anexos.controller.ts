@@ -43,9 +43,9 @@ export class AnexosController {
     @Query('entidadeId') entidadeId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    if (!file) throw new BadRequestException('Arquivo obrigatorio');
+    if (!file) throw new BadRequestException('Arquivo obrigatório');
     if (!entidadeTipo || !entidadeId) {
-      throw new BadRequestException('entidadeTipo e entidadeId obrigatorios');
+      throw new BadRequestException('Informe entidadeTipo e entidadeId.');
     }
 
     // O nome vem do multipart em latin-1; sem isso todo acento fica torto.
@@ -88,7 +88,7 @@ export class AnexosController {
     const anexo = await this.prisma.anexo.findUnique({
       where: { id: Number(id) },
     });
-    if (!anexo) throw new NotFoundException('Anexo nao encontrado');
+    if (!anexo) throw new NotFoundException('Anexo não encontrado');
 
     const bytes = await this.storage.baixar(anexo.caminho);
     res.set({

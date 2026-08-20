@@ -200,6 +200,7 @@ export default function PainelManufatura() {
           loading={isLoading}
           dataSource={kpis?.topDefeitos}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: 'Nenhum defeito lançado no período' }}
           columns={[
             { title: 'Descrição do Defeito', dataIndex: 'nome' },
@@ -227,6 +228,7 @@ export default function PainelManufatura() {
           loading={isLoading}
           dataSource={kpis?.ppmPorMaquina}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           columns={[
             { title: 'Máquina / Linha', dataIndex: 'nome' },
             {

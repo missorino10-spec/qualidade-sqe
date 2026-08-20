@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
 import 'antd/dist/reset.css';
+import './estilos.css';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { AuthProvider } from './auth';

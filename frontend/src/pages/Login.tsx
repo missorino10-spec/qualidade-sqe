@@ -15,7 +15,7 @@ export default function Login() {
       await login(values.email, values.senha);
       navigate('/');
     } catch {
-      message.error('Usuário ou senha inválidos');
+      message.error('Usuário ou senha inválidos.');
     } finally {
       setLoading(false);
     }
@@ -49,14 +49,14 @@ export default function Login() {
           <Form.Item
             name="email"
             label="E-mail"
-            rules={[{ required: true, message: 'Informe o e-mail' }]}
+            rules={[{ required: true, message: 'Informe o e-mail.' }]}
           >
             <Input prefix={<MailOutlined />} placeholder="seu@email.com" size="large" />
           </Form.Item>
           <Form.Item
             name="senha"
             label="Senha"
-            rules={[{ required: true, message: 'Informe a senha' }]}
+            rules={[{ required: true, message: 'Informe a senha.' }]}
           >
             <Input.Password prefix={<LockOutlined />} placeholder="Senha" size="large" />
           </Form.Item>

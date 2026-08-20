@@ -18,7 +18,8 @@ export class PainelManufaturaService {
     if (ate) periodo.lte = new Date(ate);
     const temPeriodo = !!(de || ate);
 
-    const [producao, inspecoes, cnqs, oitoDs, maquinas] = await Promise.all([
+    // prettier-ignore
+    const [producao, inspecoes, cnqs, oitoDs, cincoGs, maquinas] = await Promise.all([
       this.prisma.producaoDiaria.findMany({
         where: temPeriodo ? { data: periodo } : {},
         include: { maquina: { select: { id: true, nome: true, area: true } } },
@@ -37,6 +38,10 @@ export class PainelManufaturaService {
         include: { tipoDefeito: { select: { id: true, nome: true } } },
       }),
       this.prisma.oitoD.findMany({
+        where: temPeriodo ? { dataAbertura: periodo } : {},
+        select: { status: true },
+      }),
+      this.prisma.cincoG.findMany({
         where: temPeriodo ? { dataAbertura: periodo } : {},
         select: { status: true },
       }),
@@ -113,8 +118,14 @@ export class PainelManufaturaService {
           0,
         ),
         lancamentosCnq: cnqs.length,
-        oitoDsAbertos: oitoDs.filter((d) => d.status !== 'CONCLUIDO').length,
-        oitoDsConcluidos: oitoDs.filter((d) => d.status === 'CONCLUIDO').length,
+        // O 8D e o 5G sao documentos distintos, mas o painel conta os dois
+        // juntos: o que interessa e quantas analises seguem em aberto.
+        oitoDsAbertos:
+          oitoDs.filter((d) => d.status !== 'CONCLUIDO').length +
+          cincoGs.filter((g) => g.status !== 'CONCLUIDO').length,
+        oitoDsConcluidos:
+          oitoDs.filter((d) => d.status === 'CONCLUIDO').length +
+          cincoGs.filter((g) => g.status === 'CONCLUIDO').length,
       },
       topDefeitos,
       ppmPorMaquina,

@@ -47,26 +47,26 @@ export default function Planejamento() {
         dataPrevista: v.dataPrevista ? v.dataPrevista.toISOString() : undefined,
       }),
     onSuccess: () => {
-      message.success('Planejamento criado');
+      message.success('Planejamento criado.');
       qc.invalidateQueries({ queryKey: ['planejamento'] });
       setOpen(false);
       form.resetFields();
     },
-    onError: () => message.error('Erro ao salvar'),
+    onError: () => message.error('Não foi possível salvar o planejamento.'),
   });
 
   const marcarEntregue = useMutation({
     mutationFn: async (id: number) =>
       api.patch(`/planejamento-semanal/${id}/entregue`),
     onSuccess: () => {
-      message.success('Marcado como entregue');
+      message.success('Planejamento marcado como entregue.');
       qc.invalidateQueries({ queryKey: ['planejamento'] });
     },
   });
 
   return (
     <Card
-      title="Planejamento Semanal de Inspeções"
+      title="Planejamento semanal de inspeções"
       extra={
         <Button
           type="primary"
@@ -76,7 +76,7 @@ export default function Planejamento() {
             setOpen(true);
           }}
         >
-          Novo Planejamento
+          Novo planejamento
         </Button>
       }
     >
@@ -84,6 +84,7 @@ export default function Planejamento() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        scroll={{ x: 'max-content' }}
         columns={[
           { title: 'Semana', dataIndex: 'semanaReferencia', width: 110 },
           { title: 'Fornecedor', render: (_: any, r: any) => r.fornecedor?.nome },
@@ -124,7 +125,7 @@ export default function Planejamento() {
         ]}
       />
       <Modal
-        title="Novo Planejamento Semanal"
+        title="Novo planejamento semanal"
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
@@ -146,7 +147,7 @@ export default function Planejamento() {
               options={[
                 { value: semanaAtual(), label: `Semana atual (${semanaAtual()})` },
               ]}
-              placeholder="Ex: 2026-W28"
+              placeholder="Ex.: 2026-W28"
               showSearch
             />
           </Form.Item>

@@ -250,24 +250,34 @@ export function gerarPdfInspecao(
     30,
   );
 
-  linha([
-    { w: 70, label: 'FORNECEDOR', valor: txt(insp.fornecedor?.codigo) },
-    { w: 295, label: 'RAZÃO SOCIAL', valor: txt(insp.fornecedor?.nome) },
-    {
-      w: W - 70 - 295,
-      label: 'RNC',
-      valor: (insp.rncs ?? []).map((r: any) => r.numero).join(', ') || '-',
-      cor: reprovado ? VERMELHO : PRETO,
-    },
-  ]);
+  // Razao social e descricao do item sao os campos mais longos do formulario:
+  // com a altura padrao (28) so cabia uma linha e o texto saia cortado com
+  // reticencias, o que nao serve para um documento oficial. Com 40 pt o valor
+  // quebra em duas linhas.
+  linha(
+    [
+      { w: 70, label: 'FORNECEDOR', valor: txt(insp.fornecedor?.codigo) },
+      { w: 295, label: 'RAZÃO SOCIAL', valor: txt(insp.fornecedor?.nome) },
+      {
+        w: W - 70 - 295,
+        label: 'RNC',
+        valor: (insp.rncs ?? []).map((r: any) => r.numero).join(', ') || '-',
+        cor: reprovado ? VERMELHO : PRETO,
+      },
+    ],
+    40,
+  );
 
   const formulario = insp.visual ?? insp.lote ?? {};
-  linha([
-    { w: 90, label: 'CÓDIGO DO ITEM', valor: txt(insp.item?.codigo) },
-    { w: 215, label: 'DESCRIÇÃO', valor: txt(insp.item?.descricao) },
-    { w: 80, label: 'NOTA FISCAL', valor: txt(insp.notaFiscal) },
-    { w: W - 90 - 215 - 80, label: 'PO', valor: txt(insp.po) },
-  ]);
+  linha(
+    [
+      { w: 90, label: 'CÓDIGO DO ITEM', valor: txt(insp.item?.codigo) },
+      { w: 215, label: 'DESCRIÇÃO', valor: txt(insp.item?.descricao) },
+      { w: 80, label: 'NOTA FISCAL', valor: txt(insp.notaFiscal) },
+      { w: W - 90 - 215 - 80, label: 'PO', valor: txt(insp.po) },
+    ],
+    40,
+  );
 
   linha([
     {

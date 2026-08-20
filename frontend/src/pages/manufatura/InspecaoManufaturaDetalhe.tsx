@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Dropdown,
   Form,
   Modal,
   Space,
@@ -69,7 +70,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         </Space>
       }
     >
-      <Descriptions size="small" bordered column={3} style={{ marginBottom: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }} style={{ marginBottom: 12 }}>
         <Descriptions.Item label="Data">
           {dataBR(rel.dataInspecao)}
         </Descriptions.Item>
@@ -79,7 +80,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         <Descriptions.Item label="Inspetor">
           {rel.inspetor?.nome ?? '-'}
         </Descriptions.Item>
-        <Descriptions.Item label="Nº Item">
+        <Descriptions.Item label="Nº do item">
           {rel.itemCodigo ?? '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Descrição" span={2}>
@@ -132,15 +133,16 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           rowKey={(_, i) => String(i)}
           dataSource={defeitos}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           columns={[
-            { title: 'Descrição do Defeito', dataIndex: 'nome' },
+            { title: 'Descrição do defeito', dataIndex: 'nome' },
             { title: 'Quantidade', dataIndex: 'qtd', width: 130 },
           ]}
         />
       )}
 
       {rel.observacoesFinais && (
-        <Card size="small" title="Observações Finais" style={{ marginTop: 12 }}>
+        <Card size="small" title="Observações finais" style={{ marginTop: 12 }}>
           <Typography.Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
             {rel.observacoesFinais}
           </Typography.Paragraph>
@@ -156,7 +158,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
       )}
 
       {rel.resultado === 'REPROVADO' && (
-        <Descriptions size="small" bordered column={2} style={{ marginTop: 12 }}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2 }} style={{ marginTop: 12 }}>
           <Descriptions.Item label="Qtd. afetada">
             {rel.qtdAfetada ?? '-'}
           </Descriptions.Item>
@@ -166,7 +168,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         </Descriptions>
       )}
 
-      <Descriptions size="small" bordered column={2} style={{ marginTop: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2 }} style={{ marginTop: 12 }}>
         <Descriptions.Item label="Elaborado por">
           {rel.elaboradoPor ?? '-'}
         </Descriptions.Item>
@@ -312,7 +314,7 @@ export default function InspecaoManufaturaDetalhe() {
         title={
           <Space wrap>
             <Typography.Title level={4} style={{ margin: 0 }}>
-              {data.tipo === 'SETUP' ? 'Inspeção de Setup' : 'Inspeção de Produção'}{' '}
+              {data.tipo === 'SETUP' ? 'Inspeção de setup' : 'Inspeção de produção'}{' '}
               {data.numero}
             </Typography.Title>
             <Tag color={corStatusInspecao[data.status]}>
@@ -335,12 +337,20 @@ export default function InspecaoManufaturaDetalhe() {
                 Nova reinspeção
               </Button>
             )}
-            <Button
-              icon={<FileTextOutlined />}
-              onClick={() => navigate(`/manufatura/8d?inspecaoId=${data.id}`)}
+            {/* Nem toda reprovacao vira 8D: a maioria e resolvida com o 5G. */}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: '8D', label: 'Abrir 8D a partir desta inspeção' },
+                  { key: '5G', label: 'Abrir 5G a partir desta inspeção' },
+                ],
+                onClick: ({ key }) =>
+                  navigate(`/manufatura/8d?inspecaoId=${data.id}&tipo=${key}`),
+              }}
             >
-              Abrir 8D
-            </Button>
+              <Button icon={<FileTextOutlined />}>Abrir 8D / 5G</Button>
+            </Dropdown>
             <Button
               type="primary"
               icon={<FilePdfOutlined />}
@@ -351,7 +361,7 @@ export default function InspecaoManufaturaDetalhe() {
           </Space>
         }
       >
-        <Descriptions size="small" bordered column={3}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }}>
           <Descriptions.Item label="Máquina" span={2}>
             {data.maquina
               ? `${data.maquina.codigo} — ${data.maquina.nome}`
@@ -387,17 +397,27 @@ export default function InspecaoManufaturaDetalhe() {
               '-'
             )}
           </Descriptions.Item>
-          <Descriptions.Item label="8D" span={2}>
-            {data.oitoDs?.length ? (
+          <Descriptions.Item label="8D / 5G" span={2}>
+            {data.oitoDs?.length || data.cincoGs?.length ? (
               <Space wrap>
-                {data.oitoDs.map((o: any) => (
+                {(data.oitoDs ?? []).map((o: any) => (
                   <Button
-                    key={o.id}
+                    key={`8d-${o.id}`}
                     size="small"
                     type="link"
                     onClick={() => navigate(`/manufatura/8d/${o.id}`)}
                   >
                     {o.numero}
+                  </Button>
+                ))}
+                {(data.cincoGs ?? []).map((g: any) => (
+                  <Button
+                    key={`5g-${g.id}`}
+                    size="small"
+                    type="link"
+                    onClick={() => navigate(`/manufatura/5g/${g.id}`)}
+                  >
+                    {g.numero}
                   </Button>
                 ))}
               </Space>

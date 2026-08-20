@@ -51,7 +51,7 @@ export class UsuariosService {
     },
   ) {
     const existe = await this.prisma.usuario.findUnique({ where: { id } });
-    if (!existe) throw new NotFoundException('Usuario nao encontrado');
+    if (!existe) throw new NotFoundException('Usuário não encontrado');
     const patch: any = {
       nome: data.nome,
       email: data.email,

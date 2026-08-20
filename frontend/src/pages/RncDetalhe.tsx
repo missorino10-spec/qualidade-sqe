@@ -49,7 +49,7 @@ import { corStatusRnc, labelStatusRnc } from './RncLista';
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
   APROVADO: 'Satisfatório',
-  REPROVADO: 'Não Satisfatório',
+  REPROVADO: 'Não satisfatório',
   NAO_APLICAVEL: 'Não se aplica',
 };
 const corEficacia: Record<string, string> = {
@@ -63,7 +63,7 @@ const corEficacia: Record<string, string> = {
 const OPCOES_EFICACIA = [
   { value: 'PENDENTE', label: 'Pendente' },
   { value: 'APROVADO', label: 'Satisfatório' },
-  { value: 'REPROVADO', label: 'Não Satisfatório' },
+  { value: 'REPROVADO', label: 'Não satisfatório' },
   { value: 'NAO_APLICAVEL', label: 'Não se aplica' },
 ];
 
@@ -196,6 +196,9 @@ export default function RncDetalhe() {
         dataRetorno: v.dataRetorno ? v.dataRetorno.toISOString() : undefined,
         // null (e nao undefined) para o backend entender que a data foi
         // apagada de proposito.
+        dataEnvioFornecedor: v.dataEnvioFornecedor
+          ? v.dataEnvioFornecedor.toISOString()
+          : null,
         dataVerificacao: v.dataVerificacao
           ? v.dataVerificacao.toISOString()
           : null,
@@ -333,6 +336,10 @@ export default function RncDetalhe() {
       quantidadePecas: rnc.quantidadePecas,
       valorUnitario: rnc.valorUnitario,
       disposicao: rnc.disposicao,
+      enviadaFornecedor: rnc.enviadaFornecedor,
+      dataEnvioFornecedor: rnc.dataEnvioFornecedor
+        ? dayjs(rnc.dataEnvioFornecedor)
+        : undefined,
       houveRetorno: rnc.houveRetorno,
       dataRetorno: rnc.dataRetorno ? dayjs(rnc.dataRetorno) : undefined,
       fornecedorAceitou: rnc.fornecedorAceitou,
@@ -463,7 +470,7 @@ export default function RncDetalhe() {
       <Row gutter={16}>
         <Col xs={24} lg={15}>
           <Card title="Dados da RNC">
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
               <Descriptions.Item label="Abertura">
                 {dayjs(rnc.dataAbertura).format('DD/MM/YYYY')}
               </Descriptions.Item>
@@ -539,8 +546,22 @@ export default function RncDetalhe() {
             </Descriptions>
           </Card>
 
-          <Card title="Plano de Ação" style={{ marginTop: 16 }}>
-            <Descriptions column={2} bordered size="small">
+          <Card title="Plano de ação" style={{ marginTop: 16 }}>
+            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
+              {/* Controle interno da Qualidade: nao sai no PDF da RNC. */}
+              <Descriptions.Item label="Enviada para o fornecedor?">
+                {rnc.enviadaFornecedor ? 'Sim' : 'Não'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Data de envio ao fornecedor">
+                {rnc.dataEnvioFornecedor
+                  ? dayjs(rnc.dataEnvioFornecedor).format('DD/MM/YYYY')
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Lead time interno (abertura → envio)" span={2}>
+                {rnc.leadTimeEnvioDias != null
+                  ? `${rnc.leadTimeEnvioDias} dia(s)`
+                  : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="Houve retorno?">
                 {rnc.houveRetorno == null
                   ? '-'
@@ -704,7 +725,7 @@ export default function RncDetalhe() {
         </Col>
 
         <Col xs={24} lg={9}>
-          <Card title="Histórico de Status">
+          <Card title="Histórico de status">
             <Timeline
               items={(rnc.historico ?? []).map((h: any) => ({
                 color: eventoHistorico(h.statusNovo).cor,
@@ -788,6 +809,24 @@ export default function RncDetalhe() {
           <Form.Item name="disposicao" label="Disposição">
             <Input.TextArea rows={2} />
           </Form.Item>
+          {/* Lead time INTERNO da Qualidade: da abertura ao dia em que o
+              documento saiu para o fornecedor. Nao sai no PDF. */}
+          <Row gutter={12}>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="enviadaFornecedor"
+                label="Enviada para o fornecedor?"
+                valuePropName="checked"
+              >
+                <Switch checkedChildren="Sim" unCheckedChildren="Não" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="dataEnvioFornecedor" label="Data do envio">
+                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item

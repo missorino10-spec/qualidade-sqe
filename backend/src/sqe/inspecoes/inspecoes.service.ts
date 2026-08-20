@@ -540,7 +540,7 @@ export class InspecoesService {
         },
       },
     });
-    if (!insp) throw new ConflictException('Inspecao nao encontrada');
+    if (!insp) throw new ConflictException('Inspeção não encontrada');
     await this.removerRncsVinculadas(insp.rncs, cascade);
     await this.prisma.inspecaoVisual.delete({ where: { id } });
     await this.reverterInspecao(insp, 'VISUAL');
@@ -560,7 +560,7 @@ export class InspecoesService {
         },
       },
     });
-    if (!insp) throw new ConflictException('Inspecao nao encontrada');
+    if (!insp) throw new ConflictException('Inspeção não encontrada');
     await this.removerRncsVinculadas(insp.rncs, cascade);
     await this.prisma.inspecaoLote.delete({ where: { id } });
     await this.reverterInspecao(insp, 'LOTE');
@@ -623,7 +623,7 @@ export class InspecoesService {
     if (!rncs.length) return;
     if (!cascade) {
       throw new ConflictException({
-        message: 'Existe RNC vinculada a esta inspecao.',
+        message: 'Existe RNC vinculada a esta inspeção.',
         rncs,
       });
     }

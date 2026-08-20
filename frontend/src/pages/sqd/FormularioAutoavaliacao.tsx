@@ -94,6 +94,7 @@ export function CamposAutoavaliacao({
             rowKey="codigo"
             size="small"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             dataSource={b.perguntas}
             columns={[
               { title: 'Nº', dataIndex: 'codigo', width: 60 },
