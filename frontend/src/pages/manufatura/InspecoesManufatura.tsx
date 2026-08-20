@@ -5,7 +5,6 @@ import {
   Form,
   Modal,
   Space,
-  Table,
   Tag,
   Typography,
   message,
@@ -24,6 +23,7 @@ import {
   cotaVazia,
   labelStatusInspecao,
 } from './FormularioDimensional';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Duas telas separadas (Setup e Produção) usando o MESMO formulario, que e o
 // que o documento BDBR.QUA.FMR.011.06 determina.
@@ -141,7 +141,8 @@ export default function InspecoesManufatura({
           </Button>
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar inspeção (número, item, máquina, inspetor...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -162,10 +163,14 @@ export default function InspecoesManufatura({
             {
               title: 'Máquina',
               width: 180,
+              filters: filtrosDe((data ?? []).map((r: any) => r.maquina?.nome)),
+              onFilter: (v: any, r: any) => r.maquina?.nome === v,
               render: (_: any, r: any) => r.maquina?.nome,
             },
             {
               title: 'Item',
+              filters: filtrosDe((data ?? []).map((r: any) => r.itemCodigo)),
+              onFilter: (v: any, r: any) => r.itemCodigo === v,
               render: (_: any, r: any) =>
                 [r.itemCodigo, r.itemDescricao].filter(Boolean).join(' — ') ||
                 '-',
@@ -180,6 +185,11 @@ export default function InspecoesManufatura({
               title: 'Status',
               dataIndex: 'status',
               width: 190,
+              filters: Object.entries(labelStatusInspecao).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.status === v,
               render: (s: string) => (
                 <Tag color={corStatusInspecao[s]}>{labelStatusInspecao[s]}</Tag>
               ),

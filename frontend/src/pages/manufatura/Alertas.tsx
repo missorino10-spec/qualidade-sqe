@@ -13,7 +13,6 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   Timeline,
   Typography,
@@ -45,6 +44,7 @@ import {
   UploadFotosEvidencia,
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // ALERTA DA QUALIDADE — espelha o formulario .docx da empresa: titulo + data,
 // "Descricao do problema", texto da acao obrigatoria e os dois paineis de foto
@@ -278,7 +278,8 @@ export default function Alertas() {
           </Button>
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar alerta (número, título, item, área...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -303,6 +304,8 @@ export default function Alertas() {
             {
               title: 'Onde se aplica',
               width: 200,
+              filters: filtrosDe((lista ?? []).map((r: any) => r.setor)),
+              onFilter: (v: any, r: any) => r.setor === v,
               render: (_: any, r: any) =>
                 [r.setor, r.maquina?.nome].filter(Boolean).join(' — ') || '-',
             },
@@ -314,6 +317,10 @@ export default function Alertas() {
             {
               title: 'Situação',
               width: 120,
+              filters: filtrosDe(
+                (lista ?? []).map((r: any) => situacaoAlerta(r).texto),
+              ),
+              onFilter: (v: any, r: any) => situacaoAlerta(r).texto === v,
               render: (_: any, r: any) => {
                 const s = situacaoAlerta(r);
                 return <Tag color={s.cor}>{s.texto}</Tag>;

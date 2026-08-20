@@ -9,7 +9,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   message,
@@ -30,6 +29,7 @@ import {
   nota,
   opcoes,
 } from './comum';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Submenu "Homologação de Fornecedores": historico dos registros de homologacao
 // (BDBR.QUA.FMR.029.01). O registro nasce aqui, com a data da solicitacao — a
@@ -109,7 +109,8 @@ export default function Homologacoes() {
           )
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar homologação (número, fornecedor, status...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -127,12 +128,28 @@ export default function Homologacoes() {
               width: 110,
               render: (d: string) => dataBR(d),
             },
-            { title: 'Semana', dataIndex: 'semana', width: 90 },
-            { title: 'Fornecedor', dataIndex: 'fornecedorNome' },
+            {
+              title: 'Semana',
+              dataIndex: 'semana',
+              width: 90,
+              filters: filtrosDe((data ?? []).map((r: any) => r.semana)),
+              onFilter: (v: any, r: any) => r.semana === v,
+            },
+            {
+              title: 'Fornecedor',
+              dataIndex: 'fornecedorNome',
+              filters: filtrosDe((data ?? []).map((r: any) => r.fornecedorNome)),
+              onFilter: (v: any, r: any) => r.fornecedorNome === v,
+            },
             {
               title: 'Solicitante',
               dataIndex: 'solicitante',
               width: 120,
+              filters: Object.entries(labelSolicitante).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.solicitante === v,
               render: (s: string) => (s ? labelSolicitante[s] : '-'),
             },
             {
@@ -146,6 +163,15 @@ export default function Homologacoes() {
               title: 'Resultado',
               dataIndex: 'resultado',
               width: 230,
+              filters: [
+                ...Object.entries(labelResultado).map(([v, t]) => ({
+                  text: t as string,
+                  value: v,
+                })),
+                { text: 'Aguardando retorno', value: 'AGUARDANDO' },
+              ],
+              onFilter: (v: any, r: any) =>
+                v === 'AGUARDANDO' ? !r.resultado : r.resultado === v,
               // Enquanto o fornecedor nao devolve o formulario nao existe nota
               // nem resultado: a linha mostra o que o registro esta esperando.
               render: (r: string | null, h: any) =>
@@ -161,6 +187,11 @@ export default function Homologacoes() {
               title: 'Status',
               dataIndex: 'statusHomologacao',
               width: 130,
+              filters: Object.entries(labelStatusHomologacao).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.statusHomologacao === v,
               render: (s: string) => (
                 <Tag color={corStatusHomologacao[s]}>
                   {labelStatusHomologacao[s]}

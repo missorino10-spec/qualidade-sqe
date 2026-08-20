@@ -9,7 +9,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   message,
@@ -25,6 +24,7 @@ import {
   opcoesFornecedor,
   opcoesItem,
 } from '../hooks';
+import Tabela, { filtrosDe } from '../components/Tabela';
 
 export default function Entregas() {
   const qc = useQueryClient();
@@ -108,7 +108,8 @@ export default function Entregas() {
         </Button>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar entrega (NF, PO, fornecedor, item...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
@@ -118,22 +119,51 @@ export default function Entregas() {
             title: 'Data',
             dataIndex: 'dataEntrega',
             width: 110,
+            defaultSortOrder: 'descend',
+            sorter: (a: any, b: any) =>
+              dayjs(a.dataEntrega).valueOf() - dayjs(b.dataEntrega).valueOf(),
             render: (d: string) => dayjs(d).format('DD/MM/YYYY'),
           },
           {
             title: 'Semana',
             dataIndex: 'semanaReferencia',
             width: 100,
+            filters: filtrosDe((data ?? []).map((r) => r.semanaReferencia)),
+            onFilter: (v: any, r: any) => r.semanaReferencia === v,
             render: (v?: string) => v ?? '-',
           },
-          { title: 'Fornecedor', render: (_: any, r: any) => r.fornecedor?.nome },
-          { title: 'Item', render: (_: any, r: any) => r.item?.descricao ?? '-' },
+          {
+            title: 'Fornecedor',
+            filters: filtrosDe((data ?? []).map((r) => r.fornecedor?.nome)),
+            onFilter: (v: any, r: any) => r.fornecedor?.nome === v,
+            render: (_: any, r: any) => r.fornecedor?.nome,
+          },
+          {
+            title: 'Item',
+            filters: filtrosDe((data ?? []).map((r) => r.item?.descricao)),
+            onFilter: (v: any, r: any) => r.item?.descricao === v,
+            render: (_: any, r: any) => r.item?.descricao ?? '-',
+          },
           { title: 'Nota Fiscal', dataIndex: 'notaFiscal', width: 120 },
           { title: 'PO', dataIndex: 'po', width: 110, render: (v?: string) => v ?? '-' },
           { title: 'Qtd.', dataIndex: 'quantidade', width: 80 },
           {
             title: 'Inspeção',
             width: 150,
+            filters: [
+              { text: 'Inspecionada', value: 'INSPECIONADA' },
+              { text: 'A inspecionar', value: 'PENDENTE' },
+              { text: 'Sem inspeção', value: 'SEM' },
+            ],
+            onFilter: (v: any, r: any) => {
+              const inspecionada =
+                (r.inspecoesVisual?.length ?? 0) +
+                  (r.inspecoesLote?.length ?? 0) >
+                0;
+              if (v === 'INSPECIONADA') return inspecionada;
+              if (v === 'PENDENTE') return !inspecionada && !!r.passivelInspecao;
+              return !inspecionada && !r.passivelInspecao;
+            },
             render: (_: any, r: any) => {
               const temInsp =
                 (r.inspecoesVisual?.length ?? 0) + (r.inspecoesLote?.length ?? 0) >

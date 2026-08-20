@@ -45,6 +45,7 @@ import {
 } from '../components/DesvioQualidade';
 import { useAuth } from '../auth';
 import { corStatusRnc, labelStatusRnc } from './RncLista';
+import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
@@ -330,7 +331,11 @@ export default function RncDetalhe() {
 
   function abrirEdicao() {
     formEdit.setFieldsValue({
-      tipoDesvio: rnc.tipoDesvio,
+      // Normaliza para o valor cair numa das opcoes da lista: as RNCs antigas
+      // guardavam o texto do desvio inteiro nesse campo.
+      tipoDesvio: TIPOS_DESVIO.find(
+        (t) => rotuloTipoDesvio(rnc.tipoDesvio) === t,
+      ),
       reincidencia: rnc.reincidencia,
       descricaoDesvio: rnc.descricaoDesvio,
       quantidadePecas: rnc.quantidadePecas,
@@ -513,7 +518,7 @@ export default function RncDetalhe() {
                 )}
               </Descriptions.Item>
               <Descriptions.Item label="Tipo de desvio" span={2}>
-                {rnc.tipoDesvio ?? '-'}
+                {rotuloTipoDesvio(rnc.tipoDesvio) || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Descrição do desvio" span={2}>
                 {rnc.descricaoDesvio}
@@ -766,7 +771,11 @@ export default function RncDetalhe() {
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="tipoDesvio" label="Tipo de desvio">
-                <Input />
+                <Select
+                  allowClear
+                  placeholder="Dimensional ou Visual"
+                  options={TIPOS_DESVIO.map((t) => ({ value: t, label: t }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>

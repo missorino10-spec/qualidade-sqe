@@ -6,12 +6,12 @@ import {
   Input,
   Modal,
   Select,
-  Table,
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import Tabela, { filtrosDe } from '../components/Tabela';
 
 interface Item {
   id: number;
@@ -72,7 +72,8 @@ export default function Itens() {
         </Button>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar item (código, descrição, fornecedor...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
@@ -80,9 +81,17 @@ export default function Itens() {
         columns={[
           { title: 'Código', dataIndex: 'codigo', width: 130 },
           { title: 'Descrição', dataIndex: 'descricao' },
-          { title: 'Unid.', dataIndex: 'unidade', width: 80 },
+          {
+            title: 'Unid.',
+            dataIndex: 'unidade',
+            width: 80,
+            filters: filtrosDe((data ?? []).map((i) => i.unidade)),
+            onFilter: (v: any, i: any) => i.unidade === v,
+          },
           {
             title: 'Fornecedor',
+            filters: filtrosDe((data ?? []).map((i) => i.fornecedor?.nome)),
+            onFilter: (v: any, i: any) => i.fornecedor?.nome === v,
             render: (_: any, i: Item) => i.fornecedor?.nome ?? '-',
           },
           {

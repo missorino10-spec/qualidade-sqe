@@ -7,7 +7,6 @@ import {
   Row,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -39,6 +38,7 @@ import {
   labelStatusHomologacao,
   nota,
 } from './comum';
+import Tabela from '../../components/Tabela';
 
 const { RangePicker } = DatePicker;
 
@@ -259,7 +259,7 @@ export default function PainelSqd() {
       </Row>
 
       <Card title="Últimas homologações de fornecedores">
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingUltimas}
@@ -472,7 +472,7 @@ export default function PainelSqd() {
       </Row>
 
       <Card title="Últimas homologações de itens">
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingUltimasItens}
@@ -640,7 +640,7 @@ export default function PainelSqd() {
       </Row>
 
       <Card title="Últimas auditorias de fornecedores">
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingUltimasAud}

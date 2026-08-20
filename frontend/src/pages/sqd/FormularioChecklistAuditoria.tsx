@@ -1,4 +1,4 @@
-import { Card, Col, Input, Radio, Row, Space, Table, Tag, Typography } from 'antd';
+import { Card, Col, Input, Radio, Row, Space, Tag, Typography } from 'antd';
 import {
   corClassificacaoBloco,
   corRespostaAuditoria,
@@ -6,6 +6,7 @@ import {
   labelRespostaAuditoria,
   nota as fmtNota,
 } from './comum';
+import Tabela from '../../components/Tabela';
 
 // Checklist de Auditoria de Fornecedores. Os 12 blocos, os pesos e as 46
 // perguntas vem do backend (GET /sqd/auditorias/formulario), que le a mesma
@@ -176,7 +177,7 @@ export function ChecklistAuditoria({
               </Space>
             }
           >
-            <Table
+            <Tabela
               rowKey="codigo"
               size="small"
               pagination={false}
@@ -233,7 +234,7 @@ export function ChecklistAuditoria({
 export function ResumoAuditoria({ calculo }: { calculo: any }) {
   return (
     <Card size="small" title="Resumo por bloco">
-      <Table
+      <Tabela
         rowKey="codigo"
         size="small"
         pagination={false}

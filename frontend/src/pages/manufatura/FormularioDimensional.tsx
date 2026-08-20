@@ -9,7 +9,6 @@ import {
   Radio,
   Row,
   Select,
-  Table,
   Typography,
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
@@ -20,6 +19,7 @@ import {
 } from '../../components/TabelaCotas';
 import { ORIGENS_INSPECAO } from '../../inspecao';
 import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
+import Tabela from '../../components/Tabela';
 
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Os campos e a ordem seguem o formulario em papel, sem acrescimos.
@@ -77,7 +77,7 @@ export function BlocoDefeitos({
 
   return (
     <div>
-      <Table
+      <Tabela
         size="small"
         rowKey={(_, i) => String(i)}
         dataSource={defeitos}

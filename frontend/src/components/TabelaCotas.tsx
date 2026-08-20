@@ -13,6 +13,7 @@ import {
   normaCurta,
   toleranciaPadrao,
 } from '../inspecao';
+import Tabela from './Tabela';
 
 // Tabela de cotas do RELATORIO DE INSPECAO DIMENSIONAL (BDBR.QUA.FMR.011.06).
 // E a MESMA tabela nos tres modulos (SQE, Manufatura e SQD); so muda a coluna
@@ -283,7 +284,7 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
       };
 
   return (
-    <Table
+    <Tabela
       size="small"
       rowKey={(_, i) => String(i)}
       dataSource={linhas}
@@ -388,7 +389,7 @@ export function TabelaCotasMaxMin({
 
   return (
     <div>
-      <Table
+      <Tabela
         size="small"
         rowKey={(_, i) => String(i)}
         dataSource={cotas}
@@ -514,7 +515,7 @@ export function TabelaCotasPecas({
 
   return (
     <div>
-      <Table
+      <Tabela
         size="small"
         rowKey={(_, i) => String(i)}
         dataSource={cotas}

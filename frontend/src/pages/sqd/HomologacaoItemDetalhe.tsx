@@ -13,7 +13,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   Upload,
@@ -74,6 +73,7 @@ import {
   labelStatusVisual,
   opcoes,
 } from './comum';
+import Tabela from '../../components/Tabela';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_ITEM_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_ITEM_PLANO_ACAO';
@@ -598,7 +598,7 @@ export default function HomologacaoItemDetalhe() {
                   a revisão igual ao número da tentativa. O resultado do registro
                   sai sempre da tentativa mais recente.
                 </Typography.Paragraph>
-                <Table
+                <Tabela
                   rowKey="tentativa"
                   size="small"
                   pagination={false}
@@ -761,7 +761,7 @@ export default function HomologacaoItemDetalhe() {
                     (g) => (
                       <div key={g.grupo} style={{ marginTop: 12 }}>
                         <Typography.Text strong>{g.grupo}</Typography.Text>
-                        <Table
+                        <Tabela
                           style={{ marginTop: 8 }}
                           rowKey="texto"
                           size="small"

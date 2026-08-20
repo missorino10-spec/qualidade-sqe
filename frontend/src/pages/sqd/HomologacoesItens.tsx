@@ -10,7 +10,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   message,
@@ -35,6 +34,7 @@ import {
   labelStatusHomologacao,
   opcoes,
 } from './comum';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Submenu "Homologação de Itens": historico dos registros de homologacao de
 // item (BDBR.QUA.FMR.025.01). O registro nasce aqui, com a data da solicitacao
@@ -115,7 +115,8 @@ export default function HomologacoesItens() {
           )
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar item homologado (número, item, fornecedor...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -139,12 +140,26 @@ export default function HomologacoesItens() {
               width: 110,
               render: (d: string) => dataBR(d),
             },
-            { title: 'Semana', dataIndex: 'semana', width: 90 },
-            { title: 'Fornecedor', dataIndex: 'fornecedorNome', width: 200 },
+            {
+              title: 'Semana',
+              dataIndex: 'semana',
+              width: 90,
+              filters: filtrosDe((data ?? []).map((r: any) => r.semana)),
+              onFilter: (v: any, r: any) => r.semana === v,
+            },
+            {
+              title: 'Fornecedor',
+              dataIndex: 'fornecedorNome',
+              width: 200,
+              filters: filtrosDe((data ?? []).map((r: any) => r.fornecedorNome)),
+              onFilter: (v: any, r: any) => r.fornecedorNome === v,
+            },
             {
               title: 'Item',
               dataIndex: 'itemCodigo',
               width: 240,
+              filters: filtrosDe((data ?? []).map((r: any) => r.itemCodigo)),
+              onFilter: (v: any, r: any) => r.itemCodigo === v,
               render: (c: string, h: any) => (
                 <span>
                   <strong>{c || '-'}</strong>
@@ -156,12 +171,22 @@ export default function HomologacoesItens() {
               title: 'Motivo',
               dataIndex: 'motivo',
               width: 150,
+              filters: Object.entries(labelMotivoItem).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.motivo === v,
               render: (m: string) => (m ? labelMotivoItem[m] : '-'),
             },
             {
               title: 'Solicitante',
               dataIndex: 'solicitante',
               width: 120,
+              filters: Object.entries(labelSolicitanteItem).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.solicitante === v,
               render: (s: string) => (s ? labelSolicitanteItem[s] : '-'),
             },
             {
@@ -174,6 +199,15 @@ export default function HomologacoesItens() {
               title: 'Resultado',
               dataIndex: 'resultado',
               width: 230,
+              filters: [
+                ...Object.entries(labelResultadoItem).map(([v, t]) => ({
+                  text: t as string,
+                  value: v,
+                })),
+                { text: 'Aguardando amostras', value: 'AGUARDANDO' },
+              ],
+              onFilter: (v: any, r: any) =>
+                v === 'AGUARDANDO' ? !r.resultado : r.resultado === v,
               // Enquanto as amostras nao chegam nao existe relatorio nem
               // resultado: a linha mostra o que o registro esta esperando.
               render: (r: string | null, h: any) =>
@@ -201,6 +235,11 @@ export default function HomologacoesItens() {
               title: 'Status',
               dataIndex: 'statusHomologacao',
               width: 130,
+              filters: Object.entries(labelStatusHomologacao).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.statusHomologacao === v,
               render: (s: string) => (
                 <Tag color={corStatusHomologacao[s]}>
                   {labelStatusHomologacao[s]}

@@ -15,7 +15,6 @@ import {
   Space,
   Spin,
   Switch,
-  Table,
   Tag,
   Typography,
   Upload,
@@ -45,6 +44,7 @@ import {
   planoAcaoNormalizado,
 } from '../../oitod';
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
+import Tabela from '../../components/Tabela';
 
 // Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
 // A tela segue passo a passo a planilha "Analise de Problemas da Qualidade -
@@ -771,7 +771,7 @@ export default function OitoDDetalhe() {
           >
             Adicionar causa potencial
           </Button>
-          <Table
+          <Tabela
             size="small"
             rowKey={(_, i) => String(i)}
             dataSource={causasPotenciais}
@@ -823,7 +823,7 @@ export default function OitoDDetalhe() {
             </Button>
           }
         >
-          <Table
+          <Tabela
             size="small"
             rowKey={(_, i) => String(i)}
             dataSource={planoAcao}

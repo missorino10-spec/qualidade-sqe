@@ -10,7 +10,6 @@ import {
   Segmented,
   Select,
   Space,
-  Table,
   Tag,
   message,
 } from 'antd';
@@ -20,6 +19,7 @@ import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { dataBR } from '../../formatos';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Analise de Problemas da Qualidade — Doc BDBR.QUA.FMR.007.01.
 // A tela reune os dois documentos do formulario: o 8D (analise completa) e o
@@ -157,7 +157,8 @@ export default function OitoD() {
           </Space>
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar (número, título, item, responsável...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -175,10 +176,17 @@ export default function OitoD() {
               width: 110,
               render: (d: string) => dataBR(d),
             },
-            { title: 'Produto / Item', dataIndex: 'produtoItem' },
+            {
+              title: 'Produto / Item',
+              dataIndex: 'produtoItem',
+              filters: filtrosDe((data ?? []).map((r: any) => r.produtoItem)),
+              onFilter: (v: any, r: any) => r.produtoItem === v,
+            },
             {
               title: 'Origem',
               width: 140,
+              filters: ORIGENS_8D.map((o) => ({ text: o.label, value: o.value })),
+              onFilter: (v: any, r: any) => r.origem === v,
               render: (_: any, r: any) =>
                 ORIGENS_8D.find((o) => o.value === r.origem)?.label ?? '-',
             },
@@ -188,11 +196,22 @@ export default function OitoD() {
               render: (_: any, r: any) =>
                 r.inspecao?.numero ?? r.cnq?.numero ?? '-',
             },
-            { title: 'Responsável', dataIndex: 'responsavel', width: 150 },
+            {
+              title: 'Responsável',
+              dataIndex: 'responsavel',
+              width: 150,
+              filters: filtrosDe((data ?? []).map((r: any) => r.responsavel)),
+              onFilter: (v: any, r: any) => r.responsavel === v,
+            },
             {
               title: 'Status',
               dataIndex: 'status',
               width: 130,
+              filters: Object.entries(labelStatus8D).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.status === v,
               render: (s: string) => (
                 <Tag color={corStatus8D[s]}>{labelStatus8D[s] ?? s}</Tag>
               ),

@@ -7,7 +7,6 @@ import {
   Row,
   Space,
   Spin,
-  Table,
   Tag,
   Typography,
 } from 'antd';

@@ -8,7 +8,6 @@ import {
   Row,
   Space,
   Statistic,
-  Table,
   Typography,
   message,
 } from 'antd';
@@ -24,6 +23,7 @@ import { Dayjs } from 'dayjs';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { separadoresBR } from '../../formatos';
+import Tabela from '../../components/Tabela';
 
 const { RangePicker } = DatePicker;
 
@@ -194,7 +194,7 @@ export default function PainelManufatura() {
       </Row>
 
       <Card title="Defeitos mais recorrentes">
-        <Table
+        <Tabela
           rowKey="nome"
           size="small"
           loading={isLoading}
@@ -222,7 +222,7 @@ export default function PainelManufatura() {
       </Card>
 
       <Card title="PPM por máquina">
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -291,7 +291,7 @@ export default function PainelManufatura() {
           )
         }
       >
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingEvo}

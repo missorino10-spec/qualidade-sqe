@@ -10,7 +10,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   message,
 } from 'antd';
@@ -22,6 +21,8 @@ import { api } from '../api';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
 import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
+import Tabela from '../components/Tabela';
+import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
 export const corStatusRnc: Record<string, string> = {
   EM_ANDAMENTO: 'orange',
@@ -75,7 +76,11 @@ export default function RncLista() {
 
   const filtrosFornecedor = filtrosDe((data ?? []).map((r) => r.fornecedor?.nome));
   const filtrosItem = filtrosDe((data ?? []).map((r) => r.item?.descricao));
-  const filtrosTipo = filtrosDe((data ?? []).map((r) => r.tipoDesvio));
+  // O tipo e sempre DIMENSIONAL ou VISUAL; registros antigos guardavam o texto
+  // inteiro do desvio, entao a listagem normaliza antes de filtrar e exibir.
+  const filtrosTipo = filtrosDe(
+    (data ?? []).map((r) => rotuloTipoDesvio(r.tipoDesvio)),
+  );
 
   const salvar = useMutation({
     mutationFn: async (v: any) => (await api.post('/rnc', v)).data,
@@ -115,7 +120,8 @@ export default function RncLista() {
         </Space>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar RNC (número, fornecedor, item, desvio...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
@@ -154,8 +160,8 @@ export default function RncLista() {
             dataIndex: 'tipoDesvio',
             width: 160,
             filters: filtrosTipo,
-            onFilter: (v: any, r: any) => r.tipoDesvio === v,
-            render: (v?: string) => v ?? '-',
+            onFilter: (v: any, r: any) => rotuloTipoDesvio(r.tipoDesvio) === v,
+            render: (v?: string) => rotuloTipoDesvio(v) || '-',
           },
           {
             title: 'Reincidência',
@@ -325,7 +331,11 @@ export default function RncLista() {
             </Col>
           </Row>
           <Form.Item name="tipoDesvio" label="Tipo de desvio">
-            <Input placeholder="Ex.: Dimensional, Visual, Acabamento" />
+            <Select
+              allowClear
+              placeholder="Dimensional ou Visual"
+              options={TIPOS_DESVIO.map((t) => ({ value: t, label: t }))}
+            />
           </Form.Item>
           <Form.Item
             name="descricaoDesvio"

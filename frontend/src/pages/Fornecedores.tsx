@@ -5,7 +5,6 @@ import {
   Form,
   Modal,
   Space,
-  Table,
   Tag,
   message,
 } from 'antd';
@@ -16,6 +15,7 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
+import Tabela, { filtrosDe } from '../components/Tabela';
 
 const corClasse: Record<string, string> = {
   A: 'green',
@@ -73,7 +73,8 @@ export default function Fornecedores() {
         </Button>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar fornecedor (nome, CNPJ, classe...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
@@ -84,6 +85,8 @@ export default function Fornecedores() {
           {
             title: 'Tipo de fornecimento',
             dataIndex: 'tipoFornecimento',
+            filters: filtrosDe((data ?? []).map((f) => f.tipoFornecimento)),
+            onFilter: (v: any, r: any) => r.tipoFornecimento === v,
             render: (v?: string) => v ?? '-',
           },
           {
@@ -91,6 +94,18 @@ export default function Fornecedores() {
             dataIndex: 'classificacaoFornecimento',
             width: 120,
             align: 'center',
+            filters: [
+              ...filtrosDe(
+                (data ?? []).map((f) =>
+                  f.eventual ? null : f.classificacaoFornecimento,
+                ),
+              ),
+              { text: 'Eventual', value: 'EVENTUAL' },
+            ],
+            onFilter: (v: any, r: any) =>
+              v === 'EVENTUAL'
+                ? !!r.eventual
+                : !r.eventual && r.classificacaoFornecimento === v,
             render: (c: string, r: any) =>
               r.eventual ? (
                 <Tag>Eventual</Tag>
@@ -101,6 +116,12 @@ export default function Fornecedores() {
           {
             title: 'Escopo',
             width: 150,
+            filters: [
+              { text: 'Visual', value: 'VISUAL' },
+              { text: 'Lote', value: 'LOTE' },
+            ],
+            onFilter: (v: any, r: any) =>
+              v === 'VISUAL' ? !!r.fazVisual : !!r.fazLote,
             render: (_: any, r: any) => (
               <Space size={4}>
                 {r.fazVisual && <Tag color="geekblue">Visual</Tag>}
@@ -113,6 +134,11 @@ export default function Fornecedores() {
             title: 'Situação',
             dataIndex: 'ativo',
             width: 100,
+            filters: [
+              { text: 'Ativo', value: true },
+              { text: 'Inativo', value: false },
+            ],
+            onFilter: (v: any, r: any) => !!r.ativo === v,
             render: (a: boolean) =>
               a ? <Tag color="green">Ativo</Tag> : <Tag>Inativo</Tag>,
           },

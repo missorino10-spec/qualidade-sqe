@@ -13,7 +13,6 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Typography,
   message,
 } from 'antd';
@@ -30,6 +29,7 @@ import { useNavigate } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { dataBR, dataInput, separadoresBR } from '../../formatos';
 import { semanaAno } from '../../semana';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da planilha.
 // Total = quantidade x valor unitario, calculado no backend.
@@ -269,7 +269,8 @@ export default function Cnq() {
           </Button>
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar lançamento (item, máquina, categoria...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -286,21 +287,31 @@ export default function Cnq() {
             {
               title: 'Semana',
               width: 90,
+              filters: filtrosDe((data ?? []).map((r: any) => semanaDaData(r.data))),
+              onFilter: (v: any, r: any) => semanaDaData(r.data) === v,
               render: (_: any, r: any) => semanaDaData(r.data),
             },
             {
               title: 'Máquina',
               width: 170,
+              filters: filtrosDe((data ?? []).map((r: any) => r.maquina?.nome)),
+              onFilter: (v: any, r: any) => r.maquina?.nome === v,
               render: (_: any, r: any) => r.maquina?.nome ?? '-',
             },
             {
               title: 'Item',
+              filters: filtrosDe((data ?? []).map((r: any) => r.itemCodigo)),
+              onFilter: (v: any, r: any) => r.itemCodigo === v,
               render: (_: any, r: any) =>
                 [r.itemCodigo, r.itemDescricao].filter(Boolean).join(' — ') || '-',
             },
             {
               title: 'Descrição do defeito',
               width: 200,
+              filters: filtrosDe(
+                (data ?? []).map((r: any) => r.tipoDefeito?.nome),
+              ),
+              onFilter: (v: any, r: any) => r.tipoDefeito?.nome === v,
               render: (_: any, r: any) => r.tipoDefeito?.nome ?? '-',
             },
             {

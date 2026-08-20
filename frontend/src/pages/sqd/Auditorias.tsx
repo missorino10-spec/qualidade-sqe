@@ -8,7 +8,6 @@ import {
   Modal,
   Row,
   Space,
-  Table,
   Tag,
   Typography,
   message,
@@ -29,6 +28,7 @@ import {
   nota,
   textoReavaliacao,
 } from './comum';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Submenu "Auditoria de Fornecedores": historico das auditorias com o resultado
 // pela regua da Qualidade (>= 90 aprovado, 80 a 89,99 condicional, < 80
@@ -109,7 +109,8 @@ export default function Auditorias() {
           )
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar auditoria (número, fornecedor, status...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -128,9 +129,27 @@ export default function Auditorias() {
               width: 110,
               render: (d: string) => dataBR(d),
             },
-            { title: 'Semana', dataIndex: 'semana', width: 90 },
-            { title: 'Fornecedor', dataIndex: 'fornecedorNome', width: 220 },
-            { title: 'Motivo', dataIndex: 'motivo', width: 180 },
+            {
+              title: 'Semana',
+              dataIndex: 'semana',
+              width: 90,
+              filters: filtrosDe((data ?? []).map((r: any) => r.semana)),
+              onFilter: (v: any, r: any) => r.semana === v,
+            },
+            {
+              title: 'Fornecedor',
+              dataIndex: 'fornecedorNome',
+              width: 220,
+              filters: filtrosDe((data ?? []).map((r: any) => r.fornecedorNome)),
+              onFilter: (v: any, r: any) => r.fornecedorNome === v,
+            },
+            {
+              title: 'Motivo',
+              dataIndex: 'motivo',
+              width: 180,
+              filters: filtrosDe((data ?? []).map((r: any) => r.motivo)),
+              onFilter: (v: any, r: any) => r.motivo === v,
+            },
             {
               title: 'Nota',
               dataIndex: 'nota',
@@ -142,6 +161,15 @@ export default function Auditorias() {
               title: 'Resultado',
               dataIndex: 'resultado',
               width: 210,
+              filters: [
+                ...Object.entries(labelResultadoAuditoria).map(([v, t]) => ({
+                  text: t as string,
+                  value: v,
+                })),
+                { text: 'Aguardando checklist', value: 'AGUARDANDO' },
+              ],
+              onFilter: (v: any, r: any) =>
+                v === 'AGUARDANDO' ? !r.resultado : r.resultado === v,
               // Enquanto o checklist nao e lancado nao existe nota nem
               // resultado: a linha mostra o que o registro esta esperando.
               render: (r: string | null) =>
@@ -159,6 +187,12 @@ export default function Auditorias() {
               title: 'Reavaliação',
               dataIndex: 'reavaliacao',
               width: 280,
+              filters: [
+                { text: 'No prazo', value: 'VERDE' },
+                { text: 'Perto do vencimento', value: 'AMARELO' },
+                { text: 'Vencida', value: 'VERMELHO' },
+              ],
+              onFilter: (v: any, r: any) => r.reavaliacao?.semaforo === v,
               render: (r: any) =>
                 r ? (
                   <Tag color={corSemaforoReavaliacao[r.semaforo]}>
@@ -172,6 +206,11 @@ export default function Auditorias() {
               title: 'Status',
               dataIndex: 'statusAuditoria',
               width: 130,
+              filters: Object.entries(labelStatusAuditoria).map(([v, t]) => ({
+                text: t as string,
+                value: v,
+              })),
+              onFilter: (v: any, r: any) => r.statusAuditoria === v,
               render: (s: string) => (
                 <Tag color={corStatusAuditoria[s]}>
                   {labelStatusAuditoria[s]}

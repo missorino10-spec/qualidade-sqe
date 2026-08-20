@@ -10,13 +10,13 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   message,
 } from 'antd';
 import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
+import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Cadastro das maquinas/linhas. O lancamento da producao diaria e o PPM ficam
 // na tela "Produção diária / PPM".
@@ -74,7 +74,8 @@ export default function Maquinas() {
           </Button>
         }
       >
-        <Table
+        <Tabela
+          busca="Buscar máquina / linha (código, nome, área...)"
           rowKey="id"
           size="small"
           loading={isLoading}
@@ -87,6 +88,8 @@ export default function Maquinas() {
               title: 'Área',
               dataIndex: 'area',
               width: 130,
+              filters: AREAS.map((a) => ({ text: a.label, value: a.value })),
+              onFilter: (v: any, r: any) => r.area === v,
               render: (a: string) =>
                 AREAS.find((x) => x.value === a)?.label ?? a,
             },
@@ -100,6 +103,11 @@ export default function Maquinas() {
               dataIndex: 'ativa',
               width: 100,
               align: 'center',
+              filters: [
+                { text: 'Ativa', value: true },
+                { text: 'Inativa', value: false },
+              ],
+              onFilter: (v: any, r: any) => !!r.ativa === v,
               render: (a: boolean) =>
                 a ? <Tag color="green">Ativa</Tag> : <Tag>Inativa</Tag>,
             },

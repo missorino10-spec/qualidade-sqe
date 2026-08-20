@@ -5,10 +5,10 @@ import {
   Input,
   Radio,
   Row,
-  Table,
   Tag,
   Typography,
 } from 'antd';
+import Tabela from '../../components/Tabela';
 
 export type Pergunta = { codigo: string; texto: string; pontos: number };
 export type Bloco = {
@@ -90,7 +90,7 @@ export function CamposAutoavaliacao({
             </Typography.Text>{' '}
             <Tag color="blue">Peso {b.peso}%</Tag>
           </Divider>
-          <Table
+          <Tabela
             rowKey="codigo"
             size="small"
             pagination={false}

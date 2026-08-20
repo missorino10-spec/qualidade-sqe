@@ -53,6 +53,7 @@ import {
   nota,
   opcoes,
 } from './comum';
+import Tabela from '../../components/Tabela';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_PLANO_ACAO';
@@ -512,7 +513,7 @@ export default function HomologacaoDetalhe() {
                 />
               </Col>
             </Row>
-            <Table
+            <Tabela
               rowKey="letra"
               size="small"
               pagination={false}
@@ -576,7 +577,7 @@ export default function HomologacaoDetalhe() {
             <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
               Evidência para o relatório: perguntas respondidas com "Não".
             </Typography.Paragraph>
-            <Table
+            <Tabela
               rowKey="codigo"
               size="small"
               pagination={false}
@@ -625,7 +626,7 @@ export default function HomologacaoDetalhe() {
                   <Tag color={doBloco?.critico ? 'red' : 'green'}>
                     {nota(doBloco?.pontuacao)} pts
                   </Tag>
-                  <Table
+                  <Tabela
                     style={{ marginTop: 8 }}
                     rowKey="codigo"
                     size="small"

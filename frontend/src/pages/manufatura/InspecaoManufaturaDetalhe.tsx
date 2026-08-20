@@ -8,7 +8,6 @@ import {
   Modal,
   Space,
   Spin,
-  Table,
   Tag,
   Typography,
   message,
@@ -39,6 +38,7 @@ import {
   labelResultadoManufatura,
   labelStatusInspecao,
 } from './FormularioDimensional';
+import Tabela from '../../components/Tabela';
 
 // Detalhe da inspecao da Manufatura: mostra TODAS as tentativas (1a inspecao e
 // reinspecoes), cada uma com seu proprio numero, como sai no PDF do 011.06.
@@ -127,7 +127,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
       </Card>
 
       {defeitos.length > 0 && (
-        <Table
+        <Tabela
           style={{ marginTop: 12 }}
           size="small"
           rowKey={(_, i) => String(i)}

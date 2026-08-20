@@ -11,7 +11,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   Upload,
@@ -53,6 +52,7 @@ import {
   opcoes,
   textoReavaliacao,
 } from './comum';
+import Tabela from '../../components/Tabela';
 
 const TIPO_RELATORIO = 'AUDITORIA_RELATORIO';
 const TIPO_PLANO = 'AUDITORIA_PLANO_ACAO';
@@ -491,7 +491,7 @@ export default function AuditoriaDetalhe() {
                   a revisão igual ao número da rodada. O resultado do registro e o
                   prazo de reavaliação saem sempre da rodada mais recente.
                 </Typography.Paragraph>
-                <Table
+                <Tabela
                   rowKey="rodada"
                   size="small"
                   pagination={false}
@@ -603,7 +603,7 @@ export default function AuditoriaDetalhe() {
                     </Descriptions.Item>
                   </Descriptions>
 
-                  <Table
+                  <Tabela
                     rowKey="codigo"
                     size="small"
                     pagination={false}
@@ -653,7 +653,7 @@ export default function AuditoriaDetalhe() {
                     ]}
                   />
 
-                  <Table
+                  <Tabela
                     rowKey="codigo"
                     size="small"
                     pagination={false}

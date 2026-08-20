@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { rotuloTipoDesvio } from '../../comum/tipo-desvio';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -190,8 +191,8 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   y += 30;
 
   // ---------- Descricao do desvio ----------
-  const desvio =
-    (rnc.tipoDesvio ? `[${rnc.tipoDesvio}] ` : '') + (rnc.descricaoDesvio ?? '');
+  const tipo = rotuloTipoDesvio(rnc.tipoDesvio);
+  const desvio = (tipo ? `[${tipo}] ` : '') + (rnc.descricaoDesvio ?? '');
   y = secao(y, 'Descrição do Desvio', 'Deviation Description', desvio, 95);
 
   // ---------- Disposicao ----------

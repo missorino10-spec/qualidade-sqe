@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RncService } from '../rnc/rnc.service';
+import { TIPO_DESVIO } from '../../comum/tipo-desvio';
 import {
   numeroDocumento,
   semanaAno,
@@ -429,9 +430,10 @@ export class InspecoesService {
           po: dto.po,
           quantidadeLote: dto.qtdTotal,
           quantidadePecas: dto.qtdTotal,
-          tipoDesvio: itensReprovados.length
-            ? `Visual: ${itensReprovados.join('; ')}`
-            : 'Inspeção Visual reprovada',
+          // O tipo e so a natureza do desvio (VISUAL / DIMENSIONAL). O que
+          // exatamente reprovou vai na descricao: quando os itens reprovados
+          // iam para o tipo, a coluna da listagem virava um paragrafo.
+          tipoDesvio: TIPO_DESVIO.VISUAL,
           descricaoDesvio:
             dto.observacoes ||
             (itensReprovados.length
@@ -499,7 +501,7 @@ export class InspecoesService {
           po: dto.po,
           quantidadeLote: dto.qtdTotal,
           quantidadePecas: dto.qtdTotal,
-          tipoDesvio: 'Dimensional',
+          tipoDesvio: TIPO_DESVIO.DIMENSIONAL,
           descricaoDesvio:
             dto.observacoes ||
             'Não conformidade dimensional identificada na inspeção de lote.',

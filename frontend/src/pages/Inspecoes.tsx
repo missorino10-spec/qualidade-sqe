@@ -17,7 +17,6 @@ import {
   Space,
   Steps,
   Switch,
-  Table,
   Tag,
   Typography,
   Upload,
@@ -47,6 +46,8 @@ import {
   enviarFotosEvidencia,
 } from '../components/FotosEvidencia';
 import { EVID, ORIGENS_RECEBIMENTO } from '../inspecao';
+import Tabela from '../components/Tabela';
+import { TIPOS_DESVIO } from '../tipo-desvio';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
@@ -563,7 +564,8 @@ export default function Inspecoes() {
         </Button>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar inspeção (número, fornecedor, item, NF...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
@@ -1142,7 +1144,10 @@ export default function Inspecoes() {
                 label="Tipo de desvio"
                 rules={[{ required: true, message: 'Informe o tipo de desvio.' }]}
               >
-                <Input />
+                <Select
+                  placeholder="Dimensional ou Visual"
+                  options={TIPOS_DESVIO.map((t) => ({ value: t, label: t }))}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>

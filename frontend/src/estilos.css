@@ -30,3 +30,37 @@
 .ant-card-extra {
   max-width: 100%;
 }
+
+/* Campo de busca da tabela (ver components/Tabela.tsx). Em tablet o campo
+   ocupa a largura toda; no desktop fica com largura de leitura. */
+.tabela-busca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tabela-busca .ant-input-affix-wrapper {
+  max-width: 320px;
+}
+
+/* Barra de rolagem lateral no topo da tabela (ver components/Tabela.tsx). A
+   barra nativa continua rolando a tabela, mas fica invisivel: quem o usuario
+   ve e arrasta e a barra espelhada, acima do cabecalho. */
+.tabela-rolagem-topo-trilho {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Em tablet/Mac a barra so aparece durante a rolagem e o trilho ficaria
+     invisivel; a altura minima garante que ela seja sempre alcancavel. */
+  min-height: 12px;
+}
+
+.tabela-rolagem-topo .ant-table-body,
+.tabela-rolagem-topo .ant-table-content {
+  scrollbar-width: none;
+}
+
+.tabela-rolagem-topo .ant-table-body::-webkit-scrollbar:horizontal,
+.tabela-rolagem-topo .ant-table-content::-webkit-scrollbar:horizontal {
+  height: 0;
+}

@@ -9,7 +9,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Typography,
 } from 'antd';
 import { OPCOES_NORMA, cotaVaziaPecas } from '../../components/TabelaCotas';
@@ -22,6 +21,7 @@ import {
   resultadoDimensional,
   resultadoVisual,
 } from '../../inspecao';
+import Tabela from '../../components/Tabela';
 
 // Relatorio de inspecao da HOMOLOGACAO DE ITENS: as duas abas que substituem a
 // autoavaliacao do modulo de fornecedores.
@@ -118,7 +118,7 @@ export function ChecklistVisual({
               Tudo N/A
             </Button>
           </Space>
-          <Table
+          <Tabela
             style={{ marginTop: 8 }}
             rowKey={(_, i) => `${gi}-${i}`}
             size="small"

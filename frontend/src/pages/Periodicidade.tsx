@@ -7,7 +7,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Table,
   Tag,
   Typography,
   message,
@@ -15,6 +14,7 @@ import {
 import { EditOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import Tabela from '../components/Tabela';
 
 const corClasse: Record<string, string> = {
   A: 'green',
@@ -66,7 +66,8 @@ export default function Periodicidade() {
         message="Como funciona"
         description="A classificação de fornecimento (A, B, C ou D) define a frequência de inspeção, o percentual de amostra e o NQA aplicado no recebimento. Ajuste os valores abaixo conforme a política de qualidade da empresa."
       />
-      <Table
+      <Tabela
+        busca="Buscar classificação"
         rowKey="classificacao"
         loading={isLoading}
         dataSource={data}

@@ -8,7 +8,6 @@ import {
   Row,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
   message,
@@ -23,6 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
 import { dataInput, separadoresBR } from '../../formatos';
+import Tabela from '../../components/Tabela';
 
 // Lancamento da producao (qtd produzida e qtd com defeito) e o PPM resultante,
 // como na planilha. PPM = (pecas com defeito / pecas produzidas) * 1.000.000.
@@ -198,7 +198,8 @@ export default function ProducaoDiaria() {
         {indicadores(resumo, carregandoResumo)}
 
         <Card size="small" title={`Resumo por máquina — ${mes.format('MM/YYYY')}`}>
-          <Table
+          <Tabela
+            busca="Buscar máquina / linha"
             size="small"
             rowKey="maquinaId"
             loading={carregandoResumo}
@@ -305,7 +306,7 @@ export default function ProducaoDiaria() {
       {indicadores(data, isLoading)}
 
       <Card size="small" title={`Lançamento diário — ${mes.format('MM/YYYY')}`}>
-        <Table
+        <Tabela
           size="small"
           rowKey="chave"
           loading={isLoading}

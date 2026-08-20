@@ -8,7 +8,6 @@ import {
   Row,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
   message,
@@ -32,6 +31,8 @@ import {
   labelStatusRnc,
 } from './RncLista';
 import { useAuth } from '../auth';
+import Tabela from '../components/Tabela';
+import { rotuloTipoDesvio } from '../tipo-desvio';
 
 const { RangePicker } = DatePicker;
 
@@ -299,7 +300,7 @@ export default function Dashboard() {
           )
         }
       >
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingEvo}
@@ -360,7 +361,7 @@ export default function Dashboard() {
       </Card>
 
       <Card title="RNCs em andamento">
-        <Table
+        <Tabela
           rowKey="id"
           size="small"
           loading={loadingRnc}
@@ -388,7 +389,7 @@ export default function Dashboard() {
               title: 'Tipo de desvio',
               dataIndex: 'tipoDesvio',
               width: 160,
-              render: (v?: string) => v ?? '-',
+              render: (v?: string) => rotuloTipoDesvio(v) || '-',
             },
             {
               title: 'Status',

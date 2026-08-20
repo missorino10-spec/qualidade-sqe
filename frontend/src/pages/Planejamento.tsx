@@ -7,7 +7,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   message,
 } from 'antd';
@@ -21,6 +20,7 @@ import {
   opcoesFornecedor,
   opcoesItem,
 } from '../hooks';
+import Tabela, { filtrosDe } from '../components/Tabela';
 
 function semanaAtual() {
   const d = dayjs();
@@ -80,16 +80,30 @@ export default function Planejamento() {
         </Button>
       }
     >
-      <Table
+      <Tabela
+        busca="Buscar no planejamento (fornecedor, item, semana...)"
         rowKey="id"
         loading={isLoading}
         dataSource={data}
         scroll={{ x: 'max-content' }}
         columns={[
-          { title: 'Semana', dataIndex: 'semanaReferencia', width: 110 },
-          { title: 'Fornecedor', render: (_: any, r: any) => r.fornecedor?.nome },
+          {
+            title: 'Semana',
+            dataIndex: 'semanaReferencia',
+            width: 110,
+            filters: filtrosDe((data ?? []).map((r) => r.semanaReferencia)),
+            onFilter: (v: any, r: any) => r.semanaReferencia === v,
+          },
+          {
+            title: 'Fornecedor',
+            filters: filtrosDe((data ?? []).map((r) => r.fornecedor?.nome)),
+            onFilter: (v: any, r: any) => r.fornecedor?.nome === v,
+            render: (_: any, r: any) => r.fornecedor?.nome,
+          },
           {
             title: 'Item',
+            filters: filtrosDe((data ?? []).map((r) => r.item?.descricao)),
+            onFilter: (v: any, r: any) => r.item?.descricao === v,
             render: (_: any, r: any) => r.item?.descricao ?? '(todos)',
           },
           {
@@ -101,6 +115,12 @@ export default function Planejamento() {
             title: 'Status',
             dataIndex: 'status',
             width: 120,
+            filters: [
+              { text: 'Entregue', value: 'ENTREGUE' },
+              { text: 'Pendente', value: 'PENDENTE' },
+            ],
+            onFilter: (v: any, r: any) =>
+              v === 'ENTREGUE' ? r.status === 'ENTREGUE' : r.status !== 'ENTREGUE',
             render: (s: string) =>
               s === 'ENTREGUE' ? (
                 <Tag color="green">Entregue</Tag>
