@@ -578,7 +578,6 @@ export default function Inspecoes() {
             title: 'Inspeção',
             dataIndex: 'numeroInspecao',
             width: 140,
-            fixed: 'left' as const,
             render: (n: string | null, r: any) =>
               n ? (
                 <Button

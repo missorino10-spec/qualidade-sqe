@@ -191,9 +191,84 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   y += 30;
 
   // ---------- Descricao do desvio ----------
+  // As cotas reprovadas saem DENTRO do quadro da descricao, e nao mais num
+  // anexo no fim do PDF: quem le a RNC ve o desvio e a medicao que o comprova
+  // no mesmo lugar. As cotas vem da inspecao vinculada (leitura ao vivo), e
+  // nao de uma copia gravada na RNC.
+  const cotas: any[] = Array.isArray(rnc.inspecaoLote?.cotas)
+    ? rnc.inspecaoLote.cotas
+    : [];
+  const reprovadas = cotas.filter((c) => c?.conforme === false);
+
   const tipo = rotuloTipoDesvio(rnc.tipoDesvio);
   const desvio = (tipo ? `[${tipo}] ` : '') + (rnc.descricaoDesvio ?? '');
-  y = secao(y, 'Descrição do Desvio', 'Deviation Description', desvio, 95);
+
+  // Cotas que nao couberam na folha 1 e continuam na pagina seguinte.
+  let sobraCotas: any[] = [];
+
+  if (!reprovadas.length) {
+    y = secao(y, 'Descrição do Desvio', 'Deviation Description', desvio, 95);
+  } else {
+    const ALTURA_TEXTO = 46;
+    const ALT_CAB = 22; // cabecalho da tabela de cotas
+    const ALT_LINHA = 16;
+    const AREA_FOTO_MIN = 120;
+    // O formulario oficial e de uma folha so. Medindo do fim util da pagina
+    // para tras - registro fotografico (16 da faixa + area minima) e
+    // disposicao (16 + 80) -, sobra o teto que o quadro da descricao pode
+    // ocupar sem empurrar o resto do formulario para fora.
+    const teto = doc.page.height - 60 - AREA_FOTO_MIN - 16 - 96;
+    const inicioTabela = y + 16 + ALTURA_TEXTO + 12;
+    const cabem = Math.max(
+      1,
+      Math.floor((teto - inicioTabela - ALT_CAB) / ALT_LINHA),
+    );
+    const naFolha = reprovadas.slice(0, cabem);
+    sobraCotas = reprovadas.slice(cabem);
+    const altura =
+      ALTURA_TEXTO + 12 + ALT_CAB + naFolha.length * ALT_LINHA + 6;
+
+    doc.lineWidth(0.8).strokeColor(PRETO).rect(X0, y, W, 16).stroke();
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .fillColor(PRETO)
+      .text('Descrição do Desvio', X0 + 4, y + 2, {
+        width: W - 8,
+        continued: true,
+      })
+      .font('Helvetica-Oblique')
+      .fontSize(6.5)
+      .fillColor(CINZA)
+      .text('   Deviation Description');
+    doc.lineWidth(0.8).strokeColor(PRETO).rect(X0, y + 16, W, altura).stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .fillColor(PRETO)
+      .text(desvio || '', X0 + 5, y + 21, {
+        width: W - 10,
+        height: ALTURA_TEXTO - 8,
+      });
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .fillColor(CINZA)
+      .text(
+        'Cotas reprovadas / Rejected dimensions',
+        X0 + 5,
+        y + 16 + ALTURA_TEXTO,
+        { width: W - 10 },
+      );
+    desenharTabelaCotas(doc, naFolha, {
+      x0: X0 + 5,
+      largura: W - 10,
+      y: inicioTabela,
+      margem: M,
+      rodape: 60,
+    });
+    y += 16 + altura;
+  }
 
   // ---------- Disposicao ----------
   y = secao(y, 'Disposição', 'Disposition', rnc.disposicao ?? '', 80);
@@ -250,21 +325,16 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       });
   }
 
-  // ---------- Anexo: cotas reprovadas ----------
-  // O formulario oficial e de uma pagina so, entao a tabela do dimensional
-  // entra como anexo. As cotas vem da inspecao vinculada (leitura ao vivo),
-  // e nao de uma copia gravada na RNC.
-  const cotas: any[] = Array.isArray(rnc.inspecaoLote?.cotas)
-    ? rnc.inspecaoLote.cotas
-    : [];
-  const reprovadas = cotas.filter((c) => c?.conforme === false);
-  if (reprovadas.length) {
+  // ---------- Continuacao das cotas reprovadas ----------
+  // So existe quando ha mais cotas do que cabem no quadro da descricao na
+  // folha 1. No caso normal (poucas cotas) o PDF continua com uma pagina so.
+  if (sobraCotas.length) {
     doc.addPage();
     doc
       .font('Helvetica-Bold')
       .fontSize(11)
       .fillColor(PRETO)
-      .text('Cotas Reprovadas', X0, M, { width: W });
+      .text('Cotas Reprovadas (continuação)', X0, M, { width: W });
     doc
       .font('Helvetica-Oblique')
       .fontSize(8)
@@ -275,7 +345,7 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
         M + 15,
         { width: W },
       );
-    desenharTabelaCotas(doc, reprovadas, {
+    desenharTabelaCotas(doc, sobraCotas, {
       x0: X0,
       largura: W,
       y: M + 34,

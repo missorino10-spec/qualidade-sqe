@@ -2,7 +2,11 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
-import { labelNorma, labelOrigemInspecao } from '../../comum/inspecao';
+import {
+  checklistDoRelatorio,
+  labelNorma,
+  labelOrigemInspecao,
+} from '../../comum/inspecao';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
 
 const LARANJA = '#E8792B';
@@ -317,9 +321,8 @@ export function gerarPdfInspecao(
   // ---------------------------------------------------------- visual
   if (insp.visual) {
     faixa('INSPEÇÃO VISUAL — checklist preenchido');
-    const checklist = Array.isArray(insp.visual.checklist)
-      ? insp.visual.checklist
-      : [];
+    // So o que foi avaliado: os itens em "N/A" ficam de fora do relatorio.
+    const checklist = checklistDoRelatorio(insp.visual.checklist);
     for (const grupo of checklist) {
       espaco(16);
       doc

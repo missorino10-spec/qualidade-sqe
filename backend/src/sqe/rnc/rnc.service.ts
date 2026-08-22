@@ -462,24 +462,15 @@ export class RncService {
         )
       : rnc.tempoRetornoDias;
 
-    // Envio ao fornecedor: marcado como enviado, exige a data (retroativa e
-    // permitida). Desmarcado, a data cai junto para o lead time nao mentir.
+    // Envio ao fornecedor: a data e carimbada pelo servidor, nao escolhida por
+    // quem edita - e o lead time interno da Qualidade e nao pode ser ajustado
+    // depois. Marcou como enviada, grava o dia de hoje; desmarcou, a data cai
+    // junto para o lead time nao mentir. Data ja gravada nunca muda, e por isso
+    // que o dataEnvioFornecedor que vem do formulario e ignorado.
     const enviadaFornecedor = data.enviadaFornecedor ?? rnc.enviadaFornecedor;
     const dataEnvioFornecedor = !enviadaFornecedor
       ? null
-      : data.dataEnvioFornecedor !== undefined
-        ? data.dataEnvioFornecedor
-          ? new Date(data.dataEnvioFornecedor)
-          : null
-        : rnc.dataEnvioFornecedor;
-    const mexeuNoEnvio =
-      enviadaFornecedor !== rnc.enviadaFornecedor ||
-      data.dataEnvioFornecedor !== undefined;
-    if (enviadaFornecedor && mexeuNoEnvio && !dataEnvioFornecedor) {
-      throw new BadRequestException(
-        'Informe a data de envio da RNC ao fornecedor.',
-      );
-    }
+      : (rnc.dataEnvioFornecedor ?? new Date());
 
     const statusAnterior = rnc.status;
     const novoStatus = data.status ?? rnc.status;

@@ -23,6 +23,7 @@ import { CotasSomenteLeitura } from '../components/TabelaCotas';
 import { FotosEvidenciaSalvas } from '../components/FotosEvidencia';
 import {
   EVID,
+  checklistDoRelatorio,
   labelOrigemInspecao,
   textoDesenho,
   textoRevisao,
@@ -44,9 +45,10 @@ const labelStatusItem: Record<string, string> = {
 };
 
 function ChecklistPreenchido({ checklist }: { checklist: any }) {
-  const grupos = Array.isArray(checklist) ? checklist : [];
+  // Relatorio so mostra o que foi avaliado: os itens em "N/A" ficam de fora.
+  const grupos = checklistDoRelatorio(checklist);
   if (!grupos.length)
-    return <Empty description="Checklist sem itens registrados" />;
+    return <Empty description="Nenhum item avaliado neste checklist" />;
   return (
     <>
       {grupos.map((g: any) => (

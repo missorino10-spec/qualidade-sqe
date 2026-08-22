@@ -57,7 +57,12 @@ import {
   UploadFotosEvidencia,
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
-import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
+import {
+  EVID,
+  checklistDoRelatorio,
+  textoDesenho,
+  textoRevisao,
+} from '../../inspecao';
 import {
   corResultadoItem,
   corStatusHomologacao,
@@ -757,7 +762,8 @@ export default function HomologacaoItemDetalhe() {
                   <Divider orientation="left" plain>
                     VISUAL — Doc. BDBR.QUA.FMR.06.07
                   </Divider>
-                  {((recente.checklistVisual ?? []) as GrupoVisual[]).map(
+                  {/* So o que foi avaliado: os itens em "N/A" ficam de fora. */}
+                  {checklistDoRelatorio(recente.checklistVisual).map(
                     (g) => (
                       <div key={g.grupo} style={{ marginTop: 12 }}>
                         <Typography.Text strong>{g.grupo}</Typography.Text>

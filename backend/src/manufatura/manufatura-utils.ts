@@ -2,10 +2,20 @@
 // A semana e o trimestre fiscal sao os mesmos do SQE (regra da empresa),
 // entao reaproveitamos de sqe-utils em vez de duplicar a regra.
 
-export type PrefixoManufatura = 'SET' | 'PROD' | 'CNQ' | '8D' | '5G';
+// SETV/PRODV sao a inspecao VISUAL: serie propria, separada da do dimensional,
+// para que cada documento tenha a sua sequencia continua.
+export type PrefixoManufatura =
+  | 'SET'
+  | 'PROD'
+  | 'SETV'
+  | 'PRODV'
+  | 'CNQ'
+  | '8D'
+  | '5G';
 
 // Numeracao dos documentos da manufatura, no mesmo padrao do SQE:
-// SET0001/2026, PROD0001/2026, CNQ0001/2026, 8D0001/2026, 5G0001/2026.
+// SET0001/2026, PROD0001/2026, SETV0001/2026, PRODV0001/2026, CNQ0001/2026,
+// 8D0001/2026, 5G0001/2026.
 export function numeroManufatura(
   prefixo: PrefixoManufatura,
   sequencial: number,

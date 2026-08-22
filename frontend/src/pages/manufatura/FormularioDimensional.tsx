@@ -156,8 +156,6 @@ export function CamposRelatorio({
   setups,
   fotosDimensional,
   setFotosDimensional,
-  fotosVisual,
-  setFotosVisual,
 }: {
   form: any;
   maquinas?: any[];
@@ -170,8 +168,6 @@ export function CamposRelatorio({
   setups?: any[];
   fotosDimensional: any[];
   setFotosDimensional: (f: any[]) => void;
-  fotosVisual: any[];
-  setFotosVisual: (f: any[]) => void;
 }) {
   const origem = Form.useWatch('origem', form);
   const resultado = Form.useWatch('resultado', form);
@@ -291,8 +287,9 @@ export function CamposRelatorio({
       </Divider>
       <TabelaCotasMaxMin cotas={cotas} setCotas={setCotas} norma={norma} />
 
-      {/* Dois blocos de evidencia independentes. Na Manufatura preencher foto
-          e opcional: o inspetor sobe so o que precisar comprovar. */}
+      {/* Foto e opcional na Manufatura: o inspetor sobe so o que precisar
+          comprovar. A inspecao VISUAL saiu daqui - virou documento proprio,
+          com numeracao SETV/PRODV, porque acontece sozinha, sem medicao. */}
       <Divider orientation="left" plain>
         Evidências do dimensional (opcional)
       </Divider>
@@ -300,23 +297,6 @@ export function CamposRelatorio({
         fotos={fotosDimensional}
         setFotos={setFotosDimensional}
       />
-
-      {/* Inspecao visual: opcional no setup e na producao. E campo aberto -
-          nao ha checklist aqui -, com as fotos do que foi observado. */}
-      <Divider orientation="left" plain>
-        Inspeção visual (opcional)
-      </Divider>
-      <Form.Item
-        name="inspecaoVisual"
-        label="O que foi observado"
-        style={{ marginBottom: 8 }}
-      >
-        <Input.TextArea
-          rows={3}
-          placeholder="Descreva a inspeção visual (acabamento, solda, pintura, rebarba...)"
-        />
-      </Form.Item>
-      <UploadFotosEvidencia fotos={fotosVisual} setFotos={setFotosVisual} />
 
       <Divider orientation="left" plain>
         Defeitos encontrados (opcional)

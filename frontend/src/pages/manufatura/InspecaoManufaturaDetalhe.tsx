@@ -112,19 +112,25 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           entidadeId={rel.id}
         />
       </Card>
-      {/* A inspecao visual e opcional: a descricao so aparece quando houve. */}
-      <Card size="small" title="Inspeção visual" style={{ marginTop: 12 }}>
-        <Typography.Paragraph
-          type={rel.inspecaoVisual ? undefined : 'secondary'}
-          style={{ whiteSpace: 'pre-wrap' }}
+      {/* A inspecao visual virou documento proprio (SETV/PRODV) e saiu do
+          formulario dimensional. Este bloco continua aqui so para os
+          relatorios ANTIGOS, que gravaram o visual dentro do dimensional -
+          sem ele, esse texto e essas fotos sumiriam da tela. */}
+      {rel.inspecaoVisual && (
+        <Card
+          size="small"
+          title="Inspeção visual (registro antigo)"
+          style={{ marginTop: 12 }}
         >
-          {rel.inspecaoVisual || 'Sem inspeção visual registrada.'}
-        </Typography.Paragraph>
-        <FotosEvidenciaSalvas
-          entidadeTipo={EVID.manufaturaVisual}
-          entidadeId={rel.id}
-        />
-      </Card>
+          <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
+            {rel.inspecaoVisual}
+          </Typography.Paragraph>
+          <FotosEvidenciaSalvas
+            entidadeTipo={EVID.manufaturaVisual}
+            entidadeId={rel.id}
+          />
+        </Card>
+      )}
 
       {defeitos.length > 0 && (
         <Tabela
@@ -189,7 +195,6 @@ export default function InspecaoManufaturaDetalhe() {
   const [cotas, setCotas] = useState<any[]>([]);
   const [defeitos, setDefeitos] = useState<any[]>([]);
   const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
-  const [fotosVisual, setFotosVisual] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const { data, isLoading } = useQuery<any>({
@@ -259,7 +264,6 @@ export default function InspecaoManufaturaDetalhe() {
     );
     setDefeitos([]);
     setFotosDimensional([]);
-    setFotosVisual([]);
     setOpen(true);
   }
 
@@ -275,20 +279,12 @@ export default function InspecaoManufaturaDetalhe() {
       // A evidencia e da tentativa, entao vai no relatorio recem-criado.
       const novos = res.data.relatorios ?? [];
       const relatorioId = novos[novos.length - 1]?.id;
-      if (relatorioId) {
-        if (fotosDimensional.length)
-          await enviarFotosEvidencia(
-            fotosDimensional,
-            EVID.manufaturaDimensional,
-            relatorioId,
-          );
-        if (fotosVisual.length)
-          await enviarFotosEvidencia(
-            fotosVisual,
-            EVID.manufaturaVisual,
-            relatorioId,
-          );
-      }
+      if (relatorioId && fotosDimensional.length)
+        await enviarFotosEvidencia(
+          fotosDimensional,
+          EVID.manufaturaDimensional,
+          relatorioId,
+        );
       message.success(`Reinspeção ${res.data.numero} registrada.`);
       qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
@@ -459,8 +455,6 @@ export default function InspecaoManufaturaDetalhe() {
             tipo={data.tipo}
             fotosDimensional={fotosDimensional}
             setFotosDimensional={setFotosDimensional}
-            fotosVisual={fotosVisual}
-            setFotosVisual={setFotosVisual}
           />
         </Form>
       </Modal>

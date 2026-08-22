@@ -47,19 +47,22 @@ model Usuario {
   // Manufatura
   inspecoesManufatura    InspecaoManufatura[]   @relation("InspManufaturaInspetor")
   relatoriosDimensionais RelatorioDimensional[] @relation("RelatorioInspetor")
-  producaoRegistrada     ProducaoDiaria[]       @relation("ProducaoRegistradaPor")
-  cnqs                   Cnq[]                  @relation("CnqCriadoPor")
-  oitoDsCriados          OitoD[]                @relation("OitoDCriadoPor")
-  oitoDsAprovados        OitoD[]                @relation("OitoDAprovadoPor")
-  cincoGsCriados         CincoG[]               @relation("CincoGCriadoPor")
-  cincoGsAprovados       CincoG[]               @relation("CincoGAprovadoPor")
-  alertasCriados         AlertaQualidade[]      @relation("AlertaCriadoPor")
-  alertasEncerrados      AlertaQualidade[]      @relation("AlertaEncerradoPor")
-  renovacoesAlerta       RenovacaoAlerta[]      @relation("RenovacaoAlertaCriadoPor")
+
+  inspecoesVisualManufatura InspecaoVisualManufatura[] @relation("InspVisualManufaturaInspetor")
+
+  producaoRegistrada ProducaoDiaria[]  @relation("ProducaoRegistradaPor")
+  cnqs               Cnq[]             @relation("CnqCriadoPor")
+  oitoDsCriados      OitoD[]           @relation("OitoDCriadoPor")
+  oitoDsAprovados    OitoD[]           @relation("OitoDAprovadoPor")
+  cincoGsCriados     CincoG[]          @relation("CincoGCriadoPor")
+  cincoGsAprovados   CincoG[]          @relation("CincoGAprovadoPor")
+  alertasCriados     AlertaQualidade[] @relation("AlertaCriadoPor")
+  alertasEncerrados  AlertaQualidade[] @relation("AlertaEncerradoPor")
+  renovacoesAlerta   RenovacaoAlerta[] @relation("RenovacaoAlertaCriadoPor")
 
   // SQD
-  homologacoes        HomologacaoFornecedor[]  @relation("HomologacaoCriadoPor")
-  homologacoesItem    HomologacaoItem[]        @relation("HomologacaoItemCriadoPor")
+  homologacoes           HomologacaoFornecedor[] @relation("HomologacaoCriadoPor")
+  homologacoesItem       HomologacaoItem[]       @relation("HomologacaoItemCriadoPor")
   relatoriosInspecaoItem RelatorioInspecaoItem[] @relation("RelatorioItemCriadoPor")
   auditoriasFornecedor   AuditoriaFornecedor[]   @relation("AuditoriaCriadoPor")
   rodadasAuditoria       RodadaAuditoria[]       @relation("RodadaAuditoriaCriadoPor")
@@ -522,11 +525,12 @@ model Maquina {
   ativa     Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  producaoDiaria ProducaoDiaria[]
-  inspecoes      InspecaoManufatura[]
-  cnqs           Cnq[]
-  historico      HistoricoMaquina[]
-  alertas        AlertaQualidade[]
+  producaoDiaria  ProducaoDiaria[]
+  inspecoes       InspecaoManufatura[]
+  inspecoesVisual InspecaoVisualManufatura[]
+  cnqs            Cnq[]
+  historico       HistoricoMaquina[]
+  alertas         AlertaQualidade[]
 }
 
 // Apontamento diario que os operadores entregam em papel e a Qualidade digita.
@@ -686,6 +690,52 @@ model RelatorioDimensional {
   @@index([inspecaoId])
 }
 
+// INSPECAO VISUAL DA MANUFATURA - documento proprio, separado do dimensional.
+// Antes o visual era um campo opcional dentro do RelatorioDimensional; virou
+// registro proprio porque a inspecao visual acontece sozinha, sem medicao.
+//
+// Nao tem cotas nem tentativas: e um registro do que o inspetor observou
+// naquele momento, com o mesmo cabecalho do formulario dimensional. As fotos
+// vao na tabela polimorfica Anexo (EVID.manufaturaVisualInspecao).
+model InspecaoVisualManufatura {
+  id         Int                    @id @default(autoincrement())
+  tipo       TipoInspecaoManufatura
+  // Serie propria, separada da do dimensional: SETV0001/2026, PRODV0001/2026.
+  numero     String                 @unique
+  ano        Int
+  sequencial Int
+
+  maquinaId Int
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+
+  // "Rev." do proprio relatorio, preenchido a mao (comeca em 01)
+  revisao      String         @default("01")
+  dataInspecao DateTime       @default(now())
+  semana       String?
+  origem       OrigemInspecao @default(LIBERACAO_SETUP)
+  origemOutros String?
+
+  itemCodigo      String?
+  itemDescricao   String?
+  desenho         String?
+  desenhoRevisao  String?
+  po              String?
+  qtdInspecionada Float?
+  qtdTotal        Float?
+
+  // Campo aberto: o inspetor descreve o que observou.
+  observacoes String?
+
+  elaboradoPor    String?
+  inspecionadoPor String?
+  inspetorId      Int?
+  inspetor        Usuario? @relation("InspVisualManufaturaInspetor", fields: [inspetorId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([tipo, ano, sequencial])
+  @@index([tipo, dataInspecao])
+}
+
 // CNQ - Custo da Nao Qualidade. Espelha a aba "Defeitos e CNQ": um lancamento
 // por apontamento de operador. Independente das inspecoes.
 model Cnq {
@@ -794,9 +844,9 @@ model OitoD {
   cronograma Json?
 
   // Passo 2 - Analise de causa raiz (6M + 1D)
-  efeito   String?
+  efeito           String?
   // Espinha de peixe: { medicao, maquina, meioAmbiente, metodo, material, maoDeObra, projeto }
-  causas6M Json?
+  causas6M         Json?
   // Matriz Causas Potenciais x Porque 1..5
   // [{ causa, porque1, porque2, porque3, porque4, porque5 }]
   causasPotenciais Json?
@@ -1143,8 +1193,8 @@ model HomologacaoItem {
   itemDescricao    String?
 
   // --- Informacoes do documento ---
-  solicitante SolicitanteSqd?
-  motivo      MotivoHomologacaoItem?
+  solicitante  SolicitanteSqd?
+  motivo       MotivoHomologacaoItem?
   // "Custo potencial evitado" (coluna K): entra no savings do painel.
   custoEvitado Float?
 
@@ -1256,9 +1306,9 @@ model RelatorioInspecaoItem {
 // quando a Qualidade encerra a auditoria.
 
 enum ResultadoAuditoria {
-  APROVADO                  // nota >= 90
+  APROVADO // nota >= 90
   APROVADO_CONDICIONALMENTE // nota de 80 a 89,99
-  REPROVADO                 // nota < 80
+  REPROVADO // nota < 80
   CANCELADO
 }
 

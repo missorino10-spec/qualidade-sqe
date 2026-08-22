@@ -428,6 +428,24 @@ export function checklistVisualInicial(): GrupoVisual[] {
   }));
 }
 
+// Checklist como ele deve aparecer no RELATORIO (tela de detalhe e PDF): sem os
+// itens marcados como "Não aplicável". Como o checklist em branco ja nasce todo
+// em NAO_APLICAVEL, o relatorio ficava tomado por dezenas de linhas "N/A" e o
+// que realmente foi avaliado se perdia no meio. Grupo que sobra vazio some
+// junto com o cabecalho.
+//
+// Vale so na LEITURA: no formulario de preenchimento o N/A continua visivel,
+// senao o inspetor nao consegue voltar atras depois de marcar.
+export function checklistDoRelatorio(checklist: unknown): GrupoVisual[] {
+  const grupos = Array.isArray(checklist) ? (checklist as GrupoVisual[]) : [];
+  return grupos
+    .map((g) => ({
+      ...g,
+      itens: (g?.itens ?? []).filter((i) => i?.status !== 'NAO_APLICAVEL'),
+    }))
+    .filter((g) => g.itens.length > 0);
+}
+
 // A inspecao visual so e aprovada se nenhum item estiver reprovado.
 export function resultadoVisual(
   checklist: GrupoVisual[] | null | undefined,
@@ -483,7 +501,11 @@ export const EVID = {
   sqeVisual: 'INSPECAO_VISUAL',
   sqeDimensional: 'INSPECAO_LOTE',
   manufaturaDimensional: 'RELATORIO_DIMENSIONAL_DIM',
+  // Bloco visual que existia DENTRO do relatorio dimensional. Continua aqui
+  // para nao perder as fotos ja gravadas nos relatorios antigos.
   manufaturaVisual: 'RELATORIO_DIMENSIONAL_VIS',
+  // Fotos da inspecao visual da manufatura como documento proprio.
+  manufaturaVisualInspecao: 'INSPECAO_VISUAL_MANUFATURA',
   homologacaoItemDimensional: 'HOMOLOGACAO_ITEM_AMOSTRAS',
   homologacaoItemVisual: 'HOMOLOGACAO_ITEM_VISUAL',
   // Os dois paineis de foto do Alerta da Qualidade.

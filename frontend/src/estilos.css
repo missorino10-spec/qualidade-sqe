@@ -31,6 +31,13 @@
   max-width: 100%;
 }
 
+/* O Descriptions com borda e uma <table>: se qualquer celula empurrar a largura,
+   o navegador rouba espaco da coluna do rotulo e "Abertura" vira uma letra por
+   linha. O nowrap garante que o rotulo sempre reserve o espaco dele. */
+.ant-descriptions-bordered .ant-descriptions-item-label {
+  white-space: nowrap;
+}
+
 /* Campo de busca da tabela (ver components/Tabela.tsx). Em tablet o campo
    ocupa a largura toda; no desktop fica com largura de leitura. */
 .tabela-busca {

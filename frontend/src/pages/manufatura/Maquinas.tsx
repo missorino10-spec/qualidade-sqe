@@ -114,7 +114,6 @@ export default function Maquinas() {
             {
               title: '',
               width: 60,
-              fixed: 'right',
               align: 'center',
               render: (_: any, r: any) => (
                 <Button

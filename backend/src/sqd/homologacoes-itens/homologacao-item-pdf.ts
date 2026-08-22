@@ -28,7 +28,11 @@ import {
 } from './itens-utils';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
-import { labelNorma, labelOrigemInspecao } from '../../comum/inspecao';
+import {
+  checklistDoRelatorio,
+  labelNorma,
+  labelOrigemInspecao,
+} from '../../comum/inspecao';
 
 const LABEL_RESULTADO: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -521,7 +525,8 @@ export function gerarPdfRelatorioInspecaoItem(
   // ------------------------------------------------ aba VISUAL
   t.estado.y += 6;
   t.faixa('VISUAL — BDBR.QUA.FMR.06.07 (Rev. 07)');
-  const grupos: any[] = r.checklistVisual ?? [];
+  // So o que foi avaliado: os itens em "N/A" ficam de fora do relatorio.
+  const grupos: any[] = checklistDoRelatorio(r.checklistVisual);
   for (const g of grupos) {
     t.espaco(28);
     doc

@@ -126,6 +126,50 @@ function CamposEficacia({ form }: { form: any }) {
   );
 }
 
+// Envio do documento ao fornecedor: fecha o lead time INTERNO da Qualidade,
+// entao a data nao pode ser escolhida a dedo. Marcou "Sim", carimba o dia de
+// hoje e trava; voltou para "Não", a data cai junto. Data ja gravada nunca
+// muda - quem manda e o servidor, aqui e so o espelho do que ele vai gravar.
+function CamposEnvioFornecedor({ form }: { form: any }) {
+  const enviada = Form.useWatch('enviadaFornecedor', form) ?? false;
+
+  return (
+    <Row gutter={12}>
+      <Col xs={24} md={8}>
+        <Form.Item
+          name="enviadaFornecedor"
+          label="Enviada para o fornecedor?"
+          valuePropName="checked"
+        >
+          <Switch
+            checkedChildren="Sim"
+            unCheckedChildren="Não"
+            onChange={(v) =>
+              form.setFieldValue(
+                'dataEnvioFornecedor',
+                v ? (form.getFieldValue('dataEnvioFornecedor') ?? dayjs()) : undefined,
+              )
+            }
+          />
+        </Form.Item>
+      </Col>
+      <Col xs={24} md={8}>
+        <Form.Item
+          name="dataEnvioFornecedor"
+          label="Data do envio"
+          extra={
+            enviada
+              ? 'Data do envio, registrada automaticamente.'
+              : 'Sem data enquanto a RNC não for enviada.'
+          }
+        >
+          <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled />
+        </Form.Item>
+      </Col>
+    </Row>
+  );
+}
+
 // O historico guarda dois tipos de evento: mudanca de status da RNC e
 // verificacao da eficacia (gravada com o prefixo EFICACIA_).
 function eventoHistorico(statusNovo: string) {
@@ -195,11 +239,9 @@ export default function RncDetalhe() {
       api.patch(`/rnc/${id}`, {
         ...v,
         dataRetorno: v.dataRetorno ? v.dataRetorno.toISOString() : undefined,
-        // null (e nao undefined) para o backend entender que a data foi
-        // apagada de proposito.
-        dataEnvioFornecedor: v.dataEnvioFornecedor
-          ? v.dataEnvioFornecedor.toISOString()
-          : null,
+        // A data de envio ao fornecedor nao vai no PATCH: quem carimba e o
+        // servidor, no dia em que a RNC e marcada como enviada.
+        dataEnvioFornecedor: undefined,
         dataVerificacao: v.dataVerificacao
           ? v.dataVerificacao.toISOString()
           : null,
@@ -522,19 +564,6 @@ export default function RncDetalhe() {
               </Descriptions.Item>
               <Descriptions.Item label="Descrição do desvio" span={2}>
                 {rnc.descricaoDesvio}
-                {/* Cotas lidas da inspecao vinculada, na mesma tabela do
-                    formulario dimensional. Se a inspecao for corrigida
-                    depois, a RNC mostra a correcao. */}
-                {cotasReprovadas.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <Typography.Text strong>
-                      Cotas reprovadas no dimensional
-                    </Typography.Text>
-                    <div style={{ marginTop: 6 }}>
-                      <CotasSomenteLeitura cotas={cotasReprovadas} />
-                    </div>
-                  </div>
-                )}
               </Descriptions.Item>
               <Descriptions.Item label="Qtd. de peças">
                 {rnc.quantidadePecas ?? '-'}
@@ -550,6 +579,20 @@ export default function RncDetalhe() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
+
+          {/* Cotas lidas da inspecao vinculada, na mesma tabela do formulario
+              dimensional. Se a inspecao for corrigida depois, a RNC mostra a
+              correcao. Fica em card proprio porque a tabela tem 13 colunas:
+              dentro de uma celula do Descriptions ela esticava o <table> e
+              esmagava os rotulos ate sobrar uma letra por linha. */}
+          {cotasReprovadas.length > 0 && (
+            <Card
+              title="Cotas reprovadas no dimensional"
+              style={{ marginTop: 16 }}
+            >
+              <CotasSomenteLeitura cotas={cotasReprovadas} />
+            </Card>
+          )}
 
           <Card title="Plano de ação" style={{ marginTop: 16 }}>
             <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
@@ -820,22 +863,7 @@ export default function RncDetalhe() {
           </Form.Item>
           {/* Lead time INTERNO da Qualidade: da abertura ao dia em que o
               documento saiu para o fornecedor. Nao sai no PDF. */}
-          <Row gutter={12}>
-            <Col xs={24} md={8}>
-              <Form.Item
-                name="enviadaFornecedor"
-                label="Enviada para o fornecedor?"
-                valuePropName="checked"
-              >
-                <Switch checkedChildren="Sim" unCheckedChildren="Não" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="dataEnvioFornecedor" label="Data do envio">
-                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <CamposEnvioFornecedor form={formEdit} />
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item

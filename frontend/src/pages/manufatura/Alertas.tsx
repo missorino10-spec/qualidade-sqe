@@ -329,7 +329,6 @@ export default function Alertas() {
             {
               title: '',
               width: 190,
-              fixed: 'right',
               render: (_: any, r: any) => (
                 <Space size={0}>
                   <Button

@@ -12,6 +12,7 @@ import Periodicidade from './pages/Periodicidade';
 import PainelManufatura from './pages/manufatura/PainelManufatura';
 import InspecoesManufatura from './pages/manufatura/InspecoesManufatura';
 import InspecaoManufaturaDetalhe from './pages/manufatura/InspecaoManufaturaDetalhe';
+import InspecaoVisualDetalhe from './pages/manufatura/InspecaoVisualDetalhe';
 import Cnq from './pages/manufatura/Cnq';
 import OitoD from './pages/manufatura/OitoD';
 import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
@@ -54,6 +55,11 @@ export default function App() {
       <Route
         path="/manufatura/inspecoes/producao"
         element={<Privado><InspecoesManufatura tipo="PRODUCAO" /></Privado>}
+      />
+      {/* Antes de ":id" porque "inspecoes-visuais" nao e um id. */}
+      <Route
+        path="/manufatura/inspecoes-visuais/:id"
+        element={<Privado><InspecaoVisualDetalhe /></Privado>}
       />
       <Route
         path="/manufatura/inspecoes/:id"

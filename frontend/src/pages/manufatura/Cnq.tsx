@@ -338,7 +338,6 @@ export default function Cnq() {
             {
               title: '',
               width: 140,
-              fixed: 'right',
               render: (_: any, r: any) => (
                 <Space size={0}>
                   {/* Nem todo CNQ vira 8D: a maioria e resolvida com o 5G, no

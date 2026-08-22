@@ -64,8 +64,9 @@ class AtualizarRncDto {
   @IsOptional() @IsString() dataRetorno?: string;
   // Envio do documento ao fornecedor: fecha o lead time INTERNO da Qualidade.
   // Nao sai no PDF - e controle de processo, so aparece na tela do sistema.
+  // A data nao entra aqui de proposito: quem carimba e o servidor, no dia em
+  // que a RNC foi marcada como enviada.
   @IsOptional() @IsBoolean() enviadaFornecedor?: boolean;
-  @IsOptional() @IsString() dataEnvioFornecedor?: string;
   @IsOptional() @IsString() fornecedorAceitou?: string;
   @IsOptional() @IsBoolean() fornecedorEnviouPlano?: boolean;
   @IsOptional()
