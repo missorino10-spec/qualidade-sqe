@@ -115,7 +115,7 @@ export default function InspecaoVisualDetalhe() {
         <Descriptions
           size="small"
           bordered
-          column={{ xs: 1, sm: 2, md: 2, lg: 3 }}
+          column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }}
         >
           <Descriptions.Item label="Máquina" span={2}>
             {data.maquina

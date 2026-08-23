@@ -21,6 +21,7 @@ import {
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
   FilePdfOutlined,
   SaveOutlined,
   UploadOutlined,
@@ -253,6 +254,20 @@ export default function CincoGDetalhe() {
     }
   }
 
+  // Excluir apaga o 5G inteiro. E o caminho para o documento aberto por
+  // engano; o 5G valido fica no historico mesmo depois de aprovado.
+  async function remover() {
+    try {
+      await api.delete(`/manufatura/5g/${id}`);
+      message.success('5G excluído.');
+      qc.invalidateQueries({ queryKey: ['manufatura-5g'] });
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
+      navigate('/manufatura/8d');
+    } catch (e: any) {
+      message.error(e?.response?.data?.message ?? 'Não foi possível excluir o 5G.');
+    }
+  }
+
   return (
     <Form form={form} layout="vertical">
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -304,6 +319,17 @@ export default function CincoGDetalhe() {
               >
                 Exportar PDF
               </Button>
+              <Popconfirm
+                title="Excluir este 5G?"
+                description="A exclusão é definitiva."
+                okText="Excluir"
+                cancelText="Cancelar"
+                onConfirm={remover}
+              >
+                <Button danger icon={<DeleteOutlined />}>
+                  Excluir
+                </Button>
+              </Popconfirm>
             </Space>
           }
         >

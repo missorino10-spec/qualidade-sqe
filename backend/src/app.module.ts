@@ -9,6 +9,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { FornecedoresModule } from './fornecedores/fornecedores.module';
 import { PeriodicidadeModule } from './periodicidade/periodicidade.module';
 import { ItensModule } from './itens/itens.module';
+import { InstrumentosModule } from './instrumentos/instrumentos.module';
 import { AnexosModule } from './anexos/anexos.module';
 import { HistoricoModule } from './historico/historico.module';
 import { PlanejamentoModule } from './sqe/planejamento/planejamento.module';
@@ -53,6 +54,7 @@ const servirFrontend = existsSync(frontendDir);
     FornecedoresModule,
     PeriodicidadeModule,
     ItensModule,
+    InstrumentosModule,
     AnexosModule,
     HistoricoModule,
     PlanejamentoModule,

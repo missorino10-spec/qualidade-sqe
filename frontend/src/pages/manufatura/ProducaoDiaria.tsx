@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   InputNumber,
+  Popconfirm,
   Row,
   Space,
   Statistic,
@@ -90,8 +91,29 @@ export default function ProducaoDiaria() {
       qtdProduzida: valorCelula(editado, salvo, 'qtdProduzida'),
       qtdDefeito: valorCelula(editado, salvo, 'qtdDefeito'),
       alterado: !!editado,
+      producaoId: salvo?.id,
     };
   });
+
+  // Apagar o apontamento devolve o dia para "em branco". Zerar os campos nao
+  // serve: zero produzido conta como dia apontado no resumo do mes.
+  async function excluirDia(r: any) {
+    try {
+      await api.delete(`/maquinas/${maquinaId}/producao/${r.producaoId}`);
+      message.success(`Apontamento de ${r.dia.format('DD/MM')} excluído.`);
+      setLinhas((atual) => {
+        const { [r.chave]: _fora, ...resto } = atual;
+        return resto;
+      });
+      qc.invalidateQueries({ queryKey: ['maquina-producao', maquinaId] });
+      qc.invalidateQueries({ queryKey: ['producao-resumo'] });
+      qc.invalidateQueries({ queryKey: ['maquinas'] });
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir o apontamento.',
+      );
+    }
+  }
 
   function editar(chave: string, campo: string, valor: any) {
     setLinhas((atual) => ({
@@ -360,6 +382,24 @@ export default function ProducaoDiaria() {
               title: '',
               render: (_: any, r: any) =>
                 r.alterado ? <Tag color="gold">Não salvo</Tag> : null,
+            },
+            {
+              title: '',
+              width: 90,
+              align: 'right',
+              render: (_: any, r: any) =>
+                r.producaoId ? (
+                  <Popconfirm
+                    title={`Excluir o apontamento de ${r.dia.format('DD/MM')}?`}
+                    okText="Excluir"
+                    cancelText="Cancelar"
+                    onConfirm={() => excluirDia(r)}
+                  >
+                    <Button size="small" danger>
+                      Excluir
+                    </Button>
+                  </Popconfirm>
+                ) : null,
             },
           ]}
         />

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcularPpm } from '../manufatura-utils';
 
@@ -70,6 +74,23 @@ export class MaquinasService {
   async atualizar(id: number, dto: any) {
     await this.detalhe(id);
     return this.prisma.maquina.update({ where: { id }, data: dto });
+  }
+
+  // Excluir de verdade e so do ADMIN. Maquina com inspecao, CNQ ou producao
+  // apontada nao sai: o banco recusa e a tela mostra o motivo - nesse caso o
+  // caminho e inativar.
+  async remover(id: number) {
+    await this.detalhe(id);
+    try {
+      await this.prisma.maquina.delete({ where: { id } });
+      return { ok: true };
+    } catch (e: any) {
+      if (e?.code === 'P2003')
+        throw new BadRequestException(
+          'Esta máquina já está sendo usada em outros registros e não pode ser excluída. Use "Inativar".',
+        );
+      throw e;
+    }
   }
 
   // ------------------------------------------------- grade de producao diaria

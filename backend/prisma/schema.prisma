@@ -66,6 +66,9 @@ model Usuario {
   relatoriosInspecaoItem RelatorioInspecaoItem[] @relation("RelatorioItemCriadoPor")
   auditoriasFornecedor   AuditoriaFornecedor[]   @relation("AuditoriaCriadoPor")
   rodadasAuditoria       RodadaAuditoria[]       @relation("RodadaAuditoriaCriadoPor")
+
+  // Metrologia
+  instrumentos Instrumento[] @relation("InstrumentoCriadoPor")
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)
@@ -143,10 +146,17 @@ model Contato {
 }
 
 model Item {
-  id           Int         @id @default(autoincrement())
-  codigo       String      @unique
-  descricao    String
-  unidade      String?
+  id        Int    @id @default(autoincrement())
+  codigo    String @unique
+  descricao String
+  unidade   String?
+  // Custo unitario em R$ vindo da "Base de Codigos e Custo". E o valor que
+  // alimenta valorUnitario da RNC e do CNQ quando o codigo e digitado. Fica
+  // opcional porque item digitado na mao (fora da base) nao tem custo.
+  custoUnitario Float?
+  // Cadastro nao se apaga por padrao: inativa. Item inativo some das buscas
+  // dos formularios, mas continua nos registros antigos que apontam para ele.
+  ativo        Boolean     @default(true)
   fornecedorId Int?
   fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
   createdAt    DateTime    @default(now())
@@ -1400,4 +1410,45 @@ model RodadaAuditoria {
   updatedAt   DateTime @updatedAt
 
   @@unique([auditoriaId, rodada])
+}
+
+// ---------------------------------------------------------------------------
+// INVENTARIO DE INSTRUMENTOS E EQUIPAMENTOS - BDBR.QUA.FMR.004.01
+//
+// Copia fiel das nove colunas da planilha. Duas observacoes que vieram do
+// arquivo real e mandam no modelo:
+//   - o CODIGO nao e chave: 35 linhas vem com "-" e varios codigos aparecem
+//     repetidos (a barra padrao herda o codigo do micrometro a que pertence).
+//     Por isso e texto opcional, sem @unique.
+//   - PROXIMA CALIBRACAO e campo gravado, nao conta. Nas 52 linhas do arquivo
+//     ela e sempre calibracao + 730 dias enquanto o PERIODO (ANOS) esta
+//     preenchido com 1 - quem vale e a data do certificado. O sistema apenas
+//     SUGERE "calibracao + periodo" quando o campo vem vazio.
+// ---------------------------------------------------------------------------
+model Instrumento {
+  id          Int     @id @default(autoincrement())
+  codigo      String?
+  equipamento String
+  fabricante  String?
+  numeroSerie String?
+
+  dataCalibracao    DateTime?
+  periodoAnos       Int?
+  proximaCalibracao DateTime?
+  numeroCertificado String?
+
+  localizacao String?
+  observacoes String?
+
+  // Cadastro nao se apaga por padrao: inativa. Instrumento inativo sai do
+  // inventario e do controle de vencimento, mas o registro continua.
+  ativo Boolean @default(true)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("InstrumentoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ativo])
+  @@index([proximaCalibracao])
 }

@@ -1,6 +1,7 @@
 import { Col, Divider, Form, Input, InputNumber, Row, Select } from 'antd';
 import { ORIGENS_INSPECAO } from '../../inspecao';
 import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
+import { CamposItem } from '../../components/CamposItem';
 
 // INSPECAO VISUAL DA MANUFATURA - documento proprio, sem cotas.
 // O cabecalho e o mesmo do relatorio dimensional (011.06); o que muda e o
@@ -53,23 +54,11 @@ export function CamposVisual({
         </Col>
       </Row>
 
-      <Row gutter={12}>
-        <Col span={7}>
-          <Form.Item name="itemCodigo" label="Nº do item">
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col span={11}>
-          <Form.Item name="itemDescricao" label="Descrição">
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item name="po" label="PO">
-            <Input />
-          </Form.Item>
-        </Col>
-      </Row>
+      <CamposItem form={form} spanCodigo={8} spanDescricao={16} />
+
+      <Form.Item name="po" label="PO">
+        <Input />
+      </Form.Item>
 
       <Row gutter={12}>
         <Col span={8}>

@@ -15,20 +15,10 @@ export function useFornecedores() {
   });
 }
 
-export function useItens() {
-  return useQuery<any[]>({
-    queryKey: ['itens'],
-    queryFn: async () => (await api.get('/itens')).data,
-  });
-}
+// A base de itens tem ~14.400 codigos: nenhuma tela baixa a lista inteira.
+// Quem precisa escolher um item usa o SelectItem/CamposItem, que buscam no
+// servidor conforme o usuario digita.
 
 export function opcoesFornecedor(lista?: any[]) {
   return (lista ?? []).map((f) => ({ value: f.id, label: `${f.codigo} — ${f.nome}` }));
-}
-
-export function opcoesItem(lista?: any[]) {
-  return (lista ?? []).map((i) => ({
-    value: i.id,
-    label: `${i.codigo} — ${i.descricao}`,
-  }));
 }

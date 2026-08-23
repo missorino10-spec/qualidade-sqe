@@ -493,6 +493,19 @@ export default function OitoDDetalhe() {
     }
   }
 
+  // Excluir apaga o 8D inteiro. E o caminho para o documento aberto por
+  // engano; o 8D valido fica no historico mesmo depois de aprovado.
+  async function remover() {
+    try {
+      await api.delete(`/manufatura/8d/${id}`);
+      message.success('8D excluído.');
+      qc.invalidateQueries({ queryKey: ['manufatura-8d'] });
+      navigate('/manufatura/8d');
+    } catch (e: any) {
+      message.error(e?.response?.data?.message ?? 'Não foi possível excluir o 8D.');
+    }
+  }
+
   const edCausas = criarEditor(causasPotenciais, setCausasPotenciais);
   const edPlano = criarEditor(planoAcao, setPlanoAcao);
 
@@ -547,6 +560,17 @@ export default function OitoDDetalhe() {
               >
                 Exportar PDF
               </Button>
+              <Popconfirm
+                title="Excluir este 8D?"
+                description="A exclusão é definitiva."
+                okText="Excluir"
+                cancelText="Cancelar"
+                onConfirm={remover}
+              >
+                <Button danger icon={<DeleteOutlined />}>
+                  Excluir
+                </Button>
+              </Popconfirm>
             </Space>
           }
         >

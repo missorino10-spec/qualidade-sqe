@@ -4,6 +4,7 @@ import { AppLayout } from './components/AppLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Fornecedores from './pages/Fornecedores';
+import Itens from './pages/Itens';
 import Inspecoes from './pages/Inspecoes';
 import InspecaoDetalhe from './pages/InspecaoDetalhe';
 import RncLista from './pages/RncLista';
@@ -27,6 +28,7 @@ import HomologacoesItens from './pages/sqd/HomologacoesItens';
 import HomologacaoItemDetalhe from './pages/sqd/HomologacaoItemDetalhe';
 import Auditorias from './pages/sqd/Auditorias';
 import AuditoriaDetalhe from './pages/sqd/AuditoriaDetalhe';
+import Instrumentos from './pages/Instrumentos';
 
 function Privado({ children }: { children: JSX.Element }) {
   const { usuario } = useAuth();
@@ -41,6 +43,7 @@ export default function App() {
       <Route path="/" element={<Privado><Dashboard /></Privado>} />
       <Route path="/periodicidade" element={<Privado><Periodicidade /></Privado>} />
       <Route path="/fornecedores" element={<Privado><Fornecedores /></Privado>} />
+      <Route path="/itens" element={<Privado><Itens /></Privado>} />
       <Route path="/inspecoes" element={<Privado><Inspecoes /></Privado>} />
       <Route path="/inspecoes/:id" element={<Privado><InspecaoDetalhe /></Privado>} />
       <Route path="/rnc" element={<Privado><RncLista /></Privado>} />
@@ -92,6 +95,12 @@ export default function App() {
       <Route
         path="/sqd/auditorias/:id"
         element={<Privado><AuditoriaDetalhe /></Privado>}
+      />
+
+      {/* Instrumentos - BDBR.QUA.FMR.004.01 */}
+      <Route
+        path="/instrumentos/inventario"
+        element={<Privado><Instrumentos /></Privado>}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

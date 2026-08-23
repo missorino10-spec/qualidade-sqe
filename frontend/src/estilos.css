@@ -31,11 +31,18 @@
   max-width: 100%;
 }
 
-/* O Descriptions com borda e uma <table>: se qualquer celula empurrar a largura,
-   o navegador rouba espaco da coluna do rotulo e "Abertura" vira uma letra por
-   linha. O nowrap garante que o rotulo sempre reserve o espaco dele. */
+/* Rotulo do Descriptions com borda: reserva um piso de largura para nao virar
+   uma letra por linha, mas continua podendo quebrar. NAO usar "nowrap" aqui:
+   com o rotulo travado a coluna dele engole a tabela e quem fica com uma letra
+   por linha e o CONTEUDO - foi exatamente o defeito da tela da RNC. */
 .ant-descriptions-bordered .ant-descriptions-item-label {
-  white-space: nowrap;
+  min-width: 110px;
+}
+
+/* O conteudo precisa de um piso maior que o do rotulo: uma data ("18/08/2026")
+   ou um valor em R$ nunca podem ser espremidos abaixo disso. */
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  min-width: 96px;
 }
 
 /* Campo de busca da tabela (ver components/Tabela.tsx). Em tablet o campo

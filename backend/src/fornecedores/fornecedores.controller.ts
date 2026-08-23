@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Patch,
@@ -123,5 +126,26 @@ export class FornecedoresController {
       },
       include: { contatos: true },
     });
+  }
+
+  // Excluir de verdade e so do ADMIN. Fornecedor com inspecao, RNC ou
+  // homologacao apontando para ele nao sai: o banco recusa e a tela mostra o
+  // motivo, o caminho nesse caso e inativar.
+  @Roles('ADMIN')
+  @Delete(':id')
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    try {
+      await this.prisma.contato.deleteMany({ where: { fornecedorId: id } });
+      await this.prisma.fornecedor.delete({ where: { id } });
+      return { ok: true };
+    } catch (e: any) {
+      if (e?.code === 'P2025')
+        throw new NotFoundException('Fornecedor não encontrado');
+      if (e?.code === 'P2003')
+        throw new BadRequestException(
+          'Este fornecedor já está sendo usado em outros registros e não pode ser excluído. Use "Inativar".',
+        );
+      throw e;
+    }
   }
 }

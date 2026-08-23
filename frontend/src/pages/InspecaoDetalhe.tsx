@@ -102,7 +102,7 @@ function Formulario({
       }
       style={{ marginBottom: 16 }}
     >
-      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }} style={{ marginBottom: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }} style={{ marginBottom: 12 }}>
         <Descriptions.Item label="Data">
           {dados.dataInspecao
             ? dayjs(dados.dataInspecao).format('DD/MM/YYYY')
@@ -194,7 +194,7 @@ export default function InspecaoDetalhe() {
           </Space>
         }
       >
-        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }}>
           <Descriptions.Item label="Data">
             {data.dataInspecao
               ? dayjs(data.dataInspecao).format('DD/MM/YYYY')

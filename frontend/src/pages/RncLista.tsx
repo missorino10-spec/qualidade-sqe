@@ -22,6 +22,8 @@ import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
 import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
 import Tabela from '../components/Tabela';
+import { CamposItem } from '../components/CamposItem';
+import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
 export const corStatusRnc: Record<string, string> = {
@@ -60,6 +62,13 @@ export default function RncLista() {
 
   const hoje = dayjs();
   const { semana: semanaHoje, ano: anoHoje } = semanaAno(hoje.toDate());
+
+  // O valor do desvio e sempre qtd x unitario (mesma conta do backend). Fica
+  // aqui so para o inspetor ver o total enquanto preenche.
+  const qtdPecas = Form.useWatch('quantidadePecas', form);
+  const valorUnit = Form.useWatch('valorUnitario', form);
+  const valorDesvio =
+    qtdPecas != null && valorUnit != null ? qtdPecas * valorUnit : null;
 
   const { data, isLoading } = useQuery<any[]>({
     queryKey: ['rnc', filtroStatus],
@@ -286,33 +295,27 @@ export default function RncLista() {
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                name="fornecedorId"
-                label="Fornecedor"
-                rules={[{ required: true, message: 'Selecione o fornecedor.' }]}
-              >
-                <Select
-                  showSearch
-                  optionFilterProp="label"
-                  options={opcoesFornecedor(fornecedores)}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="itemDescricao"
-                label="Item (descrição)"
-                rules={[{ required: true, message: 'Informe o item.' }]}
-              >
-                <Input placeholder="Ex.: Chapa de aço galvanizado 2mm" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="itemCodigo" label="Código do item">
-            <Input placeholder="Opcional" />
+          <Form.Item
+            name="fornecedorId"
+            label="Fornecedor"
+            rules={[{ required: true, message: 'Selecione o fornecedor.' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={opcoesFornecedor(fornecedores)}
+            />
           </Form.Item>
+          {/* Codigo primeiro: achando na base, a descricao e o valor unitario
+              entram sozinhos e o total do desvio sai de qtd x unitario. */}
+          <CamposItem
+            form={form}
+            descricaoObrigatoria
+            aoResolver={(item) => {
+              if (item?.custoUnitario != null)
+                form.setFieldValue('valorUnitario', item.custoUnitario);
+            }}
+          />
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item name="notaFiscal" label="Nota Fiscal">
@@ -345,18 +348,27 @@ export default function RncLista() {
             <Input.TextArea rows={3} />
           </Form.Item>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="quantidadePecas" label="Qtd. de peças afetadas">
                 <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="valorUnitario" label="Valor unitário (R$)">
+            <Col span={8}>
+              <Form.Item name="valorUnitario" label="Valor unitário">
                 <InputNumber
                   style={{ width: '100%' }}
                   min={0}
                   precision={2}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
                 />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              {/* So mostra o que o backend vai gravar (qtd x unitario), para o
+                  inspetor conferir o valor do desvio antes de abrir a RNC. */}
+              <Form.Item label="Valor do desvio">
+                <Input value={moeda(valorDesvio)} disabled />
               </Form.Item>
             </Col>
           </Row>

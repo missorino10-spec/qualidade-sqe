@@ -74,6 +74,12 @@ export class MaquinasController {
     return this.service.atualizar(id, dto);
   }
 
+  @Roles('ADMIN')
+  @Delete(':id')
+  remover(@Param('id', ParseIntPipe) id: number) {
+    return this.service.remover(id);
+  }
+
   @Get(':id/producao')
   producao(
     @Param('id', ParseIntPipe) id: number,

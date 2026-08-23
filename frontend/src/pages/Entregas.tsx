@@ -18,13 +18,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import {
-  useFornecedores,
-  useItens,
-  opcoesFornecedor,
-  opcoesItem,
-} from '../hooks';
+import { useFornecedores, opcoesFornecedor } from '../hooks';
 import Tabela, { filtrosDe } from '../components/Tabela';
+import { SelectItem } from '../components/CamposItem';
 
 export default function Entregas() {
   const qc = useQueryClient();
@@ -32,7 +28,6 @@ export default function Entregas() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const { data: fornecedores } = useFornecedores();
-  const { data: itens } = useItens();
 
   const { data, isLoading } = useQuery<any[]>({
     queryKey: ['entregas'],
@@ -216,12 +211,7 @@ export default function Entregas() {
             />
           </Form.Item>
           <Form.Item name="itemId" label="Item">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={opcoesItem(itens)}
-            />
+            <SelectItem allowClear />
           </Form.Item>
           <Form.Item name="dataEntrega" label="Data da entrega">
             <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />

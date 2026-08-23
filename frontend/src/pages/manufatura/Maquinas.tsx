@@ -13,9 +13,10 @@ import {
   Tag,
   message,
 } from 'antd';
-import { EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PlusOutlined } from '@ant-design/icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
+import { useAuth } from '../../auth';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 
 // Cadastro das maquinas/linhas. O lancamento da producao diaria e o PPM ficam
@@ -28,6 +29,8 @@ export const AREAS = [
 
 export default function Maquinas() {
   const qc = useQueryClient();
+  const { usuario } = useAuth();
+  const admin = usuario?.papel === 'ADMIN';
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<any>(null);
   const [form] = Form.useForm();
@@ -62,6 +65,44 @@ export default function Maquinas() {
     } finally {
       setSalvando(false);
     }
+  }
+
+  // Inativar e o caminho normal: a maquina some das telas de lancamento, mas
+  // continua valendo nas inspecoes, CNQs e producoes ja registradas.
+  const alternarAtiva = useMutation({
+    mutationFn: async (m: any) =>
+      api.patch(`/maquinas/${m.id}`, { ativa: !m.ativa }),
+    onSuccess: (_r, m) => {
+      message.success(m.ativa ? 'Máquina inativada.' : 'Máquina reativada.');
+      qc.invalidateQueries({ queryKey: ['maquinas'] });
+    },
+    onError: () => message.error('Não foi possível alterar a situação.'),
+  });
+
+  // Excluir de verdade e so do ADMIN. Se a maquina ja estiver em uso, o
+  // proprio backend devolve o motivo.
+  const excluir = useMutation({
+    mutationFn: async (m: any) => api.delete(`/maquinas/${m.id}`),
+    onSuccess: () => {
+      message.success('Máquina excluída.');
+      qc.invalidateQueries({ queryKey: ['maquinas'] });
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir a máquina.',
+      ),
+  });
+
+  function confirmarExclusao(m: any) {
+    Modal.confirm({
+      title: `Excluir a máquina ${m.codigo}?`,
+      content:
+        'A exclusão é definitiva. Se a máquina já tiver inspeção, CNQ ou produção apontada, o sistema recusa a exclusão — nesse caso use "Inativar".',
+      okText: 'Excluir',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: () => excluir.mutateAsync(m),
+    });
   }
 
   return (
@@ -112,15 +153,31 @@ export default function Maquinas() {
                 a ? <Tag color="green">Ativa</Tag> : <Tag>Inativa</Tag>,
             },
             {
-              title: '',
-              width: 60,
-              align: 'center',
+              title: 'Ações',
+              width: admin ? 230 : 160,
+              fixed: 'right' as const,
               render: (_: any, r: any) => (
-                <Button
-                  type="text"
-                  icon={<EditOutlined />}
-                  onClick={() => abrir(r)}
-                />
+                <Space size={4}>
+                  <Button size="small" onClick={() => abrir(r)}>
+                    Editar
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => alternarAtiva.mutate(r)}
+                    loading={alternarAtiva.isPending}
+                  >
+                    {r.ativa ? 'Inativar' : 'Reativar'}
+                  </Button>
+                  {admin && (
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => confirmarExclusao(r)}
+                    >
+                      Excluir
+                    </Button>
+                  )}
+                </Space>
               ),
             },
           ]}

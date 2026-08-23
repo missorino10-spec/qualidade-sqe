@@ -11,10 +11,11 @@ import {
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
+import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import { EVID } from '../../inspecao';
 import { enviarFotosEvidencia } from '../../components/FotosEvidencia';
@@ -38,6 +39,8 @@ export default function InspecoesManufatura({
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const admin = usuario?.papel === 'ADMIN';
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [cotas, setCotas] = useState<any[]>([]);
@@ -172,6 +175,60 @@ export default function InspecoesManufatura({
     }
   }
 
+  // Excluir de verdade e so do ADMIN. E o caminho para o lancamento errado; a
+  // dimensional e a visual sao registros distintos, cada uma com a sua rota.
+  const excluir = useMutation({
+    mutationFn: async ({ rota, r }: { rota: string; r: any }) =>
+      api.delete(`/manufatura/${rota}/${r.id}`),
+    onSuccess: () => {
+      message.success('Inspeção excluída.');
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecoes-visuais'] });
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir a inspeção.',
+      ),
+  });
+
+  function confirmarExclusao(rota: string, r: any) {
+    Modal.confirm({
+      title: `Excluir a inspeção ${r.numero}?`,
+      content:
+        rota === 'inspecoes'
+          ? 'As reinspeções também serão excluídas.'
+          : 'A exclusão é definitiva.',
+      okText: 'Excluir',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: () => excluir.mutateAsync({ rota, r }),
+    });
+  }
+
+  // A linha inteira abre o detalhe, entao o botao precisa segurar o clique.
+  function colunaAcoes(rota: string) {
+    if (!admin) return [];
+    return [
+      {
+        title: 'Ações',
+        width: 100,
+        fixed: 'right' as const,
+        render: (_: any, r: any) => (
+          <Button
+            size="small"
+            danger
+            onClick={(e) => {
+              e.stopPropagation();
+              confirmarExclusao(rota, r);
+            }}
+          >
+            Excluir
+          </Button>
+        ),
+      },
+    ];
+  }
+
   const titulo =
     tipo === 'SETUP' ? 'Inspeção de setup' : 'Inspeção de produção';
 
@@ -262,6 +319,7 @@ export default function InspecoesManufatura({
                         </Tag>
                       ),
                     },
+                    ...colunaAcoes('inspecoes'),
                   ]}
                 />
               ),
@@ -315,6 +373,7 @@ export default function InspecoesManufatura({
                       width: 160,
                       render: (_: any, r: any) => r.inspetor?.nome ?? '-',
                     },
+                    ...colunaAcoes('inspecoes-visuais'),
                   ]}
                 />
               ),

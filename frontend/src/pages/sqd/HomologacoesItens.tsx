@@ -35,6 +35,8 @@ import {
   opcoes,
 } from './comum';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import { CamposItem } from '../../components/CamposItem';
+import { formatarMoedaInput, lerMoedaInput } from '../../moeda';
 
 // Submenu "Homologação de Itens": historico dos registros de homologacao de
 // item (BDBR.QUA.FMR.025.01). O registro nasce aqui, com a data da solicitacao
@@ -312,19 +314,14 @@ export default function HomologacoesItens() {
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={14}>
-              <Form.Item
-                name="itemCodigo"
-                label="Código do item"
-                rules={[{ required: true, message: 'Informe o código do item.' }]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
             <Col span={24}>
-              <Form.Item name="itemDescricao" label="Descrição do item">
-                <Input />
-              </Form.Item>
+              {/* Codigo primeiro: achando na base, a descricao vem sozinha.
+                  Item novo (o caso comum aqui) continua livre para digitar. */}
+              <CamposItem
+                form={form}
+                codigoObrigatorio
+                rotuloDescricao="Descrição do item"
+              />
             </Col>
             <Col span={8}>
               <Form.Item name="solicitante" label="Solicitante">
@@ -339,13 +336,15 @@ export default function HomologacoesItens() {
             <Col span={8}>
               <Form.Item
                 name="custoEvitado"
-                label="Custo evitado (R$)"
+                label="Custo evitado"
                 tooltip="Savings do FMR.025.01: só entra no painel quando a homologação é finalizada."
               >
                 <InputNumber
                   style={{ width: '100%' }}
                   min={0}
-                  decimalSeparator=","
+                  precision={2}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
                 />
               </Form.Item>
             </Col>

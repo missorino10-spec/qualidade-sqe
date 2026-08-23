@@ -30,12 +30,11 @@ import { abrirPdfEmNovaAba, api } from '../../api';
 import { dataBR, dataInput, separadoresBR } from '../../formatos';
 import { semanaAno } from '../../semana';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import { CamposItem } from '../../components/CamposItem';
+import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
 
 // Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da planilha.
 // Total = quantidade x valor unitario, calculado no backend.
-
-const moeda = (v: number) =>
-  (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Atalhos do filtro de periodo. A semana e de DOMINGO a SABADO, como no
 // restante do sistema (src/semana.ts).
@@ -414,18 +413,17 @@ export default function Cnq() {
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item name="itemCodigo" label="Nº do item">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={16}>
-              <Form.Item name="itemDescricao" label="Descrição do item">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
+          {/* Achando o codigo na base, a descricao e o custo unitario entram
+              sozinhos e o CNQ da linha sai de quantidade x unitario. */}
+          <CamposItem
+            form={form}
+            rotuloCodigo="Nº do item"
+            rotuloDescricao="Descrição do item"
+            aoResolver={(item) => {
+              if (item?.custoUnitario != null)
+                form.setFieldValue('valorUnitario', item.custoUnitario);
+            }}
+          />
           <Form.Item
             name="tipoDefeitoId"
             label="Descrição do defeito"
@@ -447,8 +445,15 @@ export default function Cnq() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="valorUnitario" label="Valor unitário (R$)">
-                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+              <Form.Item name="valorUnitario" label="Valor unitário">
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  precision={2}
+                  style={{ width: '100%' }}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>

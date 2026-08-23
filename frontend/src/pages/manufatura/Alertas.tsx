@@ -606,7 +606,7 @@ export default function Alertas() {
                 description="O prazo passou e o alerta continua em aberto. Renove o prazo ou encerre com o que foi feito."
               />
             )}
-            <Descriptions size="small" column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered>
+            <Descriptions size="small" column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} bordered>
               <Descriptions.Item label="Data">
                 {dataBR(detalhe.data)}
               </Descriptions.Item>

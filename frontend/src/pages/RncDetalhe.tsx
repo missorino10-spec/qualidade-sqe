@@ -44,6 +44,7 @@ import {
   TIPO_DESVIO,
 } from '../components/DesvioQualidade';
 import { useAuth } from '../auth';
+import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { corStatusRnc, labelStatusRnc } from './RncLista';
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
@@ -186,12 +187,6 @@ function eventoHistorico(statusNovo: string) {
   };
 }
 
-function moeda(v?: number | null) {
-  return v != null
-    ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-    : '-';
-}
-
 export default function RncDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -206,6 +201,13 @@ export default function RncDetalhe() {
   const [formEncerrar] = Form.useForm();
   const [formEficacia] = Form.useForm();
   const [formCancelar] = Form.useForm();
+
+  // Valor do desvio da tela de edicao: qtd x unitario, a mesma conta que o
+  // backend grava em valorTotal.
+  const qtdEdit = Form.useWatch('quantidadePecas', formEdit);
+  const unitEdit = Form.useWatch('valorUnitario', formEdit);
+  const valorDesvioEdit =
+    qtdEdit != null && unitEdit != null ? qtdEdit * unitEdit : null;
 
   const { data: rnc, isLoading } = useQuery<any>({
     queryKey: ['rnc', 'detalhe', id],
@@ -517,7 +519,7 @@ export default function RncDetalhe() {
       <Row gutter={16}>
         <Col xs={24} lg={15}>
           <Card title="Dados da RNC">
-            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
+            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} bordered size="small">
               <Descriptions.Item label="Abertura">
                 {dayjs(rnc.dataAbertura).format('DD/MM/YYYY')}
               </Descriptions.Item>
@@ -595,7 +597,7 @@ export default function RncDetalhe() {
           )}
 
           <Card title="Plano de ação" style={{ marginTop: 16 }}>
-            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
+            <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} bordered size="small">
               {/* Controle interno da Qualidade: nao sai no PDF da RNC. */}
               <Descriptions.Item label="Enviada para o fornecedor?">
                 {rnc.enviadaFornecedor ? 'Sim' : 'Não'}
@@ -843,18 +845,26 @@ export default function RncDetalhe() {
             <Input.TextArea rows={2} />
           </Form.Item>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="quantidadePecas" label="Qtd. de peças">
                 <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="valorUnitario" label="Valor unitário (R$)">
+            <Col span={8}>
+              <Form.Item name="valorUnitario" label="Valor unitário">
                 <InputNumber
                   style={{ width: '100%' }}
                   min={0}
                   precision={2}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
                 />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              {/* Mesma conta do backend (qtd x unitario), so para conferir. */}
+              <Form.Item label="Valor do desvio">
+                <Input value={moeda(valorDesvioEdit)} disabled />
               </Form.Item>
             </Col>
           </Row>

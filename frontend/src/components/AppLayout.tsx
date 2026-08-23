@@ -17,6 +17,8 @@ import {
   ClusterOutlined,
   LineChartOutlined,
   NotificationOutlined,
+  BarcodeOutlined,
+  ColumnWidthOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -45,6 +47,7 @@ const itensMenu: {
       { key: '/inspecoes', icon: <AuditOutlined />, label: 'Inspeções' },
       { key: '/rnc', icon: <WarningOutlined />, label: 'RNC' },
       { key: '/fornecedores', icon: <ShopOutlined />, label: 'Fornecedores' },
+      { key: '/itens', icon: <BarcodeOutlined />, label: 'Itens' },
       {
         key: '/periodicidade',
         icon: <SlidersOutlined />,
@@ -107,6 +110,18 @@ const itensMenu: {
         key: '/sqd/auditorias',
         icon: <AuditOutlined />,
         label: 'Auditoria de Fornecedores',
+      },
+    ],
+  },
+  {
+    key: 'instrumentos',
+    icon: <ColumnWidthOutlined />,
+    label: 'INSTRUMENTOS',
+    children: [
+      {
+        key: '/instrumentos/inventario',
+        icon: <ColumnWidthOutlined />,
+        label: 'Inventário de Instrumentos',
       },
     ],
   },

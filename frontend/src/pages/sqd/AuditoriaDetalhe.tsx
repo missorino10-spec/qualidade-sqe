@@ -588,7 +588,7 @@ export default function AuditoriaDetalhe() {
                     </Space>
                   }
                 >
-                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
+                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} bordered size="small">
                     <Descriptions.Item label="Data da auditoria">
                       {dataBR(recente.dataAuditoria)}
                     </Descriptions.Item>

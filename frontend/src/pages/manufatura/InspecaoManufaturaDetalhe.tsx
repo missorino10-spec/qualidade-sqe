@@ -6,6 +6,7 @@ import {
   Dropdown,
   Form,
   Modal,
+  Popconfirm,
   Space,
   Spin,
   Tag,
@@ -14,6 +15,7 @@ import {
 } from 'antd';
 import {
   ArrowLeftOutlined,
+  DeleteOutlined,
   FilePdfOutlined,
   FileTextOutlined,
   ReloadOutlined,
@@ -70,7 +72,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         </Space>
       }
     >
-      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }} style={{ marginBottom: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }} style={{ marginBottom: 12 }}>
         <Descriptions.Item label="Data">
           {dataBR(rel.dataInspecao)}
         </Descriptions.Item>
@@ -164,7 +166,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
       )}
 
       {rel.resultado === 'REPROVADO' && (
-        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2 }} style={{ marginTop: 12 }}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} style={{ marginTop: 12 }}>
           <Descriptions.Item label="Qtd. afetada">
             {rel.qtdAfetada ?? '-'}
           </Descriptions.Item>
@@ -174,7 +176,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
         </Descriptions>
       )}
 
-      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2 }} style={{ marginTop: 12 }}>
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} style={{ marginTop: 12 }}>
         <Descriptions.Item label="Elaborado por">
           {rel.elaboradoPor ?? '-'}
         </Descriptions.Item>
@@ -304,6 +306,21 @@ export default function InspecaoManufaturaDetalhe() {
       ? '/manufatura/inspecoes/setup'
       : '/manufatura/inspecoes/producao';
 
+  // Excluir apaga a inspecao inteira, com as reinspecoes. E o caminho para o
+  // lancamento errado; a inspecao valida fica no historico.
+  async function remover() {
+    try {
+      await api.delete(`/manufatura/inspecoes/${id}`);
+      message.success('Inspeção excluída.');
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
+      navigate(rotaLista);
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir a inspeção.',
+      );
+    }
+  }
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card
@@ -347,6 +364,17 @@ export default function InspecaoManufaturaDetalhe() {
             >
               <Button icon={<FileTextOutlined />}>Abrir 8D / 5G</Button>
             </Dropdown>
+            <Popconfirm
+              title="Excluir esta inspeção?"
+              description="As reinspeções também serão excluídas."
+              okText="Excluir"
+              cancelText="Cancelar"
+              onConfirm={remover}
+            >
+              <Button danger icon={<DeleteOutlined />}>
+                Excluir
+              </Button>
+            </Popconfirm>
             <Button
               type="primary"
               icon={<FilePdfOutlined />}
@@ -357,7 +385,7 @@ export default function InspecaoManufaturaDetalhe() {
           </Space>
         }
       >
-        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3 }}>
+        <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }}>
           <Descriptions.Item label="Máquina" span={2}>
             {data.maquina
               ? `${data.maquina.codigo} — ${data.maquina.nome}`

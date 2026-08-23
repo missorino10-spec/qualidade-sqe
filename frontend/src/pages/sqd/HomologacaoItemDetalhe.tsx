@@ -79,6 +79,8 @@ import {
   opcoes,
 } from './comum';
 import Tabela from '../../components/Tabela';
+import { CamposItem } from '../../components/CamposItem';
+import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_ITEM_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_ITEM_PLANO_ACAO';
@@ -705,7 +707,7 @@ export default function HomologacaoItemDetalhe() {
                     </Space>
                   }
                 >
-                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2 }} bordered size="small">
+                  <Descriptions column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} bordered size="small">
                     <Descriptions.Item label="Data da inspeção">
                       {dataBR(recente.dataInspecao)}
                     </Descriptions.Item>
@@ -839,12 +841,7 @@ export default function HomologacaoItemDetalhe() {
                 {h.motivo ? labelMotivoItem[h.motivo] : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Custo evitado">
-                {h.custoEvitado != null
-                  ? Number(h.custoEvitado).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })
-                  : '-'}
+                {moeda(h.custoEvitado)}
               </Descriptions.Item>
               <Descriptions.Item label="Semana">{h.semana}</Descriptions.Item>
               <Descriptions.Item label="Revisão / Nº de tentativas">
@@ -965,15 +962,11 @@ export default function HomologacaoItemDetalhe() {
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={10}>
-              <Form.Item name="itemCodigo" label="Código do item">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={14}>
-              <Form.Item name="itemDescricao" label="Descrição do item">
-                <Input />
-              </Form.Item>
+            <Col span={24}>
+              <CamposItem
+                form={formRegistro}
+                rotuloDescricao="Descrição do item"
+              />
             </Col>
             <Col span={8}>
               <Form.Item name="solicitante" label="Solicitante">
@@ -988,13 +981,15 @@ export default function HomologacaoItemDetalhe() {
             <Col span={8}>
               <Form.Item
                 name="custoEvitado"
-                label="Custo evitado (R$)"
+                label="Custo evitado"
                 tooltip="Savings do FMR.025.01: só entra no painel quando a homologação é finalizada."
               >
                 <InputNumber
                   style={{ width: '100%' }}
                   min={0}
-                  decimalSeparator=","
+                  precision={2}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
                 />
               </Form.Item>
             </Col>

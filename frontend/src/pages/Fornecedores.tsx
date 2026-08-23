@@ -11,6 +11,7 @@ import {
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
@@ -26,6 +27,8 @@ const corClasse: Record<string, string> = {
 
 export default function Fornecedores() {
   const qc = useQueryClient();
+  const { usuario } = useAuth();
+  const admin = usuario?.papel === 'ADMIN';
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<any | null>(null);
   const [form] = Form.useForm();
@@ -52,6 +55,44 @@ export default function Fornecedores() {
     },
     onError: () => message.error('Não foi possível salvar o fornecedor.'),
   });
+
+  // Inativar e o caminho normal: o fornecedor some dos formularios novos, mas
+  // continua valendo nas inspecoes, RNCs e homologacoes ja lancadas.
+  const alternarAtivo = useMutation({
+    mutationFn: async (f: any) =>
+      api.patch(`/fornecedores/${f.id}`, { ativo: !f.ativo }),
+    onSuccess: (_r, f) => {
+      message.success(f.ativo ? 'Fornecedor inativado.' : 'Fornecedor reativado.');
+      qc.invalidateQueries({ queryKey: ['fornecedores'] });
+    },
+    onError: () => message.error('Não foi possível alterar a situação.'),
+  });
+
+  // Excluir de verdade e so do ADMIN. Se o fornecedor ja estiver em uso, o
+  // proprio backend devolve o motivo.
+  const excluir = useMutation({
+    mutationFn: async (f: any) => api.delete(`/fornecedores/${f.id}`),
+    onSuccess: () => {
+      message.success('Fornecedor excluído.');
+      qc.invalidateQueries({ queryKey: ['fornecedores'] });
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir o fornecedor.',
+      ),
+  });
+
+  function confirmarExclusao(f: any) {
+    Modal.confirm({
+      title: `Excluir o fornecedor ${f.nome}?`,
+      content:
+        'A exclusão é definitiva. Se o fornecedor já tiver inspeção, RNC ou homologação, o sistema recusa a exclusão — nesse caso use "Inativar".',
+      okText: 'Excluir',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: () => excluir.mutateAsync(f),
+    });
+  }
 
   function abrir(f?: any) {
     setEditando(f ?? null);
@@ -144,11 +185,26 @@ export default function Fornecedores() {
           },
           {
             title: 'Ações',
-            width: 90,
+            width: admin ? 230 : 160,
+            fixed: 'right' as const,
             render: (_: any, f: any) => (
-              <Button size="small" onClick={() => abrir(f)}>
-                Editar
-              </Button>
+              <Space size={4}>
+                <Button size="small" onClick={() => abrir(f)}>
+                  Editar
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => alternarAtivo.mutate(f)}
+                  loading={alternarAtivo.isPending}
+                >
+                  {f.ativo ? 'Inativar' : 'Reativar'}
+                </Button>
+                {admin && (
+                  <Button size="small" danger onClick={() => confirmarExclusao(f)}>
+                    Excluir
+                  </Button>
+                )}
+              </Space>
             ),
           },
         ]}

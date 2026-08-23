@@ -14,10 +14,11 @@ import {
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
+import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 
@@ -79,6 +80,8 @@ export const labelStatus8D: Record<string, string> = {
 export default function OitoD() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const admin = usuario?.papel === 'ADMIN';
   const [params, setParams] = useSearchParams();
   const [tipo, setTipo] = useState<TipoDoc>('8D');
   const [open, setOpen] = useState(false);
@@ -118,6 +121,33 @@ export default function OitoD() {
     setParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspecaoId, cnqId, tipoParam]);
+
+  // Excluir de verdade e so do ADMIN. E o caminho para o documento aberto por
+  // engano. O tipo e a rota vao junto no argumento: quem manda e o que estava
+  // na tela quando o modal abriu, nao o filtro do momento em que confirma.
+  const excluir = useMutation({
+    mutationFn: async (alvo: { tipo: TipoDoc; r: any }) =>
+      api.delete(`/manufatura/${DOCS[alvo.tipo].rota}/${alvo.r.id}`),
+    onSuccess: (_res, alvo) => {
+      message.success(`${alvo.tipo} excluído.`);
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
+    },
+    onError: (e: any, alvo) =>
+      message.error(
+        e?.response?.data?.message ?? `Não foi possível excluir o ${alvo.tipo}.`,
+      ),
+  });
+
+  function confirmarExclusao(alvoTipo: TipoDoc, r: any) {
+    Modal.confirm({
+      title: `Excluir o ${alvoTipo} ${r.numero}?`,
+      content: 'A exclusão é definitiva.',
+      okText: 'Excluir',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: () => excluir.mutateAsync({ tipo: alvoTipo, r }),
+    });
+  }
 
   async function salvar() {
     const v = await form.validateFields();
@@ -216,6 +246,29 @@ export default function OitoD() {
                 <Tag color={corStatus8D[s]}>{labelStatus8D[s] ?? s}</Tag>
               ),
             },
+            // A linha inteira abre o documento, entao o botao precisa segurar o
+            // clique para nao navegar junto.
+            ...(admin
+              ? [
+                  {
+                    title: 'Ações',
+                    width: 100,
+                    fixed: 'right' as const,
+                    render: (_: any, r: any) => (
+                      <Button
+                        size="small"
+                        danger
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmarExclusao(tipo, r);
+                        }}
+                      >
+                        Excluir
+                      </Button>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </Card>

@@ -47,6 +47,7 @@ import {
 } from '../components/FotosEvidencia';
 import { EVID, ORIGENS_RECEBIMENTO } from '../inspecao';
 import Tabela from '../components/Tabela';
+import { CamposItem } from '../components/CamposItem';
 import { TIPOS_DESVIO } from '../tipo-desvio';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
@@ -803,7 +804,7 @@ export default function Inspecoes() {
             <Descriptions
               size="small"
               bordered
-              column={{ xs: 1, sm: 2, md: 2, lg: 2 }}
+              column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }}
               style={{ marginBottom: 12 }}
             >
               <Descriptions.Item label="Classificação">
@@ -930,22 +931,9 @@ export default function Inspecoes() {
                 />
               )}
 
-              <Row gutter={12}>
-                <Col span={16}>
-                  <Form.Item
-                    name="itemDescricao"
-                    label="Item (descrição)"
-                    rules={[{ required: true, message: 'Informe o item.' }]}
-                  >
-                    <Input placeholder="Ex.: Chapa de aço galvanizado 2mm" />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item name="itemCodigo" label="Código do item">
-                    <Input placeholder="Opcional" />
-                  </Form.Item>
-                </Col>
-              </Row>
+              {/* Codigo primeiro: e por ele que o inspetor comeca, e achando
+                  na base a descricao entra sozinha. */}
+              <CamposItem form={form} descricaoObrigatoria />
 
               <Row gutter={12}>
                 <Col span={6}>
