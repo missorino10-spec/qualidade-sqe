@@ -212,7 +212,6 @@ export default function InspecoesManufatura({
       {
         title: 'Ações',
         width: 100,
-        fixed: 'right' as const,
         render: (_: any, r: any) => (
           <Button
             size="small"

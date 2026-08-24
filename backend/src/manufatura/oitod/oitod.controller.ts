@@ -30,6 +30,9 @@ import { gerarPdfOitoD, FotosOitoD } from './oitod-pdf';
 import { EVID_8D } from '../../comum/oitod';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // Analise de Problemas da Qualidade / 8D - Doc BDBR.QUA.FMR.007.01.
 class OitoDDto {
@@ -82,7 +85,8 @@ class OitoDDto {
   @IsOptional() @IsString() aprovacaoProducao?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('manufatura/8d')
 export class OitoDController {
   constructor(

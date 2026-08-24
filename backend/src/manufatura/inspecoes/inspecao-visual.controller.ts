@@ -28,6 +28,9 @@ import { StorageService } from '../../anexos/storage.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import { EVID, ORIGENS_INSPECAO } from '../../comum/inspecao';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // A Manufatura e o unico modulo que oferta a inspecao de producao, entao usa
 // a lista cheia de origens.
@@ -55,7 +58,8 @@ class InspecaoVisualDto {
   @IsOptional() @IsString() inspecionadoPor?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('manufatura/inspecoes-visuais')
 export class InspecaoVisualManufaturaController {
   constructor(

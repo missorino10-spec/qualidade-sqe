@@ -36,6 +36,20 @@ model Usuario {
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  // Ficha do colaborador: o admin cadastra a pessoa da empresa e o e-mail
+  // daqui e o login dela.
+  matricula    String?
+  cargo        String?
+  setor        String?
+  telefone     String?
+  dataAdmissao DateTime?
+
+  // Senha provisoria entregue pelo admin: no primeiro acesso o sistema abre a
+  // troca de senha antes de deixar entrar.
+  precisaTrocarSenha Boolean @default(false)
+
+  acessos AcessoModulo[]
+
   planejamentos   PlanejamentoSemanal[] @relation("PlanejamentoCriadoPor")
   entregas        EntregaPortaria[]     @relation("EntregaConfirmadoPor")
   inspecoesVisual InspecaoVisual[]      @relation("InspVisualInspetor")
@@ -69,6 +83,38 @@ model Usuario {
 
   // Metrologia
   instrumentos Instrumento[] @relation("InstrumentoCriadoPor")
+}
+
+// O que o admin libera para cada colaborador. SQE, MANUFATURA e SQD sao o
+// modulo inteiro; CADASTROS e liberado submenu a submenu, porque quem mexe no
+// cadastro base costuma ser um grupo bem menor de gente.
+enum ModuloSistema {
+  SQE
+  MANUFATURA
+  SQD
+  CAD_FORNECEDORES
+  CAD_ITENS
+  CAD_MAQUINAS
+  CAD_INSTRUMENTOS
+}
+
+enum NivelAcesso {
+  VISUALIZAR
+  EDITAR
+}
+
+// "Sem acesso" nao e um nivel: e a ausencia da linha. Assim ninguem nasce com
+// permissao e tirar acesso e apagar o registro.
+model AcessoModulo {
+  id        Int           @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  modulo    ModuloSistema
+  nivel     NivelAcesso
+  createdAt DateTime      @default(now())
+
+  @@unique([usuarioId, modulo])
+  @@index([usuarioId])
 }
 
 // Classificacao de fornecimento (definida manualmente, base no trimestre anterior)

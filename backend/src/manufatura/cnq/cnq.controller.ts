@@ -19,6 +19,9 @@ import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { CnqService } from './cnq.service';
 import { gerarPdfCnq } from './cnq-pdf';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // Espelha a aba "Defeitos e CNQ" da planilha de indicadores.
 class CnqDto {
@@ -29,11 +32,15 @@ class CnqDto {
   @IsOptional() @IsInt() tipoDefeitoId?: number;
   @IsOptional() @IsNumber() quantidade?: number;
   @IsOptional() @IsNumber() valorUnitario?: number;
+  // So vem preenchido quando a pessoa digita o total a mao. Sem ele o servico
+  // volta a calcular quantidade x valor unitario.
+  @IsOptional() @IsNumber() valorTotal?: number;
   @IsOptional() @IsString() observacoes?: string;
   @IsOptional() @IsString() acao?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('manufatura/cnq')
 export class CnqController {
   constructor(private service: CnqService) {}

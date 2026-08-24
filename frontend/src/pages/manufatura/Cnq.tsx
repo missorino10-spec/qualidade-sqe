@@ -31,10 +31,17 @@ import { dataBR, dataInput, separadoresBR } from '../../formatos';
 import { semanaAno } from '../../semana';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import { CamposItem } from '../../components/CamposItem';
+import {
+  CampoValorTotal,
+  TagTotalManual,
+  useValorTotal,
+} from '../../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
 
 // Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da planilha.
-// Total = quantidade x valor unitario, calculado no backend.
+// Total = quantidade x valor unitario, mas pode ser digitado a mao quando o
+// custo do desvio nao vem dessa conta.
+const CAMPOS_VALOR = { quantidade: 'quantidade', unitario: 'valorUnitario' };
 
 // Atalhos do filtro de periodo. A semana e de DOMINGO a SABADO, como no
 // restante do sistema (src/semana.ts).
@@ -75,8 +82,7 @@ export default function Cnq() {
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
 
-  const quantidade = Form.useWatch('quantidade', form);
-  const valorUnitario = Form.useWatch('valorUnitario', form);
+  const ctrlTotal = useValorTotal(form, CAMPOS_VALOR);
 
   // Filtro da tela: o mesmo recorte vale para a lista, para os totais e para
   // o PDF. Abre sem recorte para nao esconder lancamentos de meses anteriores.
@@ -135,6 +141,7 @@ export default function Cnq() {
             quantidade: 1,
           },
     );
+    ctrlTotal.carregar(registro);
     setOpen(true);
   }
 
@@ -331,7 +338,12 @@ export default function Cnq() {
               dataIndex: 'valorTotal',
               width: 130,
               align: 'right',
-              render: (v: number) => <strong>{moeda(v)}</strong>,
+              render: (v: number, r: any) => (
+                <>
+                  <strong>{moeda(v)}</strong>
+                  <TagTotalManual registro={r} campos={CAMPOS_VALOR} />
+                </>
+              ),
             },
             { title: 'Ação', dataIndex: 'acao', width: 200 },
             {
@@ -389,7 +401,11 @@ export default function Cnq() {
         onCancel={() => setOpen(false)}
         destroyOnClose
       >
-        <Form form={form} layout="vertical">
+        <Form
+          form={form}
+          layout="vertical"
+          onValuesChange={ctrlTotal.aoMudarValores}
+        >
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item name="data" label="Data">
@@ -419,9 +435,13 @@ export default function Cnq() {
             form={form}
             rotuloCodigo="Nº do item"
             rotuloDescricao="Descrição do item"
+            permitirCadastro
             aoResolver={(item) => {
-              if (item?.custoUnitario != null)
-                form.setFieldValue('valorUnitario', item.custoUnitario);
+              if (item?.custoUnitario == null) return;
+              form.setFieldValue('valorUnitario', item.custoUnitario);
+              // setFieldValue nao passa pelo onValuesChange, entao o total
+              // precisa ser refeito na mao aqui.
+              if (!ctrlTotal.manual) ctrlTotal.recalcular();
             }}
           />
           <Form.Item
@@ -457,11 +477,7 @@ export default function Cnq() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label="Total">
-                <Typography.Text strong style={{ fontSize: 18 }}>
-                  {moeda((quantidade ?? 0) * (valorUnitario ?? 0))}
-                </Typography.Text>
-              </Form.Item>
+              <CampoValorTotal ctrl={ctrlTotal} />
             </Col>
           </Row>
           <Form.Item name="acao" label="Ação">

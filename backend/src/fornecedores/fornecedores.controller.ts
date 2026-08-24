@@ -24,6 +24,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../auth/modulo.decorator';
+import { PermissaoGuard } from '../auth/permissao.guard';
 
 class ContatoDto {
   @IsString() nome: string;
@@ -56,7 +59,11 @@ class FornecedorDto {
   contatos?: ContatoDto[];
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.CAD_FORNECEDORES, {
+  leituraLivre: true,
+  criacaoLivrePara: [ModuloSistema.SQE, ModuloSistema.SQD],
+})
 @Controller('fornecedores')
 export class FornecedoresController {
   constructor(private prisma: PrismaService) {}

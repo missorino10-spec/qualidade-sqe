@@ -186,7 +186,6 @@ export default function Fornecedores() {
           {
             title: 'Ações',
             width: admin ? 230 : 160,
-            fixed: 'right' as const,
             render: (_: any, f: any) => (
               <Space size={4}>
                 <Button size="small" onClick={() => abrir(f)}>

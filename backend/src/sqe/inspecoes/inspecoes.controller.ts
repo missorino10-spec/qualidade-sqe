@@ -32,6 +32,9 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // O SQE oferta todas as origens menos a inspecao de producao, que so existe
 // na Manufatura.
@@ -81,7 +84,8 @@ class RecebimentoDto {
   @IsOptional() @Type(() => Number) @IsNumber() qtdTotal?: number;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQE)
 @Controller('inspecoes')
 export class InspecoesController {
   constructor(

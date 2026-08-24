@@ -1,5 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Result } from 'antd';
 import { useAuth } from './auth';
+import type { Modulo } from './permissoes';
 import { AppLayout } from './components/AppLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -29,81 +31,140 @@ import HomologacaoItemDetalhe from './pages/sqd/HomologacaoItemDetalhe';
 import Auditorias from './pages/sqd/Auditorias';
 import AuditoriaDetalhe from './pages/sqd/AuditoriaDetalhe';
 import Instrumentos from './pages/Instrumentos';
+import Colaboradores from './pages/admin/Colaboradores';
+import TrocarSenha from './pages/TrocarSenha';
 
-function Privado({ children }: { children: JSX.Element }) {
-  const { usuario } = useAuth();
+function SemAcesso() {
+  return (
+    <Result
+      status="403"
+      title="Sem acesso"
+      subTitle="Você não tem permissão para esta área. Fale com o administrador do sistema."
+    />
+  );
+}
+
+/**
+ * Alem de exigir login, confere o acesso ao modulo da tela. Esconder o menu
+ * nao basta: alguem pode digitar a URL. O bloqueio de verdade e no servidor,
+ * isto aqui e para a pessoa nao cair numa tela quebrada.
+ */
+function Privado({
+  children,
+  modulo,
+  admin,
+}: {
+  children: JSX.Element;
+  modulo?: Modulo;
+  admin?: boolean;
+}) {
+  const { usuario, podeVer, rotaInicial } = useAuth();
+  const location = useLocation();
+
   if (!usuario) return <Navigate to="/login" replace />;
+  // Senha provisoria: so sai daqui depois de definir a definitiva.
+  if (usuario.precisaTrocarSenha) return <Navigate to="/trocar-senha" replace />;
+
+  const negado = admin ? usuario.papel !== 'ADMIN' : modulo && !podeVer(modulo);
+  if (negado) {
+    const destino = rotaInicial();
+    if (destino !== location.pathname) return <Navigate to={destino} replace />;
+    return (
+      <AppLayout>
+        <SemAcesso />
+      </AppLayout>
+    );
+  }
   return <AppLayout>{children}</AppLayout>;
+}
+
+// Depois de entrar, cada um cai na primeira tela que tem direito de ver.
+function Inicio() {
+  const { usuario, rotaInicial } = useAuth();
+  if (!usuario) return <Navigate to="/login" replace />;
+  return <Navigate to={rotaInicial()} replace />;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Privado><Dashboard /></Privado>} />
-      <Route path="/periodicidade" element={<Privado><Periodicidade /></Privado>} />
-      <Route path="/fornecedores" element={<Privado><Fornecedores /></Privado>} />
-      <Route path="/itens" element={<Privado><Itens /></Privado>} />
-      <Route path="/inspecoes" element={<Privado><Inspecoes /></Privado>} />
-      <Route path="/inspecoes/:id" element={<Privado><InspecaoDetalhe /></Privado>} />
-      <Route path="/rnc" element={<Privado><RncLista /></Privado>} />
-      <Route path="/rnc/:id" element={<Privado><RncDetalhe /></Privado>} />
+      <Route path="/" element={<Privado modulo="SQE"><Dashboard /></Privado>} />
+      <Route path="/periodicidade" element={<Privado modulo="SQE"><Periodicidade /></Privado>} />
+      <Route path="/fornecedores" element={<Privado modulo="CAD_FORNECEDORES"><Fornecedores /></Privado>} />
+      <Route path="/itens" element={<Privado modulo="CAD_ITENS"><Itens /></Privado>} />
+      <Route path="/inspecoes" element={<Privado modulo="SQE"><Inspecoes /></Privado>} />
+      <Route path="/inspecoes/:id" element={<Privado modulo="SQE"><InspecaoDetalhe /></Privado>} />
+      <Route path="/rnc" element={<Privado modulo="SQE"><RncLista /></Privado>} />
+      <Route path="/rnc/:id" element={<Privado modulo="SQE"><RncDetalhe /></Privado>} />
 
       {/* Qualidade da Manufatura */}
-      <Route path="/manufatura" element={<Privado><PainelManufatura /></Privado>} />
+      <Route path="/manufatura" element={<Privado modulo="MANUFATURA"><PainelManufatura /></Privado>} />
       <Route
         path="/manufatura/inspecoes/setup"
-        element={<Privado><InspecoesManufatura tipo="SETUP" /></Privado>}
+        element={<Privado modulo="MANUFATURA"><InspecoesManufatura tipo="SETUP" /></Privado>}
       />
       <Route
         path="/manufatura/inspecoes/producao"
-        element={<Privado><InspecoesManufatura tipo="PRODUCAO" /></Privado>}
+        element={<Privado modulo="MANUFATURA"><InspecoesManufatura tipo="PRODUCAO" /></Privado>}
       />
       {/* Antes de ":id" porque "inspecoes-visuais" nao e um id. */}
       <Route
         path="/manufatura/inspecoes-visuais/:id"
-        element={<Privado><InspecaoVisualDetalhe /></Privado>}
+        element={<Privado modulo="MANUFATURA"><InspecaoVisualDetalhe /></Privado>}
       />
       <Route
         path="/manufatura/inspecoes/:id"
-        element={<Privado><InspecaoManufaturaDetalhe /></Privado>}
+        element={<Privado modulo="MANUFATURA"><InspecaoManufaturaDetalhe /></Privado>}
       />
-      <Route path="/manufatura/cnq" element={<Privado><Cnq /></Privado>} />
-      <Route path="/manufatura/8d" element={<Privado><OitoD /></Privado>} />
-      <Route path="/manufatura/8d/:id" element={<Privado><OitoDDetalhe /></Privado>} />
-      <Route path="/manufatura/5g/:id" element={<Privado><CincoGDetalhe /></Privado>} />
-      <Route path="/manufatura/alertas" element={<Privado><Alertas /></Privado>} />
-      <Route path="/manufatura/maquinas" element={<Privado><Maquinas /></Privado>} />
-      <Route path="/manufatura/producao" element={<Privado><ProducaoDiaria /></Privado>} />
+      <Route path="/manufatura/cnq" element={<Privado modulo="MANUFATURA"><Cnq /></Privado>} />
+      <Route path="/manufatura/8d" element={<Privado modulo="MANUFATURA"><OitoD /></Privado>} />
+      <Route path="/manufatura/8d/:id" element={<Privado modulo="MANUFATURA"><OitoDDetalhe /></Privado>} />
+      <Route path="/manufatura/5g/:id" element={<Privado modulo="MANUFATURA"><CincoGDetalhe /></Privado>} />
+      <Route path="/manufatura/alertas" element={<Privado modulo="MANUFATURA"><Alertas /></Privado>} />
+      <Route path="/manufatura/maquinas" element={<Privado modulo="CAD_MAQUINAS"><Maquinas /></Privado>} />
+      <Route path="/manufatura/producao" element={<Privado modulo="MANUFATURA"><ProducaoDiaria /></Privado>} />
 
       {/* SQD - Desenvolvimento de Fornecedores */}
-      <Route path="/sqd" element={<Privado><PainelSqd /></Privado>} />
-      <Route path="/sqd/homologacoes" element={<Privado><Homologacoes /></Privado>} />
+      <Route path="/sqd" element={<Privado modulo="SQD"><PainelSqd /></Privado>} />
+      <Route path="/sqd/homologacoes" element={<Privado modulo="SQD"><Homologacoes /></Privado>} />
       <Route
         path="/sqd/homologacoes/:id"
-        element={<Privado><HomologacaoDetalhe /></Privado>}
+        element={<Privado modulo="SQD"><HomologacaoDetalhe /></Privado>}
       />
       <Route
         path="/sqd/homologacoes-itens"
-        element={<Privado><HomologacoesItens /></Privado>}
+        element={<Privado modulo="SQD"><HomologacoesItens /></Privado>}
       />
       <Route
         path="/sqd/homologacoes-itens/:id"
-        element={<Privado><HomologacaoItemDetalhe /></Privado>}
+        element={<Privado modulo="SQD"><HomologacaoItemDetalhe /></Privado>}
       />
-      <Route path="/sqd/auditorias" element={<Privado><Auditorias /></Privado>} />
+      <Route path="/sqd/auditorias" element={<Privado modulo="SQD"><Auditorias /></Privado>} />
       <Route
         path="/sqd/auditorias/:id"
-        element={<Privado><AuditoriaDetalhe /></Privado>}
+        element={<Privado modulo="SQD"><AuditoriaDetalhe /></Privado>}
       />
 
       {/* Instrumentos - BDBR.QUA.FMR.004.01 */}
       <Route
         path="/instrumentos/inventario"
-        element={<Privado><Instrumentos /></Privado>}
+        element={<Privado modulo="CAD_INSTRUMENTOS"><Instrumentos /></Privado>}
       />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Administracao - so o admin */}
+      <Route
+        path="/admin/colaboradores"
+        element={<Privado admin><Colaboradores /></Privado>}
+      />
+
+      <Route path="/trocar-senha" element={<TrocarSenha />} />
+      <Route
+        path="/sem-acesso"
+        element={<Privado><SemAcesso /></Privado>}
+      />
+
+      <Route path="*" element={<Inicio />} />
     </Routes>
   );
 }

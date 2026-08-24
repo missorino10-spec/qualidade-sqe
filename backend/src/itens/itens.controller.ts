@@ -26,6 +26,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../auth/modulo.decorator';
+import { PermissaoGuard } from '../auth/permissao.guard';
 
 class CreateItemDto {
   @IsString() codigo: string;
@@ -51,7 +54,15 @@ class UpdateItemDto {
 const LIMITE_PADRAO = 50;
 const LIMITE_MAXIMO = 200;
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.CAD_ITENS, {
+  leituraLivre: true,
+  criacaoLivrePara: [
+    ModuloSistema.SQE,
+    ModuloSistema.MANUFATURA,
+    ModuloSistema.SQD,
+  ],
+})
 @Controller('itens')
 export class ItensController {
   constructor(private prisma: PrismaService) {}

@@ -29,6 +29,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { gerarInventarioPdf } from './instrumentos-pdf';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../auth/modulo.decorator';
+import { PermissaoGuard } from '../auth/permissao.guard';
 
 /**
  * Inventario de Instrumentos e Equipamentos - BDBR.QUA.FMR.004.01.
@@ -72,7 +75,8 @@ function dataOuNulo(texto?: string | null) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.CAD_INSTRUMENTOS, { leituraLivre: true })
 @Controller('instrumentos')
 export class InstrumentosController {
   constructor(private prisma: PrismaService) {}

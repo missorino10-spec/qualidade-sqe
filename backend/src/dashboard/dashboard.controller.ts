@@ -9,8 +9,12 @@ import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../auth/modulo.decorator';
+import { PermissaoGuard } from '../auth/permissao.guard';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQE)
 @Controller('dashboard')
 export class DashboardController {
   constructor(private service: DashboardService) {}

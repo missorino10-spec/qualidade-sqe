@@ -328,10 +328,15 @@ export class RncService {
         inspecaoVisualId: data.inspecaoVisualId,
         inspecaoLoteId: data.inspecaoLoteId,
       }));
+    // Total informado a mao tem prioridade sobre a conta: ha desvio que nao e
+    // quantidade x unitario (frete, retrabalho, lote parcial). Sem total na
+    // tela, calcula como sempre.
     const valorTotal =
-      data.quantidadePecas != null && data.valorUnitario != null
-        ? data.quantidadePecas * data.valorUnitario
-        : (data.valorTotal ?? null);
+      data.valorTotal != null
+        ? data.valorTotal
+        : data.quantidadePecas != null && data.valorUnitario != null
+          ? data.quantidadePecas * data.valorUnitario
+          : null;
 
     const { semana } = semanaAno(new Date());
 
@@ -446,10 +451,14 @@ export class RncService {
 
     const quantidadePecas = data.quantidadePecas ?? rnc.quantidadePecas;
     const valorUnitario = data.valorUnitario ?? rnc.valorUnitario;
+    // Total digitado a mao ganha da conta. A tela sempre manda valorTotal ao
+    // editar, entao o valor que aparece la e o que fica gravado.
     const valorTotal =
-      quantidadePecas != null && valorUnitario != null
-        ? quantidadePecas * valorUnitario
-        : rnc.valorTotal;
+      data.valorTotal != null
+        ? data.valorTotal
+        : quantidadePecas != null && valorUnitario != null
+          ? quantidadePecas * valorUnitario
+          : rnc.valorTotal;
 
     const dataAbertura = rnc.dataAbertura;
     const dataRetorno = data.dataRetorno

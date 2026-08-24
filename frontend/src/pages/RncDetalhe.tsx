@@ -44,7 +44,17 @@ import {
   TIPO_DESVIO,
 } from '../components/DesvioQualidade';
 import { useAuth } from '../auth';
+import {
+  CampoValorTotal,
+  TagTotalManual,
+  useValorTotal,
+} from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
+
+const CAMPOS_VALOR = {
+  quantidade: 'quantidadePecas',
+  unitario: 'valorUnitario',
+};
 import { corStatusRnc, labelStatusRnc } from './RncLista';
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
@@ -202,12 +212,9 @@ export default function RncDetalhe() {
   const [formEficacia] = Form.useForm();
   const [formCancelar] = Form.useForm();
 
-  // Valor do desvio da tela de edicao: qtd x unitario, a mesma conta que o
-  // backend grava em valorTotal.
-  const qtdEdit = Form.useWatch('quantidadePecas', formEdit);
-  const unitEdit = Form.useWatch('valorUnitario', formEdit);
-  const valorDesvioEdit =
-    qtdEdit != null && unitEdit != null ? qtdEdit * unitEdit : null;
+  // Valor do desvio: nasce de qtd x unitario, mas pode ser digitado a mao
+  // quando o custo do desvio nao vem dessa conta.
+  const ctrlTotal = useValorTotal(formEdit, CAMPOS_VALOR);
 
   const { data: rnc, isLoading } = useQuery<any>({
     queryKey: ['rnc', 'detalhe', id],
@@ -384,6 +391,7 @@ export default function RncDetalhe() {
       descricaoDesvio: rnc.descricaoDesvio,
       quantidadePecas: rnc.quantidadePecas,
       valorUnitario: rnc.valorUnitario,
+      valorTotal: rnc.valorTotal,
       disposicao: rnc.disposicao,
       enviadaFornecedor: rnc.enviadaFornecedor,
       dataEnvioFornecedor: rnc.dataEnvioFornecedor
@@ -400,6 +408,7 @@ export default function RncDetalhe() {
         : undefined,
       observacoes: rnc.observacoes,
     });
+    ctrlTotal.carregar(rnc);
     setEditOpen(true);
   }
 
@@ -575,6 +584,7 @@ export default function RncDetalhe() {
               </Descriptions.Item>
               <Descriptions.Item label="Valor total (R$)" span={2}>
                 <strong>{moeda(rnc.valorTotal)}</strong>
+                <TagTotalManual registro={rnc} campos={CAMPOS_VALOR} />
               </Descriptions.Item>
               <Descriptions.Item label="Disposição" span={2}>
                 {rnc.disposicao ?? '-'}
@@ -811,6 +821,7 @@ export default function RncDetalhe() {
           form={formEdit}
           layout="vertical"
           onFinish={(v) => atualizar.mutate(v)}
+          onValuesChange={ctrlTotal.aoMudarValores}
           style={{ marginTop: 12 }}
         >
           <Row gutter={12}>
@@ -862,10 +873,7 @@ export default function RncDetalhe() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              {/* Mesma conta do backend (qtd x unitario), so para conferir. */}
-              <Form.Item label="Valor do desvio">
-                <Input value={moeda(valorDesvioEdit)} disabled />
-              </Form.Item>
+              <CampoValorTotal ctrl={ctrlTotal} label="Valor do desvio" />
             </Col>
           </Row>
           <Form.Item name="disposicao" label="Disposição">

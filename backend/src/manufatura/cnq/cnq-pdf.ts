@@ -62,6 +62,15 @@ function inteiro(v: any): string {
   return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR');
 }
 
+// Total que nao bate com quantidade x valor unitario so pode ter sido digitado
+// a mao no lancamento.
+function totalManual(c: any): boolean {
+  if (c?.valorTotal == null || c?.quantidade == null || c?.valorUnitario == null)
+    return false;
+  const calculado = Math.round(c.quantidade * c.valorUnitario * 100) / 100;
+  return Math.round(c.valorTotal * 100) / 100 !== calculado;
+}
+
 type Coluna = {
   titulo: string;
   peso: number;
@@ -96,7 +105,9 @@ const COLUNAS: Coluna[] = [
   {
     titulo: 'CNQ (R$)',
     peso: 58,
-    valor: (c) => moeda(c.valorTotal),
+    // O asterisco avisa que o total nao saiu de qtd x unitario, foi digitado.
+    // Sem ele quem confere a planilha acha que a conta esta errada.
+    valor: (c) => `${moeda(c.valorTotal)}${totalManual(c) ? ' *' : ''}`,
     direita: true,
     negrito: true,
   },

@@ -23,7 +23,13 @@ import { semanaAno } from '../semana';
 import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
 import Tabela from '../components/Tabela';
 import { CamposItem } from '../components/CamposItem';
+import { CampoValorTotal, useValorTotal } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
+
+const CAMPOS_VALOR = {
+  quantidade: 'quantidadePecas',
+  unitario: 'valorUnitario',
+};
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
 export const corStatusRnc: Record<string, string> = {
@@ -63,12 +69,9 @@ export default function RncLista() {
   const hoje = dayjs();
   const { semana: semanaHoje, ano: anoHoje } = semanaAno(hoje.toDate());
 
-  // O valor do desvio e sempre qtd x unitario (mesma conta do backend). Fica
-  // aqui so para o inspetor ver o total enquanto preenche.
-  const qtdPecas = Form.useWatch('quantidadePecas', form);
-  const valorUnit = Form.useWatch('valorUnitario', form);
-  const valorDesvio =
-    qtdPecas != null && valorUnit != null ? qtdPecas * valorUnit : null;
+  // O valor do desvio nasce de qtd x unitario, mas o inspetor pode digitar
+  // outro valor quando o custo do desvio nao vem dessa conta.
+  const ctrlTotal = useValorTotal(form, CAMPOS_VALOR);
 
   const { data, isLoading } = useQuery<any[]>({
     queryKey: ['rnc', filtroStatus],
@@ -276,6 +279,7 @@ export default function RncLista() {
           form={form}
           layout="vertical"
           onFinish={(v) => salvar.mutate(v)}
+          onValuesChange={ctrlTotal.aoMudarValores}
           style={{ marginTop: 12 }}
         >
           <Row gutter={12}>
@@ -311,9 +315,12 @@ export default function RncLista() {
           <CamposItem
             form={form}
             descricaoObrigatoria
+            permitirCadastro
             aoResolver={(item) => {
-              if (item?.custoUnitario != null)
-                form.setFieldValue('valorUnitario', item.custoUnitario);
+              if (item?.custoUnitario == null) return;
+              form.setFieldValue('valorUnitario', item.custoUnitario);
+              // setFieldValue nao passa pelo onValuesChange: refaz o total.
+              if (!ctrlTotal.manual) ctrlTotal.recalcular();
             }}
           />
           <Row gutter={12}>
@@ -365,11 +372,7 @@ export default function RncLista() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              {/* So mostra o que o backend vai gravar (qtd x unitario), para o
-                  inspetor conferir o valor do desvio antes de abrir a RNC. */}
-              <Form.Item label="Valor do desvio">
-                <Input value={moeda(valorDesvio)} disabled />
-              </Form.Item>
+              <CampoValorTotal ctrl={ctrlTotal} label="Valor do desvio" />
             </Col>
           </Row>
           <Form.Item name="disposicao" label="Disposição">

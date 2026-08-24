@@ -12,6 +12,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../auth/modulo.decorator';
+import { PermissaoGuard } from '../auth/permissao.guard';
 
 class UpdatePeriodicidadeDto {
   @IsOptional() @IsString() periodicidadeTexto?: string;
@@ -24,7 +27,8 @@ class UpdatePeriodicidadeDto {
   @IsOptional() @Type(() => Number) @IsNumber() conformidadeMin?: number;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQE)
 @Controller('periodicidade')
 export class PeriodicidadeController {
   constructor(private prisma: PrismaService) {}

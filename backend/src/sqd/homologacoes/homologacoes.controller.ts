@@ -23,6 +23,9 @@ import {
   gerarPdfAutoavaliacao,
   gerarPdfRegistroHomologacao,
 } from './homologacao-pdf';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // Cabecalho do FMR.024.03 + controle do FMR.029.01. O registro nasce so com o
 // controle; a autoavaliacao entra depois, pela rota /autoavaliacao.
@@ -78,7 +81,8 @@ class AutoavaliacaoDto {
   @IsOptional() @IsString() setor?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQD)
 @Controller('sqd/homologacoes')
 export class HomologacoesController {
   constructor(private service: HomologacoesService) {}

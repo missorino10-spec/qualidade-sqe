@@ -23,6 +23,9 @@ import { StorageService } from '../../anexos/storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import { EVID } from '../../comum/inspecao';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // Espelha o formulario "Alerta da Qualidade" (.docx).
 class AlertaDto {
@@ -47,7 +50,8 @@ class EncerramentoDto {
   @IsOptional() @IsString() observacao?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('manufatura/alertas')
 export class AlertasController {
   constructor(

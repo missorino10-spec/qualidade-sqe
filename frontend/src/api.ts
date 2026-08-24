@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { message } from 'antd';
 
 // Sem VITE_API_URL, usa o caminho relativo /api: e o caso do nginx (producao
 // on-premise) e do proxy do Vite (dev), onde front e back sao o mesmo host.
@@ -25,6 +26,14 @@ api.interceptors.response.use(
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
+    }
+    // Quem tem acesso so de visualizacao ainda enxerga alguns botoes. O bloqueio
+    // real e do servidor; aqui a pessoa fica sabendo por que nao salvou.
+    if (err.response?.status === 403) {
+      message.warning(
+        err.response?.data?.message ??
+          'Você não tem permissão para esta ação. Fale com o administrador.',
+      );
     }
     return Promise.reject(err);
   },

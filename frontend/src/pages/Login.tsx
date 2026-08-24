@@ -12,6 +12,8 @@ export default function Login() {
   async function onFinish(values: { email: string; senha: string }) {
     setLoading(true);
     try {
+      // Quem entrou com senha provisoria vai direto para a troca; os demais
+      // caem na primeira tela que tem direito de ver (o "*" resolve isso).
       await login(values.email, values.senha);
       navigate('/');
     } catch {
@@ -41,9 +43,7 @@ export default function Login() {
           <Typography.Title level={3} style={{ marginBottom: 0, color: '#D37119' }}>
             Sistema de Qualidade
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Big Dutchman Brasil — Módulo SQE
-          </Typography.Text>
+          <Typography.Text type="secondary">Big Dutchman Brasil</Typography.Text>
         </div>
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item

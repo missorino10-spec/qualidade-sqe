@@ -33,6 +33,9 @@ import {
   gerarPdfRegistroHomologacaoItem,
   gerarPdfRelatorioInspecaoItem,
 } from './homologacao-item-pdf';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // A inspecao de producao so existe na Manufatura.
 const ORIGENS = ORIGENS_RECEBIMENTO.map((o) => o.value);
@@ -125,7 +128,8 @@ class EncerrarDesvioDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQD)
 @Controller('sqd/homologacoes-itens')
 export class HomologacoesItensController {
   constructor(

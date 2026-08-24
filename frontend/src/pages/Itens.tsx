@@ -219,7 +219,6 @@ export default function Itens() {
           {
             title: 'Ações',
             width: admin ? 230 : 160,
-            fixed: 'right' as const,
             render: (_: any, i: Item) => (
               <Space size={4}>
                 <Button size="small" onClick={() => abrir(i)}>

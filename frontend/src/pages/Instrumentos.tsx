@@ -333,7 +333,6 @@ export default function Instrumentos() {
                 {
                   title: 'Ações',
                   width: admin ? 220 : 150,
-                  fixed: 'right' as const,
                   render: (_: any, i: Instrumento) => (
                     <Space size={4}>
                       <Button size="small" onClick={() => abrir(i)}>

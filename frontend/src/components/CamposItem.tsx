@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { AutoComplete, Col, Form, Input, Row, Select, Typography } from 'antd';
+import {
+  AutoComplete,
+  Button,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Row,
+  Select,
+  Typography,
+  message,
+} from 'antd';
 import type { FormInstance } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { moeda } from '../moeda';
+import { formatarMoedaInput, lerMoedaInput, moeda } from '../moeda';
 
 /**
  * Par CODIGO + DESCRICAO do item, com consulta na base de codigos e custo.
@@ -43,6 +55,11 @@ interface Props {
    * para preencher o valor unitario e recalcular o total.
    */
   aoResolver?: (item: ItemDaBase | null) => void;
+  /**
+   * Oferece cadastrar na base o codigo que nao existe, sem sair da tela. E o
+   * caso da inspecao extra de peca que ainda nao entrou na planilha.
+   */
+  permitirCadastro?: boolean;
 }
 
 export function CamposItem({
@@ -56,11 +73,16 @@ export function CamposItem({
   spanCodigo = 8,
   spanDescricao = 16,
   aoResolver,
+  permitirCadastro = false,
 }: Props) {
+  const qc = useQueryClient();
   const [opcoes, setOpcoes] = useState<ItemDaBase[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [situacao, setSituacao] = useState<'vazio' | 'achou' | 'fora'>('vazio');
   const [achado, setAchado] = useState<ItemDaBase | null>(null);
+  const [cadastroOpen, setCadastroOpen] = useState(false);
+  const [salvandoItem, setSalvandoItem] = useState(false);
+  const [formItem] = Form.useForm();
   const codigoAtual = Form.useWatch(nomeCodigo, form);
 
   // Guarda o ultimo codigo resolvido para nao repetir a consulta a cada
@@ -188,8 +210,103 @@ export function CamposItem({
       {!buscando && situacao === 'fora' && (
         <Typography.Text type="warning" style={{ fontSize: 12 }}>
           Código fora da base — digite a descrição e o valor unitário.
+          {permitirCadastro && (
+            <Button
+              type="link"
+              size="small"
+              style={{ fontSize: 12, paddingLeft: 6 }}
+              onClick={() => {
+                formItem.setFieldsValue({
+                  codigo: (codigoAtual ?? '').trim(),
+                  descricao: form.getFieldValue(nomeDescricao) ?? '',
+                  unidade: undefined,
+                  custoUnitario: undefined,
+                });
+                setCadastroOpen(true);
+              }}
+            >
+              Cadastrar na base
+            </Button>
+          )}
         </Typography.Text>
       )}
+
+      {/* Cadastro rapido: a peca da inspecao extra ainda nao entrou na planilha.
+          Cadastrar aqui evita mandar o inspetor para outra tela no meio do
+          lancamento e faz o codigo existir com custo para as proximas vezes. */}
+      <Modal
+        open={cadastroOpen}
+        title="Cadastrar item na base"
+        okText="Salvar"
+        cancelText="Cancelar"
+        confirmLoading={salvandoItem}
+        onCancel={() => setCadastroOpen(false)}
+        onOk={async () => {
+          const v = await formItem.validateFields();
+          setSalvandoItem(true);
+          try {
+            const { data: novo } = await api.post('/itens', {
+              codigo: String(v.codigo).trim(),
+              descricao: String(v.descricao).trim(),
+              unidade: v.unidade || null,
+              custoUnitario: v.custoUnitario ?? null,
+            });
+            qc.invalidateQueries({ queryKey: ['itens'] });
+            form.setFieldValue(nomeCodigo, novo.codigo);
+            aplicar(novo as ItemDaBase, novo.codigo);
+            setCadastroOpen(false);
+            message.success('Item cadastrado na base.');
+          } catch (e: any) {
+            message.error(
+              e?.response?.data?.message ?? 'Não foi possível cadastrar o item.',
+            );
+          } finally {
+            setSalvandoItem(false);
+          }
+        }}
+      >
+        <Form form={formItem} layout="vertical">
+          <Row gutter={12}>
+            <Col xs={24} sm={10}>
+              <Form.Item
+                name="codigo"
+                label="Código"
+                rules={[{ required: true, message: 'Informe o código.' }]}
+              >
+                <Input placeholder="Ex.: 12345678" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={14}>
+              <Form.Item
+                name="descricao"
+                label="Descrição"
+                rules={[{ required: true, message: 'Informe a descrição.' }]}
+              >
+                <Input placeholder="Descrição da peça" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={10}>
+              <Form.Item name="unidade" label="Unidade">
+                <Input placeholder="PC, KG, M..." />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={14}>
+              {/* Opcional de proposito: as vezes o inspetor nao tem o custo na
+                  hora. Sem ele o valor unitario do lancamento e digitado. */}
+              <Form.Item name="custoUnitario" label="Custo unitário (opcional)">
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  precision={2}
+                  style={{ width: '100%' }}
+                  formatter={formatarMoedaInput}
+                  parser={lerMoedaInput as any}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </>
   );
 }

@@ -28,6 +28,9 @@ import {
   gerarPdfRegistroAuditoria,
   gerarPdfChecklistAuditoria,
 } from './auditoria-pdf';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // Registro da auditoria de fornecedor (cabecalho da aba "Checklist").
 class AuditoriaDto {
@@ -64,7 +67,8 @@ class RodadaAuditoriaDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQD)
 @Controller('sqd/auditorias')
 export class AuditoriasController {
   constructor(private service: AuditoriasService) {}

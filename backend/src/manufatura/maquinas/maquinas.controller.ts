@@ -22,6 +22,9 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { MaquinasService } from './maquinas.service';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 class MaquinaDto {
   @IsOptional() @IsString() codigo?: string;
@@ -37,7 +40,8 @@ class ProducaoDto {
   @IsOptional() @IsNumber() qtdDefeito?: number;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.CAD_MAQUINAS, { leituraLivre: true })
 @Controller('maquinas')
 export class MaquinasController {
   constructor(private service: MaquinasService) {}

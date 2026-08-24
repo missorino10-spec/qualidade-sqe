@@ -30,6 +30,9 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 class CreateRncDto {
   // Recebimento (= inspecao) de origem: e por ele que a RNC e reaproveitada
@@ -49,6 +52,8 @@ class CreateRncDto {
   @IsString() descricaoDesvio: string;
   @IsOptional() @Type(() => Number) @IsNumber() quantidadePecas?: number;
   @IsOptional() @Type(() => Number) @IsNumber() valorUnitario?: number;
+  // So vem preenchido quando a pessoa digita o total a mao.
+  @IsOptional() @Type(() => Number) @IsNumber() valorTotal?: number;
   @IsOptional() @IsString() disposicao?: string;
   @IsOptional() @IsString() observacoes?: string;
 }
@@ -59,6 +64,8 @@ class AtualizarRncDto {
   @IsOptional() @IsString() descricaoDesvio?: string;
   @IsOptional() @Type(() => Number) @IsNumber() quantidadePecas?: number;
   @IsOptional() @Type(() => Number) @IsNumber() valorUnitario?: number;
+  // So vem preenchido quando a pessoa digita o total a mao.
+  @IsOptional() @Type(() => Number) @IsNumber() valorTotal?: number;
   @IsOptional() @IsString() disposicao?: string;
   @IsOptional() @IsBoolean() houveRetorno?: boolean;
   @IsOptional() @IsString() dataRetorno?: string;
@@ -109,7 +116,8 @@ class EncerrarDesvioDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQE)
 @Controller('rnc')
 export class RncController {
   constructor(

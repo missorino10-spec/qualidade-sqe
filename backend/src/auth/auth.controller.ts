@@ -13,6 +13,11 @@ class LoginDto {
   senha: string;
 }
 
+class TrocarSenhaDto {
+  @IsString() senhaAtual: string;
+  @IsString() @MinLength(6) novaSenha: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -25,6 +30,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
-    return user;
+    return this.authService.me(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('trocar-senha')
+  trocarSenha(@CurrentUser() user: AuthUser, @Body() dto: TrocarSenhaDto) {
+    return this.authService.trocarSenha(user.id, dto.senhaAtual, dto.novaSenha);
   }
 }

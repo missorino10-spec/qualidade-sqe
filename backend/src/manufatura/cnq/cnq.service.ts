@@ -50,13 +50,21 @@ export class CnqService {
 
   // CNQ (custo da nao qualidade) = quantidade x valor unitario da peca.
   // O valor unitario e digitado no lancamento, como na planilha.
+  //
+  // O total e calculado, mas nao e imposto: se a tela mandar um valorTotal, e
+  // porque a pessoa digitou um valor a mao (frete, retrabalho, lote parcial) e
+  // esse valor manda. Sem valorTotal no dto, volta a valer a conta.
   private calcular(dto: any) {
     const quantidade = dto.quantidade ?? 0;
     const valorUnitario = dto.valorUnitario ?? 0;
+    const calculado = Math.round(quantidade * valorUnitario * 100) / 100;
     return {
       quantidade,
       valorUnitario,
-      valorTotal: Math.round(quantidade * valorUnitario * 100) / 100,
+      valorTotal:
+        dto.valorTotal != null
+          ? Math.round(dto.valorTotal * 100) / 100
+          : calculado,
     };
   }
 

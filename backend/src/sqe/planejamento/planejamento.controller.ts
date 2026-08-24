@@ -16,6 +16,9 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 class CreatePlanejamentoDto {
   @IsString() semanaReferencia: string;
@@ -29,7 +32,8 @@ const includePadrao = {
   item: { select: { id: true, descricao: true, codigo: true } },
 };
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.SQE)
 @Controller('planejamento-semanal')
 export class PlanejamentoController {
   constructor(private prisma: PrismaService) {}

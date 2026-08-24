@@ -28,6 +28,9 @@ import { gerarPdfCincoG, FotosCincoG } from './cincog-pdf';
 import { EVID_5G } from '../../comum/cincog';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 // MÉTODO 5G - aba "MÉTODO 5G" da planilha de Analise de Problemas.
 class CincoGDto {
@@ -57,7 +60,8 @@ class CincoGDto {
   @IsOptional() @IsString() verificacaoGerente?: string;
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('manufatura/5g')
 export class CincoGController {
   constructor(

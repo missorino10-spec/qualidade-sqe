@@ -155,7 +155,6 @@ export default function Maquinas() {
             {
               title: 'Ações',
               width: admin ? 230 : 160,
-              fixed: 'right' as const,
               render: (_: any, r: any) => (
                 <Space size={4}>
                   <Button size="small" onClick={() => abrir(r)}>

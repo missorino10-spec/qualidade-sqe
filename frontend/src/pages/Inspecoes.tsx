@@ -933,7 +933,7 @@ export default function Inspecoes() {
 
               {/* Codigo primeiro: e por ele que o inspetor comeca, e achando
                   na base a descricao entra sozinha. */}
-              <CamposItem form={form} descricaoObrigatoria />
+              <CamposItem form={form} descricaoObrigatoria permitirCadastro />
 
               <Row gutter={12}>
                 <Col span={6}>

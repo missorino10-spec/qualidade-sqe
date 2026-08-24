@@ -19,9 +19,12 @@ import {
   NotificationOutlined,
   BarcodeOutlined,
   ColumnWidthOutlined,
+  DatabaseOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import type { Modulo } from '../permissoes';
 
 const { Header, Sider, Content } = Layout;
 
@@ -30,24 +33,30 @@ type ItemMenu = {
   label: string;
   icon?: ReactNode;
   disabled?: boolean;
+  /** Submenu que depende de acesso proprio (so os Cadastros). */
+  modulo?: Modulo;
 };
 
+// O menu e a lista completa; o que cada pessoa ve sai do filtro la embaixo.
+// SQE, MANUFATURA e SQD sao modulo inteiro; CADASTROS aparece com os submenus
+// que o admin liberou, e some se nao liberou nenhum.
 const itensMenu: {
   key: string;
   icon: ReactNode;
   label: string;
+  modulo?: Modulo;
+  somenteAdmin?: boolean;
   children: ItemMenu[];
 }[] = [
   {
     key: 'sqe',
     icon: <ExperimentOutlined />,
     label: 'QUALIDADE - SQE',
+    modulo: 'SQE',
     children: [
       { key: '/', icon: <DashboardOutlined />, label: 'Painel' },
       { key: '/inspecoes', icon: <AuditOutlined />, label: 'Inspeções' },
       { key: '/rnc', icon: <WarningOutlined />, label: 'RNC' },
-      { key: '/fornecedores', icon: <ShopOutlined />, label: 'Fornecedores' },
-      { key: '/itens', icon: <BarcodeOutlined />, label: 'Itens' },
       {
         key: '/periodicidade',
         icon: <SlidersOutlined />,
@@ -59,6 +68,7 @@ const itensMenu: {
     key: 'manufatura',
     icon: <ToolOutlined />,
     label: 'QUALIDADE - MANUFATURA',
+    modulo: 'MANUFATURA',
     children: [
       { key: '/manufatura', icon: <DashboardOutlined />, label: 'Painel' },
       {
@@ -79,11 +89,6 @@ const itensMenu: {
         label: 'Alerta da Qualidade',
       },
       {
-        key: '/manufatura/maquinas',
-        icon: <ClusterOutlined />,
-        label: 'Cadastro de Máquinas',
-      },
-      {
         key: '/manufatura/producao',
         icon: <LineChartOutlined />,
         label: 'Produção Diária / PPM',
@@ -94,6 +99,7 @@ const itensMenu: {
     key: 'sqd',
     icon: <SafetyCertificateOutlined />,
     label: 'QUALIDADE - SQD',
+    modulo: 'SQD',
     children: [
       { key: '/sqd', icon: <DashboardOutlined />, label: 'Painel' },
       {
@@ -114,14 +120,46 @@ const itensMenu: {
     ],
   },
   {
-    key: 'instrumentos',
-    icon: <ColumnWidthOutlined />,
-    label: 'INSTRUMENTOS',
+    key: 'cadastros',
+    icon: <DatabaseOutlined />,
+    label: 'CADASTROS',
     children: [
+      {
+        key: '/fornecedores',
+        icon: <ShopOutlined />,
+        label: 'Fornecedores',
+        modulo: 'CAD_FORNECEDORES',
+      },
+      {
+        key: '/itens',
+        icon: <BarcodeOutlined />,
+        label: 'Itens',
+        modulo: 'CAD_ITENS',
+      },
+      {
+        key: '/manufatura/maquinas',
+        icon: <ClusterOutlined />,
+        label: 'Máquinas',
+        modulo: 'CAD_MAQUINAS',
+      },
       {
         key: '/instrumentos/inventario',
         icon: <ColumnWidthOutlined />,
-        label: 'Inventário de Instrumentos',
+        label: 'Instrumentos',
+        modulo: 'CAD_INSTRUMENTOS',
+      },
+    ],
+  },
+  {
+    key: 'administracao',
+    icon: <TeamOutlined />,
+    label: 'ADMINISTRAÇÃO',
+    somenteAdmin: true,
+    children: [
+      {
+        key: '/admin/colaboradores',
+        icon: <UserOutlined />,
+        label: 'Colaboradores e Acessos',
       },
     ],
   },
@@ -144,7 +182,22 @@ const ALIAS_MENU: Record<string, string> = {
 export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, podeVer } = useAuth();
+
+  // Cada um so ve o que o admin liberou. O grupo some quando fica sem filhos:
+  // e o caso de CADASTROS para quem nao recebeu nenhum submenu.
+  const menuVisivel = itensMenu
+    .filter((g) => (g.somenteAdmin ? usuario?.papel === 'ADMIN' : true))
+    .filter((g) => (g.modulo ? podeVer(g.modulo) : true))
+    .map((g) => ({
+      key: g.key,
+      icon: g.icon,
+      label: g.label,
+      children: g.children
+        .filter((c) => !c.modulo || podeVer(c.modulo))
+        .map(({ modulo: _m, ...c }) => c),
+    }))
+    .filter((g) => g.children.length > 0);
 
   const alias = Object.keys(ALIAS_MENU).find(
     (r) => location.pathname === r || location.pathname.startsWith(`${r}/`),
@@ -185,7 +238,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           onClick={({ key }) => {
             if (key.startsWith('/')) navigate(key);
           }}
-          items={itensMenu}
+          items={menuVisivel}
         />
       </Sider>
       <Layout>

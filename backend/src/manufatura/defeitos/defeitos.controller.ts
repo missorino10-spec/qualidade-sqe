@@ -14,6 +14,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
+import { ModuloSistema } from '@prisma/client';
+import { Modulo } from '../../auth/modulo.decorator';
+import { PermissaoGuard } from '../../auth/permissao.guard';
 
 class TipoDefeitoDto {
   @IsOptional() @IsString() nome?: string;
@@ -23,7 +26,8 @@ class TipoDefeitoDto {
 
 // Lista oficial de "Descricao do Defeito" da Qualidade. Alimenta o lancamento
 // de CNQ e o bloco visual do relatorio de inspecao.
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
+@Modulo(ModuloSistema.MANUFATURA)
 @Controller('tipos-defeito')
 export class DefeitosController {
   constructor(private prisma: PrismaService) {}
