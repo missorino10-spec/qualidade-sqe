@@ -12,6 +12,9 @@ build/
 # Uploads locais (fora do Docker)
 uploads/
 
+# Dumps tirados antes de limpeza no banco: contem dado real, nao versionar
+backup/
+
 # Prisma
 *.db
 

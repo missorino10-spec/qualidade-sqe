@@ -50,7 +50,6 @@ model Usuario {
 
   acessos AcessoModulo[]
 
-  planejamentos   PlanejamentoSemanal[] @relation("PlanejamentoCriadoPor")
   entregas        EntregaPortaria[]     @relation("EntregaConfirmadoPor")
   inspecoesVisual InspecaoVisual[]      @relation("InspVisualInspetor")
   inspecoesLote   InspecaoLote[]        @relation("InspLoteInspetor")
@@ -170,7 +169,6 @@ model Fornecedor {
 
   contatos         Contato[]
   itens            Item[]
-  planejamentos    PlanejamentoSemanal[]
   entregas         EntregaPortaria[]
   inspecoesVisual  InspecaoVisual[]
   inspecoesLote    InspecaoLote[]
@@ -207,7 +205,6 @@ model Item {
   fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
   createdAt    DateTime    @default(now())
 
-  planejamentos   PlanejamentoSemanal[]
   entregas        EntregaPortaria[]
   inspecoesVisual InspecaoVisual[]
   inspecoesLote   InspecaoLote[]
@@ -281,35 +278,12 @@ model HistoricoClassificacao {
 
 // ---------------------- MODULO SQE ----------------------
 
-enum StatusPlanejamento {
-  PENDENTE
-  ENTREGUE
-}
-
-model PlanejamentoSemanal {
-  id               Int                @id @default(autoincrement())
-  semanaReferencia String // ex: "2026-W28"
-  fornecedorId     Int
-  fornecedor       Fornecedor         @relation(fields: [fornecedorId], references: [id])
-  itemId           Int?
-  item             Item?              @relation(fields: [itemId], references: [id])
-  dataPrevista     DateTime?
-  status           StatusPlanejamento @default(PENDENTE)
-  criadoPorId      Int?
-  criadoPor        Usuario?           @relation("PlanejamentoCriadoPor", fields: [criadoPorId], references: [id])
-  createdAt        DateTime           @default(now())
-
-  entregas EntregaPortaria[]
-}
-
 // Um recebimento. Quando ele e inspecionado, ganha um numero de inspecao
 // (INSP0001/2026) e passa a ser a UNIDADE de inspecao: os formularios Visual e
 // Lote do mesmo recebimento sao a MESMA inspecao, contam como uma so e
 // compartilham uma unica RNC.
 model EntregaPortaria {
   id                     Int                  @id @default(autoincrement())
-  planejamentoId         Int?
-  planejamento           PlanejamentoSemanal? @relation(fields: [planejamentoId], references: [id])
   fornecedorId           Int
   fornecedor             Fornecedor           @relation(fields: [fornecedorId], references: [id])
   itemId                 Int?

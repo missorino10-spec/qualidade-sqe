@@ -17,11 +17,15 @@ import { extname } from 'path';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EntidadeModuloGuard } from '../auth/entidade-modulo.guard';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { StorageService } from './storage.service';
 import { corrigirNomeArquivo, disposicaoAnexo } from './nome-arquivo';
 
-@UseGuards(JwtAuthGuard)
+// Anexo e uma tabela so para o sistema inteiro. Quem manda no acesso e o
+// "entidadeTipo": anexo de RNC exige SQE, de 8D exige Manufatura, e assim por
+// diante. Sem isso qualquer pessoa logada baixaria o arquivo de qualquer area.
+@UseGuards(JwtAuthGuard, EntidadeModuloGuard)
 @Controller('anexos')
 export class AnexosController {
   constructor(

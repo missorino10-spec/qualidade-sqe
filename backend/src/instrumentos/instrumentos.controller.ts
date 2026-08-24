@@ -108,6 +108,11 @@ export class InstrumentosController {
   }
 
   // PDF no layout do 004.01, para imprimir e afixar na metrologia.
+  //
+  // Fora da leitura livre da classe: a lista continua aberta porque alimenta os
+  // combos dos lancamentos, mas o inventario impresso e documento do cadastro e
+  // so sai para quem tem Cadastros > Instrumentos.
+  @Modulo(ModuloSistema.CAD_INSTRUMENTOS)
   @Get('pdf')
   async pdf(
     @Res() res: Response,

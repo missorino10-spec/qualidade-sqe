@@ -157,7 +157,9 @@ export default function Instrumentos() {
             fabricante: '',
             numeroSerie: '',
             dataCalibracao: undefined,
-            periodoAnos: 1,
+            // Padrao da casa: o certificado dos instrumentos vale 2 anos. E so
+            // sugestao - quem tem instrumento com outro prazo troca o numero.
+            periodoAnos: 2,
             proximaCalibracao: undefined,
             numeroCertificado: '',
             localizacao: '',

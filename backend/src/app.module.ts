@@ -12,8 +12,6 @@ import { ItensModule } from './itens/itens.module';
 import { InstrumentosModule } from './instrumentos/instrumentos.module';
 import { AnexosModule } from './anexos/anexos.module';
 import { HistoricoModule } from './historico/historico.module';
-import { PlanejamentoModule } from './sqe/planejamento/planejamento.module';
-import { EntregasModule } from './sqe/entregas/entregas.module';
 import { InspecoesModule } from './sqe/inspecoes/inspecoes.module';
 import { RncModule } from './sqe/rnc/rnc.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -57,8 +55,6 @@ const servirFrontend = existsSync(frontendDir);
     InstrumentosModule,
     AnexosModule,
     HistoricoModule,
-    PlanejamentoModule,
-    EntregasModule,
     InspecoesModule,
     RncModule,
     DashboardModule,
