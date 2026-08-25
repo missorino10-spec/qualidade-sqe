@@ -2,6 +2,8 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { nomeCurto } from '../../comum/nome';
+import { valorDeCelula } from '../../comum/pdf-texto';
 import {
   checklistDoRelatorio,
   labelNorma,
@@ -76,13 +78,8 @@ export function gerarPdfInspecao(
       .text(label, x + 3, y + 3, { width: largura - 6, lineBreak: false });
     doc
       .font(opts.negrito ? 'Helvetica-Bold' : 'Helvetica')
-      .fontSize(8.5)
-      .fillColor(opts.valorColor ?? PRETO)
-      .text(valor, x + 3, y + 13, {
-        width: largura - 6,
-        height: altura - 15,
-        ellipsis: true,
-      });
+      .fillColor(opts.valorColor ?? PRETO);
+    valorDeCelula(doc, valor, x + 3, y + 13, largura - 6, altura - 15, 8.5);
   };
 
   // Linha de celulas: cada uma com sua largura proporcional.
@@ -213,17 +210,14 @@ export function gerarPdfInspecao(
   const reprovado = insp.resultado === 'REPROVADO';
   // Recebimento sem inspecao nao e "aprovado": nada foi verificado.
   const semInspecao = insp.resultado === 'SEM_INSPECAO';
-  // Aprovado, mas com desvio apontado e sem RNC. O papel tem que dizer isso no
-  // cabecalho: quem le depois ve cota reprovada na tabela e precisa entender
-  // por que o recebimento passou.
-  const comDesvio = insp.resultado === 'APROVADO_COM_DESVIO';
+  // Desvio encerrado sem RNC sai como APROVADO no cabecalho, igual a qualquer
+  // outro. O que explica a cota reprovada na tabela e o bloco de justificativa
+  // impresso mais abaixo, nao o veredito.
   const labelResultado = semInspecao
     ? 'SEM INSPEÇÃO'
     : reprovado
       ? 'REPROVADO'
-      : comDesvio
-        ? 'APROVADO C/ DESVIO'
-        : 'APROVADO';
+      : 'APROVADO';
   linha(
     [
       {
@@ -242,19 +236,13 @@ export function gerarPdfInspecao(
       {
         w: 115,
         label: 'INSPETOR',
-        valor: txt(insp.inspetor?.nome),
+        valor: nomeCurto(insp.inspetor?.nome),
       },
       {
         w: 100,
         label: 'RESULTADO',
         valor: labelResultado,
-        cor: semInspecao
-          ? CINZA
-          : reprovado
-            ? VERMELHO
-            : comDesvio
-              ? LARANJA
-              : VERDE,
+        cor: semInspecao ? CINZA : reprovado ? VERMELHO : VERDE,
         negrito: true,
       },
       {
@@ -462,7 +450,7 @@ export function gerarPdfInspecao(
   y += 10;
   linha(
     [
-      { w: W / 2, label: 'INSPETOR RESPONSÁVEL', valor: txt(insp.inspetor?.nome) },
+      { w: W / 2, label: 'INSPETOR RESPONSÁVEL', valor: nomeCurto(insp.inspetor?.nome) },
       { w: W / 2, label: 'VISTO / DATA', valor: '' },
     ],
     38,

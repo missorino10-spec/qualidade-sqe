@@ -3,6 +3,8 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
 import { ORIGENS_INSPECAO } from '../../comum/inspecao';
+import { nomeCurto } from '../../comum/nome';
+import { valorDeCelula } from '../../comum/pdf-texto';
 
 // Relatorio de Inspecao Visual da Manufatura.
 // Mesmo cabecalho e mesma identidade visual do 011.06 (dimensional), mas sem
@@ -73,13 +75,8 @@ export function gerarPdfInspecaoVisual(
       .text(label, x + 3, y + 3, { width: largura - 6, lineBreak: false });
     doc
       .font(opts.negrito ? 'Helvetica-Bold' : 'Helvetica')
-      .fontSize(8.5)
-      .fillColor(opts.valorColor ?? PRETO)
-      .text(valor, x + 3, y + 13, {
-        width: largura - 6,
-        height: altura - 15,
-        ellipsis: true,
-      });
+      .fillColor(opts.valorColor ?? PRETO);
+    valorDeCelula(doc, valor, x + 3, y + 13, largura - 6, altura - 15, 8.5);
   };
 
   const linha = (
@@ -285,7 +282,7 @@ export function gerarPdfInspecaoVisual(
     {
       w: W - 110 - 100 - 70,
       label: 'INSPETOR',
-      valor: txt(insp.inspetor?.nome),
+      valor: nomeCurto(insp.inspetor?.nome),
     },
   ]);
 
@@ -317,12 +314,12 @@ export function gerarPdfInspecaoVisual(
       {
         w: 170,
         label: 'ELABORADO POR',
-        valor: txt(insp.inspetor?.nome) || txt(insp.elaboradoPor),
+        valor: nomeCurto(insp.inspetor?.nome) || txt(insp.elaboradoPor),
       },
       {
         w: 170,
         label: 'INSPECIONADO POR',
-        valor: txt(insp.inspetor?.nome) || txt(insp.inspecionadoPor),
+        valor: nomeCurto(insp.inspetor?.nome) || txt(insp.inspecionadoPor),
       },
       {
         w: W - 170 - 170,

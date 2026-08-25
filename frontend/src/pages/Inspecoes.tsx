@@ -52,18 +52,16 @@ import { TIPOS_DESVIO } from '../tipo-desvio';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
+// Desvio encerrado sem RNC nao tem status proprio: o recebimento passou, entao
+// a linha sai como Aprovado. O desvio esta registrado dentro do relatorio.
 const corResultado: Record<string, string> = {
   APROVADO: 'green',
-  // Passou no recebimento, mas com desvio apontado e sem RNC: nao e um
-  // aprovado limpo, entao nao pode sair verde na listagem.
-  APROVADO_COM_DESVIO: 'orange',
   REPROVADO: 'red',
   SEM_INSPECAO: 'default',
 };
 
 const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
-  APROVADO_COM_DESVIO: 'Aprovado com desvio registrado',
   REPROVADO: 'Reprovado',
   SEM_INSPECAO: 'Sem inspeção recomendada',
 };
@@ -727,7 +725,7 @@ export default function Inspecoes() {
           {
             title: 'Resultado',
             dataIndex: 'resultado',
-            width: 240,
+            width: 190,
             filters: Object.entries(labelResultado).map(([value, text]) => ({
               text,
               value,

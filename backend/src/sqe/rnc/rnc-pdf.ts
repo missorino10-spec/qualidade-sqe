@@ -3,6 +3,8 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
 import { rotuloTipoDesvio } from '../../comum/tipo-desvio';
+import { nomeCurto } from '../../comum/nome';
+import { valorDeCelula } from '../../comum/pdf-texto';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -57,15 +59,16 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       .fontSize(5)
       .fillColor(opts.labelFill ? '#FFEFE2' : CINZA)
       .text(enLabel, x + 3, y + 9, { width: w - 6, lineBreak: false });
-    doc
-      .font('Helvetica')
-      .fontSize(opts.valorSize ?? 8.5)
-      .fillColor(opts.valorColor ?? PRETO)
-      .text(valor || '', x + 3, y + 17, {
-        width: w - 6,
-        height: h - 18,
-        ellipsis: true,
-      });
+    doc.font('Helvetica').fillColor(opts.valorColor ?? PRETO);
+    valorDeCelula(
+      doc,
+      valor || '',
+      x + 3,
+      y + 17,
+      w - 6,
+      h - 18,
+      opts.valorSize ?? 8.5,
+    );
   };
 
   // ---------- Secao de texto (titulo bilingue + area de valor) ----------
@@ -157,7 +160,7 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       w: 90,
       pt: 'Responsável',
       en: 'Responsible',
-      v: rnc.criadoPor?.nome ?? rnc.solicitante ?? 'Qualidade',
+      v: nomeCurto(rnc.criadoPor?.nome) || rnc.solicitante || 'Qualidade',
     },
     { w: 80, pt: 'Setor', en: 'Department', v: 'Qualidade / Quality' },
     { w: 115, pt: 'Fornecedor', en: 'Vendor', v: rnc.fornecedor?.nome ?? '' },

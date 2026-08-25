@@ -41,6 +41,7 @@ import {
   labelStatusInspecao,
 } from './FormularioDimensional';
 import Tabela from '../../components/Tabela';
+import NomeAssinatura from '../../components/NomeAssinatura';
 
 // Detalhe da inspecao da Manufatura: mostra TODAS as tentativas (1a inspecao e
 // reinspecoes), cada uma com seu proprio numero, como sai no PDF do 011.06.
@@ -80,7 +81,7 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           {rel.revisao ?? '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Inspetor">
-          {rel.inspetor?.nome ?? '-'}
+          <NomeAssinatura nome={rel.inspetor?.nome} />
         </Descriptions.Item>
         <Descriptions.Item label="Nº do item">
           {rel.itemCodigo ?? '-'}
@@ -178,10 +179,18 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
 
       <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} style={{ marginTop: 12 }}>
         <Descriptions.Item label="Elaborado por">
-          {rel.inspetor?.nome ?? rel.elaboradoPor ?? '-'}
+          {rel.inspetor?.nome ? (
+            <NomeAssinatura nome={rel.inspetor.nome} />
+          ) : (
+            (rel.elaboradoPor ?? '-')
+          )}
         </Descriptions.Item>
         <Descriptions.Item label="Inspecionado por">
-          {rel.inspetor?.nome ?? rel.inspecionadoPor ?? '-'}
+          {rel.inspetor?.nome ? (
+            <NomeAssinatura nome={rel.inspetor.nome} />
+          ) : (
+            (rel.inspecionadoPor ?? '-')
+          )}
         </Descriptions.Item>
       </Descriptions>
     </Card>
@@ -403,7 +412,7 @@ export default function InspecaoManufaturaDetalhe() {
             {data.semana ?? '-'}
           </Descriptions.Item>
           <Descriptions.Item label="Inspetor">
-            {data.inspetor?.nome ?? '-'}
+            <NomeAssinatura nome={data.inspetor?.nome} />
           </Descriptions.Item>
           <Descriptions.Item label="Tentativas">
             {relatorios.length}

@@ -67,10 +67,10 @@ export class InspecoesService {
       lote ? 'LOTE' : null,
     ].filter(Boolean) as string[];
     const principal = visual ?? lote;
+    // Encerrada com desvio apontado e sem RNC continua sendo um APROVADO comum
+    // na listagem: o desvio esta registrado dentro do relatorio (cotas e itens
+    // reprovados marcados, mais a justificativa), nao no veredito.
     const reprovado = [visual, lote].some((f) => f?.resultado === 'REPROVADO');
-    // Encerrada aprovada com desvio apontado e sem RNC: o recebimento passou,
-    // mas a listagem precisa mostrar que houve desvio registrado.
-    const comDesvio = [visual, lote].some((f) => f?.desvioSemRnc);
 
     return {
       id: e.id,
@@ -83,9 +83,7 @@ export class InspecoesService {
         ? 'SEM_INSPECAO'
         : reprovado
           ? 'REPROVADO'
-          : comDesvio
-            ? 'APROVADO_COM_DESVIO'
-            : 'APROVADO',
+          : 'APROVADO',
       dataInspecao: principal?.dataInspecao ?? e.dataEntrega,
       semana: principal?.semana ?? e.semana,
       ano: principal?.ano ?? e.ano,

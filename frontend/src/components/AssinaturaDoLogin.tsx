@@ -1,5 +1,6 @@
 import { Alert } from 'antd';
 import { useAuth } from '../auth';
+import { nomeCurto } from '../formatos';
 
 /**
  * "Elaborado por" e "Inspecionado por" deixaram de ser digitados: quem assina
@@ -17,12 +18,13 @@ export default function AssinaturaDoLogin({
   rotulo?: string;
 }) {
   const { usuario } = useAuth();
+  // Nome ja encurtado: e exatamente como vai sair impresso no documento.
   return (
     <Alert
       type="info"
       showIcon
       style={{ marginBottom: 12 }}
-      message={`${rotulo}: ${usuario?.nome ?? '-'}`}
+      message={`${rotulo}: ${nomeCurto(usuario?.nome) || '-'}`}
       description="O documento é assinado automaticamente com o usuário conectado."
     />
   );

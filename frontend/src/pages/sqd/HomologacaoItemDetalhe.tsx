@@ -81,6 +81,8 @@ import {
 import Tabela from '../../components/Tabela';
 import { CamposItem } from '../../components/CamposItem';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
+import NomeAssinatura from '../../components/NomeAssinatura';
+import { nomeCurto } from '../../formatos';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_ITEM_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_ITEM_PLANO_ACAO';
@@ -640,7 +642,7 @@ export default function HomologacaoItemDetalhe() {
                     {
                       title: 'Inspecionado por',
                       render: (_: any, r: any) =>
-                        r.criadoPor?.nome ?? r.inspecionadoPor ?? '-',
+                        nomeCurto(r.criadoPor?.nome) || r.inspecionadoPor || '-',
                     },
                     {
                       title: '',
@@ -734,12 +736,18 @@ export default function HomologacaoItemDetalhe() {
                       {recente.qtdTotal ?? '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Elaborado por">
-                      {recente.criadoPor?.nome ?? recente.elaboradoPor ?? '-'}
+                      {recente.criadoPor?.nome ? (
+                        <NomeAssinatura nome={recente.criadoPor.nome} />
+                      ) : (
+                        (recente.elaboradoPor ?? '-')
+                      )}
                     </Descriptions.Item>
                     <Descriptions.Item label="Inspecionado por">
-                      {recente.criadoPor?.nome ??
-                        recente.inspecionadoPor ??
-                        '-'}
+                      {recente.criadoPor?.nome ? (
+                        <NomeAssinatura nome={recente.criadoPor.nome} />
+                      ) : (
+                        (recente.inspecionadoPor ?? '-')
+                      )}
                     </Descriptions.Item>
                   </Descriptions>
 
@@ -907,7 +915,7 @@ export default function HomologacaoItemDetalhe() {
                 {h.observacoes ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Registrado por">
-                {h.criadoPor?.nome ?? '-'}
+                <NomeAssinatura nome={h.criadoPor?.nome} />
               </Descriptions.Item>
             </Descriptions>
           </Card>

@@ -21,6 +21,7 @@ import { dataBR } from '../../formatos';
 import { FotosEvidenciaSalvas } from '../../components/FotosEvidencia';
 import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
 import { ORIGENS_INSPECAO } from './FormularioDimensional';
+import NomeAssinatura from '../../components/NomeAssinatura';
 
 // Detalhe da INSPECAO VISUAL da Manufatura: documento proprio, sem cotas e sem
 // reinspecao - o que o inspetor observou naquele momento, com as fotos.
@@ -152,13 +153,21 @@ export default function InspecaoVisualDetalhe() {
             {labelOrigem(data.origem, data.origemOutros)}
           </Descriptions.Item>
           <Descriptions.Item label="Inspetor">
-            {data.inspetor?.nome ?? '-'}
+            <NomeAssinatura nome={data.inspetor?.nome} />
           </Descriptions.Item>
           <Descriptions.Item label="Elaborado por">
-            {data.inspetor?.nome ?? data.elaboradoPor ?? '-'}
+            {data.inspetor?.nome ? (
+              <NomeAssinatura nome={data.inspetor.nome} />
+            ) : (
+              (data.elaboradoPor ?? '-')
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="Inspecionado por" span={2}>
-            {data.inspetor?.nome ?? data.inspecionadoPor ?? '-'}
+            {data.inspetor?.nome ? (
+              <NomeAssinatura nome={data.inspetor.nome} />
+            ) : (
+              (data.inspecionadoPor ?? '-')
+            )}
           </Descriptions.Item>
         </Descriptions>
       </Card>

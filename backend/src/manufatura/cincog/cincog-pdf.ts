@@ -3,6 +3,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { CINCO_G, EVID_5G, NOTA_5G, checklist5G } from '../../comum/cincog';
 import { labelSituacaoAcao } from '../../comum/oitod';
+import { nomeCurto } from '../../comum/nome';
 
 // MÉTODO 5G — espelha a aba "MÉTODO 5G" da planilha "Analise de Problemas da
 // Qualidade - Padrao". O corpo do documento e o checklist das 9 avaliacoes.
@@ -443,7 +444,7 @@ export function gerarPdfCincoG(
         w: (W - 110) / 2,
         label: 'APROVAÇÃO DA QUALIDADE',
         valor: reg.aprovadoPor
-          ? `${txt(reg.aprovadoPor.nome)} — ${fmtData(reg.aprovadoEm)}`
+          ? `${nomeCurto(reg.aprovadoPor.nome)} — ${fmtData(reg.aprovadoEm)}`
           : '',
       },
       {

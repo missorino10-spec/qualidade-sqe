@@ -1,4 +1,5 @@
 import { fraseFaltas } from '../../comum/pendencias';
+import { nomeCurto } from '../../comum/nome';
 import PDFDocument from 'pdfkit';
 import {
   CINZA,
@@ -150,7 +151,7 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
   // digitado so responde pelas auditorias antigas.
   t.bloco(
     'Auditores responsáveis',
-    txt(a.criadoPor?.nome) || txt(a.auditores),
+    nomeCurto(a.criadoPor?.nome) || txt(a.auditores),
     26,
   );
   t.bloco('Participantes do fornecedor', txt(a.participantes), 26);
@@ -269,7 +270,7 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
         fmtData(r.dataAuditoria),
         fmtNota(r.nota),
         LABEL_RESULTADO[r.resultado] ?? '',
-        txt(r.criadoPor?.nome) || txt(r.auditores),
+        nomeCurto(r.criadoPor?.nome) || txt(r.auditores),
       ];
       let x = X0;
       colunas.forEach((c, i) => {
@@ -310,7 +311,7 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
   );
   t.linha(
     [
-      { w: W / 2, label: 'REGISTRADO POR', valor: txt(a.criadoPor?.nome) },
+      { w: W / 2, label: 'REGISTRADO POR', valor: nomeCurto(a.criadoPor?.nome) },
       { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
     ],
     40,
@@ -373,8 +374,8 @@ export function gerarPdfChecklistAuditoria(
       // Quem preencheu o checklist, tirado do login; o texto digitado so
       // responde pelas rodadas antigas.
       valor:
-        txt(r.criadoPor?.nome) ||
-        txt(a.criadoPor?.nome) ||
+        nomeCurto(r.criadoPor?.nome) ||
+        nomeCurto(a.criadoPor?.nome) ||
         txt(r.auditores ?? a.auditores),
     },
     { w: 110, label: 'DATA DA AUDITORIA', valor: fmtData(r.dataAuditoria) },

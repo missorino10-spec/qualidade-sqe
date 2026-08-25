@@ -1,4 +1,6 @@
 import { fraseFaltas } from '../../comum/pendencias';
+import { nomeCurto } from '../../comum/nome';
+import { valorDeCelula } from '../../comum/pdf-texto';
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -141,13 +143,16 @@ export function ferramentas(doc: PDFKit.PDFDocument) {
       });
     doc
       .font(opts.negrito ? 'Helvetica-Bold' : 'Helvetica')
-      .fontSize(8.5)
-      .fillColor(opts.valorColor ?? PRETO)
-      .text(valor, x + 3, estado.y + 13, {
-        width: largura - 6,
-        height: altura - 15,
-        ellipsis: true,
-      });
+      .fillColor(opts.valorColor ?? PRETO);
+    valorDeCelula(
+      doc,
+      valor,
+      x + 3,
+      estado.y + 13,
+      largura - 6,
+      altura - 15,
+      8.5,
+    );
   };
 
   const linha = (
@@ -459,7 +464,7 @@ export function gerarPdfRegistroHomologacao(h: any): PDFKit.PDFDocument {
   );
   t.linha(
     [
-      { w: W / 2, label: 'REGISTRADO POR', valor: txt(h.criadoPor?.nome) },
+      { w: W / 2, label: 'REGISTRADO POR', valor: nomeCurto(h.criadoPor?.nome) },
       { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
     ],
     40,

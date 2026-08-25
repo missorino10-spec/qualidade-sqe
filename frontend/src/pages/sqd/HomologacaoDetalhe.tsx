@@ -54,6 +54,7 @@ import {
   opcoes,
 } from './comum';
 import Tabela from '../../components/Tabela';
+import NomeAssinatura from '../../components/NomeAssinatura';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_PLANO_ACAO';
@@ -741,7 +742,7 @@ export default function HomologacaoDetalhe() {
                 {h.observacoes ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Registrado por">
-                {h.criadoPor?.nome ?? '-'}
+                <NomeAssinatura nome={h.criadoPor?.nome} />
               </Descriptions.Item>
             </Descriptions>
           </Card>

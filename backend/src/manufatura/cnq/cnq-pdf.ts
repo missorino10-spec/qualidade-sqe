@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { semanaAno } from '../../sqe/sqe-utils';
+import { nomeCurto } from '../../comum/nome';
 
 // Relatorio do Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da
 // planilha de indicadores: uma linha por apontamento (Data, Item, Maquina,
@@ -188,7 +189,7 @@ export function gerarPdfCnq(
     .fontSize(8)
     .fillColor(CINZA)
     .text(
-      `Emissão: ${hojeNoBrasil()}${emitidoPor ? `\nEmitido por: ${emitidoPor}` : ''}`,
+      `Emissão: ${hojeNoBrasil()}${emitidoPor ? `\nEmitido por: ${nomeCurto(emitidoPor)}` : ''}`,
       X1 - 150,
       36,
       { width: 150, align: 'right' },

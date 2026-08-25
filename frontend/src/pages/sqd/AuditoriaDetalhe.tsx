@@ -54,6 +54,8 @@ import {
 } from './comum';
 import Tabela from '../../components/Tabela';
 import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
+import NomeAssinatura from '../../components/NomeAssinatura';
+import { nomeCurto } from '../../formatos';
 
 const TIPO_RELATORIO = 'AUDITORIA_RELATORIO';
 const TIPO_PLANO = 'AUDITORIA_PLANO_ACAO';
@@ -524,7 +526,7 @@ export default function AuditoriaDetalhe() {
                     {
                       title: 'Auditor',
                       render: (_: any, rd: any) =>
-                        rd.criadoPor?.nome ?? rd.auditores ?? '-',
+                        nomeCurto(rd.criadoPor?.nome) || rd.auditores || '-',
                     },
                     {
                       title: '',
@@ -595,7 +597,11 @@ export default function AuditoriaDetalhe() {
                       {recente.local ?? '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Auditor responsável">
-                      {recente.criadoPor?.nome ?? recente.auditores ?? '-'}
+                      {recente.criadoPor?.nome ? (
+                        <NomeAssinatura nome={recente.criadoPor.nome} />
+                      ) : (
+                        (recente.auditores ?? '-')
+                      )}
                     </Descriptions.Item>
                     <Descriptions.Item label="Participantes">
                       {recente.participantes ?? '-'}
@@ -710,7 +716,11 @@ export default function AuditoriaDetalhe() {
                 {a.local ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Auditor responsável">
-                {a.criadoPor?.nome ?? a.auditores ?? '-'}
+                {a.criadoPor?.nome ? (
+                  <NomeAssinatura nome={a.criadoPor.nome} />
+                ) : (
+                  (a.auditores ?? '-')
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Participantes">
                 {a.participantes ?? '-'}
@@ -766,7 +776,7 @@ export default function AuditoriaDetalhe() {
                 {a.observacoes ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Registrado por">
-                {a.criadoPor?.nome ?? '-'}
+                <NomeAssinatura nome={a.criadoPor?.nome} />
               </Descriptions.Item>
             </Descriptions>
           </Card>

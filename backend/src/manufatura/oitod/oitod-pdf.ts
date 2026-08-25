@@ -8,6 +8,7 @@ import {
   labelSituacaoAcao,
   planoAcaoNormalizado,
 } from '../../comum/oitod';
+import { nomeCurto } from '../../comum/nome';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -689,7 +690,7 @@ export function gerarPdfOitoD(
         w: W / 3,
         label: 'APROVAÇÃO DA QUALIDADE',
         valor: d8.aprovadoPor
-          ? `${txt(d8.aprovadoPor.nome)} — ${fmtData(d8.aprovadoEm)}`
+          ? `${nomeCurto(d8.aprovadoPor.nome)} — ${fmtData(d8.aprovadoEm)}`
           : '',
       },
       { w: W / 3, label: 'APROVAÇÃO DA PRODUÇÃO', valor: txt(d8.aprovacaoProducao) },

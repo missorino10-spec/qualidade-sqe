@@ -45,6 +45,7 @@ import {
 } from '../../oitod';
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 import Tabela from '../../components/Tabela';
+import { nomeCurto } from '../../formatos';
 
 // Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
 // A tela segue passo a passo a planilha "Analise de Problemas da Qualidade -
@@ -1008,7 +1009,7 @@ export default function OitoDDetalhe() {
               <Form.Item label="Aprovação da Qualidade">
                 <Typography.Text>
                   {data.aprovadoPor
-                    ? `${data.aprovadoPor.nome} — ${dayjs(data.aprovadoEm).format('DD/MM/YYYY')}`
+                    ? `${nomeCurto(data.aprovadoPor.nome)} — ${dayjs(data.aprovadoEm).format('DD/MM/YYYY')}`
                     : 'Pendente de aprovação'}
                 </Typography.Text>
               </Form.Item>

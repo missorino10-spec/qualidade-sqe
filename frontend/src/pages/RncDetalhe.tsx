@@ -57,6 +57,7 @@ const CAMPOS_VALOR = {
 };
 import { corStatusRnc, labelStatusRnc } from './RncLista';
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
+import NomeAssinatura from '../components/NomeAssinatura';
 
 const labelEficacia: Record<string, string> = {
   PENDENTE: 'Pendente',
@@ -533,7 +534,11 @@ export default function RncDetalhe() {
                 {dayjs(rnc.dataAbertura).format('DD/MM/YYYY')}
               </Descriptions.Item>
               <Descriptions.Item label="Responsável">
-                {rnc.criadoPor?.nome ?? rnc.solicitante ?? '-'}
+                {rnc.criadoPor?.nome ? (
+                  <NomeAssinatura nome={rnc.criadoPor.nome} />
+                ) : (
+                  (rnc.solicitante ?? '-')
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Fornecedor" span={2}>
                 {rnc.fornecedor?.codigo} — {rnc.fornecedor?.nome}

@@ -46,6 +46,7 @@ import {
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import NomeAssinatura from '../../components/NomeAssinatura';
 
 // ALERTA DA QUALIDADE — espelha o formulario .docx da empresa: titulo + data,
 // "Descricao do problema", texto da acao obrigatoria e os dois paineis de foto
@@ -622,7 +623,11 @@ export default function Alertas() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Elaborado por" span={2}>
-                {detalhe.criadoPor?.nome || detalhe.elaboradoPor || '-'}
+                {detalhe.criadoPor?.nome ? (
+                  <NomeAssinatura nome={detalhe.criadoPor.nome} />
+                ) : (
+                  detalhe.elaboradoPor || '-'
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Ação obrigatória" span={2}>
                 <span style={{ whiteSpace: 'pre-wrap' }}>{detalhe.acao}</span>

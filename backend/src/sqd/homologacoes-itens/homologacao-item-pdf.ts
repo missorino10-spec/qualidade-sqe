@@ -1,4 +1,5 @@
 import { fraseFaltas } from '../../comum/pendencias';
+import { nomeCurto } from '../../comum/nome';
 import PDFDocument from 'pdfkit';
 // Mesmo desenho dos PDFs da homologacao de fornecedores: cabecalho, faixas
 // laranja, celulas rotuladas e rodape com paginacao. Aqui so mudam os campos.
@@ -344,7 +345,7 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
   );
   t.linha(
     [
-      { w: W / 2, label: 'REGISTRADO POR', valor: txt(h.criadoPor?.nome) },
+      { w: W / 2, label: 'REGISTRADO POR', valor: nomeCurto(h.criadoPor?.nome) },
       { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
     ],
     40,
@@ -472,12 +473,12 @@ export function gerarPdfRelatorioInspecaoItem(
     {
       w: W / 2,
       label: 'ELABORADO POR / ELABORATED BY',
-      valor: txt(r.criadoPor?.nome) || txt(r.elaboradoPor),
+      valor: nomeCurto(r.criadoPor?.nome) || txt(r.elaboradoPor),
     },
     {
       w: W / 2,
       label: 'INSPECIONADO POR / INSPECTED BY',
-      valor: txt(r.criadoPor?.nome) || txt(r.inspecionadoPor),
+      valor: nomeCurto(r.criadoPor?.nome) || txt(r.inspecionadoPor),
     },
   ]);
 

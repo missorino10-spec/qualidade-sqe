@@ -4,6 +4,8 @@ import { existsSync } from 'fs';
 import { desenharTabelaCotas } from '../../comum/cotas-pdf';
 import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
 import { labelNorma, ORIGENS_INSPECAO } from '../../comum/inspecao';
+import { nomeCurto } from '../../comum/nome';
+import { valorDeCelula } from '../../comum/pdf-texto';
 
 // Fotos de cada tentativa, indexadas pelo id do relatorio dimensional.
 export type FotosRelatorio = Record<
@@ -97,13 +99,8 @@ export function gerarPdfRelatorioDimensional(
       .text(label, x + 3, y + 3, { width: largura - 6, lineBreak: false });
     doc
       .font(opts.negrito ? 'Helvetica-Bold' : 'Helvetica')
-      .fontSize(8.5)
-      .fillColor(opts.valorColor ?? PRETO)
-      .text(valor, x + 3, y + 13, {
-        width: largura - 6,
-        height: altura - 15,
-        ellipsis: true,
-      });
+      .fillColor(opts.valorColor ?? PRETO);
+    valorDeCelula(doc, valor, x + 3, y + 13, largura - 6, altura - 15, 8.5);
   };
 
   const linha = (
@@ -346,7 +343,7 @@ export function gerarPdfRelatorioDimensional(
         label: 'TOLERÂNCIAS / NORMA',
         valor: labelNorma(rel.toleranciasNorm),
       },
-      { w: 120, label: 'INSPETOR', valor: txt(rel.inspetor?.nome) },
+      { w: 120, label: 'INSPETOR', valor: nomeCurto(rel.inspetor?.nome) },
       {
         w: W - 95 - 85 - 120 - 120,
         label: 'TENTATIVA',
@@ -459,12 +456,12 @@ export function gerarPdfRelatorioDimensional(
         {
           w: 130,
           label: 'ELABORADO POR',
-          valor: txt(rel.inspetor?.nome) || txt(rel.elaboradoPor),
+          valor: nomeCurto(rel.inspetor?.nome) || txt(rel.elaboradoPor),
         },
         {
           w: 130,
           label: 'INSPECIONADO POR',
-          valor: txt(rel.inspetor?.nome) || txt(rel.inspecionadoPor),
+          valor: nomeCurto(rel.inspetor?.nome) || txt(rel.inspecionadoPor),
         },
         {
           w: W - 160 - 130 - 130,

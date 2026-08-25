@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { nomeCurto } from '../comum/nome';
 
 // Inventario de Instrumentos e Equipamentos — BDBR.QUA.FMR.004.01.
 //
@@ -188,7 +189,7 @@ export function gerarInventarioPdf(
     .fontSize(8)
     .fillColor(PRETO)
     .text(
-      `Instrumentos: ${instrumentos.length}     |     Calibração vencida: ${vencidos}     |     Vence em até 30 dias: ${aVencer}     |     Emissão: ${hojeNoBrasil()}${emitidoPor ? `     |     Emitido por: ${emitidoPor}` : ''}`,
+      `Instrumentos: ${instrumentos.length}     |     Calibração vencida: ${vencidos}     |     Vence em até 30 dias: ${aVencer}     |     Emissão: ${hojeNoBrasil()}${emitidoPor ? `     |     Emitido por: ${nomeCurto(emitidoPor)}` : ''}`,
       X0 + 6,
       y + 5,
       { width: W - 12, lineBreak: false },

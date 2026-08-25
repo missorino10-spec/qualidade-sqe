@@ -43,6 +43,7 @@ import {
 import { SITUACOES_ACAO } from '../../oitod';
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 import Tabela from '../../components/Tabela';
+import { nomeCurto } from '../../formatos';
 
 // Metodo 5G — Doc BDBR.QUA.FMR.007.01.
 // Documento proprio (5G0001/2026): a maioria dos problemas nao vira 8D, e
@@ -506,7 +507,7 @@ export default function CincoGDetalhe() {
           <Form.Item label="Aprovação da Qualidade">
             <Typography.Text>
               {data.aprovadoPor
-                ? `${data.aprovadoPor.nome} — ${dayjs(data.aprovadoEm).format('DD/MM/YYYY')}`
+                ? `${nomeCurto(data.aprovadoPor.nome)} — ${dayjs(data.aprovadoEm).format('DD/MM/YYYY')}`
                 : 'Pendente de aprovação'}
             </Typography.Text>
           </Form.Item>

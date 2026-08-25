@@ -27,6 +27,7 @@ import {
 } from './FormularioDimensional';
 import { CamposVisual } from './FormularioVisual';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import { nomeCurto } from '../../formatos';
 
 // Duas telas separadas (Setup e Produção), cada uma com DOIS documentos:
 //   - Inspecao dimensional: o BDBR.QUA.FMR.011.06, com cotas (SET/PROD).
@@ -370,7 +371,8 @@ export default function InspecoesManufatura({
                     {
                       title: 'Inspetor',
                       width: 160,
-                      render: (_: any, r: any) => r.inspetor?.nome ?? '-',
+                      render: (_: any, r: any) =>
+                        nomeCurto(r.inspetor?.nome) || '-',
                     },
                     ...colunaAcoes('inspecoes-visuais'),
                   ]}

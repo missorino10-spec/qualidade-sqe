@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { situacaoAlerta } from '../../comum/alerta';
+import { nomeCurto } from '../../comum/nome';
 
 // ALERTA DA QUALIDADE — espelha o .docx da empresa ("Alerta da Qualidade -
 // Rebarba (Puncionadeiras)"): tarja com o titulo e a data, "Descricao do
@@ -274,7 +275,7 @@ export function gerarPdfAlerta(
     .text(
       // Quem assina e quem abriu o alerta, tirado do login. O campo digitado
       // so responde pelos alertas antigos.
-      `Elaborado por: ${txt(alerta.criadoPor?.nome) || txt(alerta.elaboradoPor) || '-'}`,
+      `Elaborado por: ${nomeCurto(alerta.criadoPor?.nome) || txt(alerta.elaboradoPor) || '-'}`,
       X0,
       yRodape + 7,
       { width: W * 0.6 },

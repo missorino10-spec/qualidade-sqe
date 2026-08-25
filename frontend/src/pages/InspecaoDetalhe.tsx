@@ -21,6 +21,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../api';
 import { CotasSomenteLeitura } from '../components/TabelaCotas';
 import { FotosEvidenciaSalvas } from '../components/FotosEvidencia';
+import NomeAssinatura from '../components/NomeAssinatura';
 import {
   EVID,
   checklistDoRelatorio,
@@ -98,9 +99,6 @@ function Formulario({
           <Tag color={dados.resultado === 'REPROVADO' ? 'red' : 'green'}>
             {dados.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
           </Tag>
-          {/* Encerrado sem RNC: o checklist e as cotas abaixo continuam com os
-              itens reprovados marcados, entao a etiqueta explica a diferenca. */}
-          {dados.desvioSemRnc && <Tag color="orange">Desvio sem RNC</Tag>}
         </Space>
       }
       style={{ marginBottom: 16 }}
@@ -112,7 +110,7 @@ function Formulario({
             : '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Inspetor">
-          {dados.inspetor?.nome ?? '-'}
+          <NomeAssinatura nome={dados.inspetor?.nome} />
         </Descriptions.Item>
         <Descriptions.Item label="Qtd. inspecionada">
           {dados.qtdInspecionada ?? '-'}
@@ -183,20 +181,8 @@ export default function InspecaoDetalhe() {
             <Typography.Title level={4} style={{ margin: 0 }}>
               Inspeção {data.numeroInspecao ?? '(sem número)'}
             </Typography.Title>
-            <Tag
-              color={
-                data.resultado === 'REPROVADO'
-                  ? 'red'
-                  : data.resultado === 'APROVADO_COM_DESVIO'
-                    ? 'orange'
-                    : 'green'
-              }
-            >
-              {data.resultado === 'REPROVADO'
-                ? 'Reprovado'
-                : data.resultado === 'APROVADO_COM_DESVIO'
-                  ? 'Aprovado com desvio registrado'
-                  : 'Aprovado'}
+            <Tag color={data.resultado === 'REPROVADO' ? 'red' : 'green'}>
+              {data.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
             </Tag>
             {data.inspecaoExtra && <Tag color="orange">Extra</Tag>}
           </Space>
@@ -236,7 +222,7 @@ export default function InspecaoDetalhe() {
               : '-'}
           </Descriptions.Item>
           <Descriptions.Item label="Inspetor">
-            {data.inspetor?.nome ?? '-'}
+            <NomeAssinatura nome={data.inspetor?.nome} />
           </Descriptions.Item>
           <Descriptions.Item label="Item" span={2}>
             {data.item

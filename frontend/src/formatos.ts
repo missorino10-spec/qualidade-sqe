@@ -25,6 +25,70 @@ export function dataInput(valor?: string | Date | null): string | undefined {
   return trechoIso(valor);
 }
 
+// Nome curto para os campos de assinatura - mesma regra do backend
+// (src/comum/nome.ts), para a tela e o PDF nunca divergirem.
+//
+// O cadastro guarda o nome completo; a assinatura mostra primeiro nome +
+// sobrenome de familia, que e o que identifica a pessoa e cabe na celula.
+
+const CONECTIVOS = new Set([
+  'de',
+  'da',
+  'das',
+  'do',
+  'dos',
+  'e',
+  'di',
+  'del',
+  'della',
+  'van',
+  'von',
+  'y',
+]);
+
+// Sufixo geracional nao e sobrenome: sem tratar isso, "Joao Pedro Silva
+// Junior" viraria "Joao Junior" e perderia o sobrenome de familia.
+const SUFIXOS = new Set([
+  'filho',
+  'filha',
+  'neto',
+  'neta',
+  'netto',
+  'junior',
+  'jr',
+  'sobrinho',
+  'segundo',
+]);
+
+function chaveNome(palavra: string): string {
+  return palavra
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\./g, '')
+    .toLowerCase();
+}
+
+export function nomeCurto(nome?: string | null): string {
+  const partes = String(nome ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (partes.length <= 2) return partes.join(' ');
+
+  const primeiro = partes[0];
+  const resto = partes.slice(1);
+
+  let i = resto.length - 1;
+  let sufixo = '';
+  if (SUFIXOS.has(chaveNome(resto[i]))) {
+    sufixo = resto[i];
+    i--;
+  }
+  while (i >= 0 && CONECTIVOS.has(chaveNome(resto[i]))) i--;
+
+  return [primeiro, i >= 0 ? resto[i] : '', sufixo].filter(Boolean).join(' ');
+}
+
 // O <Statistic> do antd nao segue o locale: por padrao imprime 4,000 e 75.0.
 // Espalhar isso nos cards deixa o numero no padrao brasileiro: 4.000 e 75,0.
 export const separadoresBR = {
