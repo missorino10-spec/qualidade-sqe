@@ -29,6 +29,7 @@ import {
   textoReavaliacao,
 } from './comum';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 
 // Submenu "Auditoria de Fornecedores": historico das auditorias com o resultado
 // pela regua da Qualidade (>= 90 aprovado, 80 a 89,99 condicional, < 80
@@ -298,14 +299,12 @@ export default function Auditorias() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="auditores" label="Auditores">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
               <Form.Item name="participantes" label="Participantes">
                 <Input />
               </Form.Item>
+            </Col>
+            <Col span={24}>
+              <AssinaturaDoLogin rotulo="Auditor responsável" />
             </Col>
             <Col span={24}>
               <Form.Item name="observacoes" label="Observações">

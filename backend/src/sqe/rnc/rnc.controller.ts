@@ -180,6 +180,9 @@ export class RncController {
       include: {
         fornecedor: { select: { nome: true, codigo: true } },
         item: { select: { descricao: true, codigo: true } },
+        // O Responsavel do cabecalho e quem abriu a RNC, e nao o texto fixo
+        // "Qualidade" que a planilha trazia.
+        criadoPor: { select: { nome: true } },
         // As cotas reprovadas saem no PDF lidas da inspecao, e nao de uma
         // copia: o papel sempre reflete o dimensional como ele esta hoje.
         inspecaoLote: { select: { cotas: true } },

@@ -454,8 +454,18 @@ export function gerarPdfRelatorioDimensional(
           cor: COR_RESULTADO[rel.resultado] ?? PRETO,
           negrito: true,
         },
-        { w: 130, label: 'ELABORADO POR', valor: txt(rel.elaboradoPor) },
-        { w: 130, label: 'INSPECIONADO POR', valor: txt(rel.inspecionadoPor) },
+        // Quem assina e quem lancou o relatorio, tirado do login. Os campos
+        // digitados so respondem pelos relatorios antigos, gravados a mao.
+        {
+          w: 130,
+          label: 'ELABORADO POR',
+          valor: txt(rel.inspetor?.nome) || txt(rel.elaboradoPor),
+        },
+        {
+          w: 130,
+          label: 'INSPECIONADO POR',
+          valor: txt(rel.inspetor?.nome) || txt(rel.inspecionadoPor),
+        },
         {
           w: W - 160 - 130 - 130,
           label: 'DATA',

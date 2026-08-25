@@ -101,8 +101,8 @@ class RelatorioInspecaoDto {
   @IsOptional() @IsString() po?: string;
   @IsOptional() @IsNumber() qtdInspecionada?: number;
   @IsOptional() @IsNumber() qtdTotal?: number;
-  @IsOptional() @IsString() elaboradoPor?: string;
-  @IsOptional() @IsString() inspecionadoPor?: string;
+  // "Elaborado por" e "Inspecionado por" nao vem mais do formulario: o sistema
+  // assina com o usuario logado.
 
   @IsOptional() @IsArray() cotas?: any[];
   @IsOptional() @IsString() observacoesAmostras?: string;

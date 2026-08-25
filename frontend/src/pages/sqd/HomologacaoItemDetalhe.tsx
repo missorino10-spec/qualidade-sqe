@@ -384,8 +384,6 @@ export default function HomologacaoItemDetalhe() {
       po: base?.po,
       qtdInspecionada: r?.qtdInspecionada,
       qtdTotal: base?.qtdTotal,
-      elaboradoPor: base?.elaboradoPor,
-      inspecionadoPor: base?.inspecionadoPor,
       observacoesAmostras: r?.observacoesAmostras,
       evidenciasVisual: r?.evidenciasVisual,
       observacoesVisual: r?.observacoesVisual,
@@ -641,8 +639,8 @@ export default function HomologacaoItemDetalhe() {
                     },
                     {
                       title: 'Inspecionado por',
-                      dataIndex: 'inspecionadoPor',
-                      render: (v: string) => v ?? '-',
+                      render: (_: any, r: any) =>
+                        r.criadoPor?.nome ?? r.inspecionadoPor ?? '-',
                     },
                     {
                       title: '',
@@ -736,10 +734,12 @@ export default function HomologacaoItemDetalhe() {
                       {recente.qtdTotal ?? '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Elaborado por">
-                      {recente.elaboradoPor ?? '-'}
+                      {recente.criadoPor?.nome ?? recente.elaboradoPor ?? '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Inspecionado por">
-                      {recente.inspecionadoPor ?? '-'}
+                      {recente.criadoPor?.nome ??
+                        recente.inspecionadoPor ??
+                        '-'}
                     </Descriptions.Item>
                   </Descriptions>
 

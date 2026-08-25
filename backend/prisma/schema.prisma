@@ -365,14 +365,23 @@ model InspecaoVisual {
   // Checklist (12 grupos) - JSON: [{ grupo, itens: [{ texto, status }] }]
   checklist Json
 
-  observacoes  String?
-  resultado    ResultadoInspecao @default(APROVADO)
-  dataInspecao DateTime          @default(now())
+  observacoes String?
+  resultado   ResultadoInspecao @default(APROVADO)
+
+  // Abrir RNC e decisao do inspetor. Quando ele diz NAO, a inspecao encerra
+  // APROVADA e os itens reprovados continuam marcados no checklist - o que
+  // muda e o veredito do recebimento, nao o que foi observado. A justificativa
+  // e obrigatoria e sai impressa no relatorio, senao o documento nao se
+  // explica sozinho.
+  desvioSemRnc     Boolean @default(false)
+  observacaoDesvio String?
+
+  dataInspecao DateTime @default(now())
   semana       String? // semana da inspecao no formato W## (ex: W28)
   ano          Int? // ano da inspecao
   inspetorId   Int?
-  inspetor     Usuario?          @relation("InspVisualInspetor", fields: [inspetorId], references: [id])
-  createdAt    DateTime          @default(now())
+  inspetor     Usuario? @relation("InspVisualInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime @default(now())
 
   rncs Rnc[]
 }
@@ -408,14 +417,23 @@ model InspecaoLote {
   //    conformeAuto, conformeManual, conforme }]
   cotas Json
 
-  observacoes  String?
-  resultado    ResultadoInspecao @default(APROVADO)
-  dataInspecao DateTime          @default(now())
+  observacoes String?
+  resultado   ResultadoInspecao @default(APROVADO)
+
+  // Abrir RNC e decisao do inspetor. Quando ele diz NAO, a inspecao encerra
+  // APROVADA e as cotas reprovadas continuam marcadas na tabela - o que muda e
+  // o veredito do recebimento, nao o que foi medido. A justificativa e
+  // obrigatoria e sai impressa no relatorio, senao o documento nao se explica
+  // sozinho.
+  desvioSemRnc     Boolean @default(false)
+  observacaoDesvio String?
+
+  dataInspecao DateTime @default(now())
   semana       String? // semana da inspecao no formato W## (ex: W28)
   ano          Int? // ano da inspecao
   inspetorId   Int?
-  inspetor     Usuario?          @relation("InspLoteInspetor", fields: [inspetorId], references: [id])
-  createdAt    DateTime          @default(now())
+  inspetor     Usuario? @relation("InspLoteInspetor", fields: [inspetorId], references: [id])
+  createdAt    DateTime @default(now())
 
   rncs Rnc[]
 }

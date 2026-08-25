@@ -83,7 +83,8 @@ export class AlertasService {
             legendaErrado: dto.legendaErrado ?? null,
             legendaCerto: dto.legendaCerto ?? null,
             prazo,
-            elaboradoPor: dto.elaboradoPor ?? null,
+            // "Elaborado por" saiu do formulario: quem assina e o usuario
+            // logado, gravado em criadoPorId.
             criadoPorId: usuarioId,
           },
         });
@@ -114,7 +115,6 @@ export class AlertasService {
         legendaErrado: dto.legendaErrado ?? undefined,
         legendaCerto: dto.legendaCerto ?? undefined,
         prazo: dataPura(dto.prazo),
-        elaboradoPor: dto.elaboradoPor ?? undefined,
       },
     });
     return this.detalhe(id);

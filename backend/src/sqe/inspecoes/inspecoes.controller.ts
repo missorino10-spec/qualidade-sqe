@@ -65,6 +65,13 @@ class CabecalhoDto {
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultado?: any;
   @IsOptional() @IsString() dataInspecao?: string;
   @IsOptional() @IsString() disposicao?: string;
+
+  // Abrir RNC e decisao do inspetor, tomada na tela antes de gravar. Sem esta
+  // resposta o desvio apontado abre RNC, que era o comportamento antigo.
+  // Quando vem false a inspecao encerra APROVADA e a justificativa passa a ser
+  // obrigatoria.
+  @IsOptional() @IsBoolean() abrirRnc?: boolean;
+  @IsOptional() @IsString() observacaoDesvio?: string;
 }
 
 class CreateVisualDto extends CabecalhoDto {

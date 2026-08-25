@@ -116,6 +116,7 @@ export class InstrumentosController {
   @Get('pdf')
   async pdf(
     @Res() res: Response,
+    @CurrentUser() user: AuthUser,
     @Query('incluirInativos') incluirInativos?: string,
   ) {
     const lista = await this.prisma.instrumento.findMany({
@@ -127,7 +128,7 @@ export class InstrumentosController {
       'Content-Disposition',
       'inline; filename="inventario-instrumentos.pdf"',
     );
-    const doc = gerarInventarioPdf(lista);
+    const doc = gerarInventarioPdf(lista, user.nome);
     doc.pipe(res);
     doc.end();
   }

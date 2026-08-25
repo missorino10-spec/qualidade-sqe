@@ -98,6 +98,9 @@ function Formulario({
           <Tag color={dados.resultado === 'REPROVADO' ? 'red' : 'green'}>
             {dados.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
           </Tag>
+          {/* Encerrado sem RNC: o checklist e as cotas abaixo continuam com os
+              itens reprovados marcados, entao a etiqueta explica a diferenca. */}
+          {dados.desvioSemRnc && <Tag color="orange">Desvio sem RNC</Tag>}
         </Space>
       }
       style={{ marginBottom: 16 }}
@@ -138,6 +141,17 @@ function Formulario({
           </Typography.Paragraph>
         </Card>
       )}
+      {dados.desvioSemRnc && (
+        <Card
+          size="small"
+          title="Encerrada como aprovada com desvio registrado — sem RNC"
+          style={{ marginTop: 12 }}
+        >
+          <Typography.Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
+            {dados.observacaoDesvio ?? '-'}
+          </Typography.Paragraph>
+        </Card>
+      )}
     </Card>
   );
 }
@@ -169,8 +183,20 @@ export default function InspecaoDetalhe() {
             <Typography.Title level={4} style={{ margin: 0 }}>
               Inspeção {data.numeroInspecao ?? '(sem número)'}
             </Typography.Title>
-            <Tag color={data.resultado === 'REPROVADO' ? 'red' : 'green'}>
-              {data.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
+            <Tag
+              color={
+                data.resultado === 'REPROVADO'
+                  ? 'red'
+                  : data.resultado === 'APROVADO_COM_DESVIO'
+                    ? 'orange'
+                    : 'green'
+              }
+            >
+              {data.resultado === 'REPROVADO'
+                ? 'Reprovado'
+                : data.resultado === 'APROVADO_COM_DESVIO'
+                  ? 'Aprovado com desvio registrado'
+                  : 'Aprovado'}
             </Tag>
             {data.inspecaoExtra && <Tag color="orange">Extra</Tag>}
           </Space>

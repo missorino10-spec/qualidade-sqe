@@ -53,6 +53,7 @@ import {
   textoReavaliacao,
 } from './comum';
 import Tabela from '../../components/Tabela';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 
 const TIPO_RELATORIO = 'AUDITORIA_RELATORIO';
 const TIPO_PLANO = 'AUDITORIA_PLANO_ACAO';
@@ -269,7 +270,6 @@ export default function AuditoriaDetalhe() {
       codigoFornecedor: a.codigoFornecedor,
       motivo: a.motivo,
       local: a.local,
-      auditores: a.auditores,
       participantes: a.participantes,
       dataAuditoria: dataInput(a.dataAuditoria),
       conclusao: a.conclusao,
@@ -289,7 +289,6 @@ export default function AuditoriaDetalhe() {
       dataAuditoria: rd
         ? dataInput(rd.dataAuditoria)
         : dayjs().format('YYYY-MM-DD'),
-      auditores: base?.auditores ?? a.auditores,
       participantes: base?.participantes ?? a.participantes,
       local: base?.local ?? a.local,
       conclusao: rd?.conclusao,
@@ -523,9 +522,9 @@ export default function AuditoriaDetalhe() {
                       ),
                     },
                     {
-                      title: 'Auditores',
-                      dataIndex: 'auditores',
-                      render: (v: string) => v ?? '-',
+                      title: 'Auditor',
+                      render: (_: any, rd: any) =>
+                        rd.criadoPor?.nome ?? rd.auditores ?? '-',
                     },
                     {
                       title: '',
@@ -595,8 +594,8 @@ export default function AuditoriaDetalhe() {
                     <Descriptions.Item label="Local">
                       {recente.local ?? '-'}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Auditores">
-                      {recente.auditores ?? '-'}
+                    <Descriptions.Item label="Auditor responsável">
+                      {recente.criadoPor?.nome ?? recente.auditores ?? '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Participantes">
                       {recente.participantes ?? '-'}
@@ -710,8 +709,8 @@ export default function AuditoriaDetalhe() {
               <Descriptions.Item label="Local">
                 {a.local ?? '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Auditores">
-                {a.auditores ?? '-'}
+              <Descriptions.Item label="Auditor responsável">
+                {a.criadoPor?.nome ?? a.auditores ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Participantes">
                 {a.participantes ?? '-'}
@@ -835,14 +834,12 @@ export default function AuditoriaDetalhe() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="auditores" label="Auditores">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
               <Form.Item name="participantes" label="Participantes">
                 <Input />
               </Form.Item>
+            </Col>
+            <Col span={24}>
+              <AssinaturaDoLogin rotulo="Auditor responsável" />
             </Col>
             <Col span={24}>
               <Form.Item
@@ -904,16 +901,13 @@ export default function AuditoriaDetalhe() {
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="auditores" label="Auditores">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
               <Form.Item name="participantes" label="Participantes">
                 <Input />
               </Form.Item>
             </Col>
           </Row>
+
+          <AssinaturaDoLogin rotulo="Auditor responsável" />
 
           <ChecklistAuditoria
             blocos={blocos}

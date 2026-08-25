@@ -54,8 +54,8 @@ class InspecaoVisualDto {
   @IsOptional() @IsNumber() qtdInspecionada?: number;
   @IsOptional() @IsNumber() qtdTotal?: number;
   @IsOptional() @IsString() observacoes?: string;
-  @IsOptional() @IsString() elaboradoPor?: string;
-  @IsOptional() @IsString() inspecionadoPor?: string;
+  // "Elaborado por" e "Inspecionado por" nao vem mais do formulario: o sistema
+  // assina com o usuario logado.
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)

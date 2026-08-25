@@ -85,8 +85,8 @@ export class InspecaoVisualManufaturaService {
             qtdInspecionada: dto.qtdInspecionada ?? null,
             qtdTotal: dto.qtdTotal ?? null,
             observacoes: dto.observacoes ?? null,
-            elaboradoPor: dto.elaboradoPor ?? null,
-            inspecionadoPor: dto.inspecionadoPor ?? null,
+            // Quem assina e o usuario logado (inspetorId); os campos digitados
+            // sairam do formulario.
             inspetorId: usuarioId,
           },
         });

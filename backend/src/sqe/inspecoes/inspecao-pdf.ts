@@ -213,11 +213,17 @@ export function gerarPdfInspecao(
   const reprovado = insp.resultado === 'REPROVADO';
   // Recebimento sem inspecao nao e "aprovado": nada foi verificado.
   const semInspecao = insp.resultado === 'SEM_INSPECAO';
+  // Aprovado, mas com desvio apontado e sem RNC. O papel tem que dizer isso no
+  // cabecalho: quem le depois ve cota reprovada na tabela e precisa entender
+  // por que o recebimento passou.
+  const comDesvio = insp.resultado === 'APROVADO_COM_DESVIO';
   const labelResultado = semInspecao
     ? 'SEM INSPEÇÃO'
     : reprovado
       ? 'REPROVADO'
-      : 'APROVADO';
+      : comDesvio
+        ? 'APROVADO C/ DESVIO'
+        : 'APROVADO';
   linha(
     [
       {
@@ -242,7 +248,13 @@ export function gerarPdfInspecao(
         w: 100,
         label: 'RESULTADO',
         valor: labelResultado,
-        cor: semInspecao ? CINZA : reprovado ? VERMELHO : VERDE,
+        cor: semInspecao
+          ? CINZA
+          : reprovado
+            ? VERMELHO
+            : comDesvio
+              ? LARANJA
+              : VERDE,
         negrito: true,
       },
       {
@@ -372,6 +384,16 @@ export function gerarPdfInspecao(
       y += 4;
       bloco('Observações da inspeção visual', txt(insp.visual.observacoes), 40);
     }
+    // Sem esta justificativa o papel nao se explica: ha item reprovado no
+    // checklist e o recebimento saiu aprovado.
+    if (insp.visual.desvioSemRnc) {
+      y += 4;
+      bloco(
+        'Encerrada como APROVADA com desvio registrado — sem RNC',
+        txt(insp.visual.observacaoDesvio),
+        40,
+      );
+    }
 
     // Bloco EVIDENCIAS do visual: as fotos que comprovam a inspecao.
     if (fotosVisual.length) {
@@ -401,6 +423,16 @@ export function gerarPdfInspecao(
     if (insp.lote.observacoes) {
       y += 4;
       bloco('Observações da inspeção de lote', txt(insp.lote.observacoes), 40);
+    }
+    // Cota fora da tolerancia com recebimento aprovado: a justificativa e o
+    // que sustenta a decisao no papel.
+    if (insp.lote.desvioSemRnc) {
+      y += 4;
+      bloco(
+        'Encerrada como APROVADA com desvio registrado — sem RNC',
+        txt(insp.lote.observacaoDesvio),
+        40,
+      );
     }
 
     // Bloco EVIDENCIAS do dimensional, independente do bloco do visual.

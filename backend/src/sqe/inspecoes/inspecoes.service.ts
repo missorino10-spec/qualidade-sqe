@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RncService } from '../rnc/rnc.service';
 import { TIPO_DESVIO } from '../../comum/tipo-desvio';
@@ -63,6 +68,9 @@ export class InspecoesService {
     ].filter(Boolean) as string[];
     const principal = visual ?? lote;
     const reprovado = [visual, lote].some((f) => f?.resultado === 'REPROVADO');
+    // Encerrada aprovada com desvio apontado e sem RNC: o recebimento passou,
+    // mas a listagem precisa mostrar que houve desvio registrado.
+    const comDesvio = [visual, lote].some((f) => f?.desvioSemRnc);
 
     return {
       id: e.id,
@@ -75,7 +83,9 @@ export class InspecoesService {
         ? 'SEM_INSPECAO'
         : reprovado
           ? 'REPROVADO'
-          : 'APROVADO',
+          : comDesvio
+            ? 'APROVADO_COM_DESVIO'
+            : 'APROVADO',
       dataInspecao: principal?.dataInspecao ?? e.dataEntrega,
       semana: principal?.semana ?? e.semana,
       ano: principal?.ano ?? e.ano,
@@ -326,6 +336,7 @@ export class InspecoesService {
       include: {
         inspecoesVisual: { select: { id: true, resultado: true } },
         inspecoesLote: { select: { id: true, resultado: true } },
+        rncs: { select: { id: true } },
       },
     });
     const formulariosAntes = [
@@ -345,6 +356,9 @@ export class InspecoesService {
       jaEstavaReprovado: formulariosAntes.some(
         (f) => f.resultado === 'REPROVADO',
       ),
+      // Recebimento que ja tem RNC aberta nao volta a perguntar: o desvio novo
+      // complementa a RNC que existe, como sempre foi.
+      jaTemRnc: antes.rncs.length > 0,
       entregaJaExistia,
     };
   }
@@ -376,9 +390,51 @@ export class InspecoesService {
     });
   }
 
+  // Abrir RNC e decisao do inspetor, tomada na tela antes de gravar. Dizendo
+  // NAO, o recebimento encerra APROVADO e as cotas / itens reprovados
+  // continuam marcados no relatorio: muda o veredito, nao o que foi medido.
+  // Duas travas: a justificativa e obrigatoria (senao o documento nao se
+  // explica) e a decisao nao vale se o recebimento ja tem RNC aberta - nesse
+  // caso o desvio novo complementa a RNC existente.
+  // Roda ANTES de preparar a inspecao: prepararInspecao cria e numera a
+  // entrega, entao recusar depois deixaria um INSP orfao na sequencia.
+  private exigirJustificativa(dto: any, resultadoApurado: string) {
+    if (
+      resultadoApurado === 'REPROVADO' &&
+      dto.abrirRnc === false &&
+      !String(dto.observacaoDesvio ?? '').trim()
+    )
+      throw new BadRequestException(
+        'Explique por que a inspeção foi encerrada como aprovada mesmo com desvio apontado.',
+      );
+  }
+
+  private decidirDesvio(
+    dto: any,
+    ctx: { jaTemRnc: boolean },
+    resultadoApurado: string,
+  ) {
+    const semRnc =
+      resultadoApurado === 'REPROVADO' &&
+      dto.abrirRnc === false &&
+      !ctx.jaTemRnc;
+    return {
+      semRnc,
+      resultado: semRnc ? 'APROVADO' : resultadoApurado,
+      desvioSemRnc: semRnc,
+      observacaoDesvio: semRnc
+        ? String(dto.observacaoDesvio ?? '').trim()
+        : null,
+    };
+  }
+
   async criarVisual(dto: any, usuarioId: number) {
-    const ctx = await this.prepararInspecao(dto, usuarioId);
     const checklist = dto.checklist ?? checklistVisualInicial();
+    const apurado = dto.resultado ?? resultadoVisual(checklist);
+    this.exigirJustificativa(dto, apurado);
+
+    const ctx = await this.prepararInspecao(dto, usuarioId);
+    const desvio = this.decidirDesvio(dto, ctx, apurado);
     const insp = await this.prisma.inspecaoVisual.create({
       data: {
         entregaId: ctx.entregaId,
@@ -402,7 +458,9 @@ export class InspecoesService {
         origemOutros: dto.origemOutros ?? null,
         checklist,
         observacoes: dto.observacoes ?? null,
-        resultado: dto.resultado ?? resultadoVisual(checklist),
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
         inspetorId: usuarioId,
       },
       include: includeFormulario,
@@ -449,10 +507,14 @@ export class InspecoesService {
   }
 
   async criarLote(dto: any, usuarioId: number) {
-    const ctx = await this.prepararInspecao(dto, usuarioId);
     // O calculo das cotas e refeito aqui: o que a tela mostrou tem que ser
     // exatamente o que vai para o banco e para o PDF.
     const cotas = (dto.cotas ?? []).map((c: CotaMaxMin) => calcularCotaMaxMin(c));
+    const apurado = dto.resultado ?? resultadoDimensional(cotas);
+    this.exigirJustificativa(dto, apurado);
+
+    const ctx = await this.prepararInspecao(dto, usuarioId);
+    const desvio = this.decidirDesvio(dto, ctx, apurado);
     const insp = await this.prisma.inspecaoLote.create({
       data: {
         entregaId: ctx.entregaId,
@@ -474,7 +536,9 @@ export class InspecoesService {
         origemOutros: dto.origemOutros ?? null,
         cotas,
         observacoes: dto.observacoes ?? null,
-        resultado: dto.resultado ?? resultadoDimensional(cotas),
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
         inspetorId: usuarioId,
       },
       include: includeFormulario,

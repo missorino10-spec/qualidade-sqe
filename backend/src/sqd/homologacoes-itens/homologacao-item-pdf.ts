@@ -466,16 +466,18 @@ export function gerarPdfRelatorioInspecaoItem(
       valor: num(r.qtdTotal),
     },
   ]);
+  // Quem assina e quem lancou o relatorio, tirado do login. Os campos
+  // digitados so respondem pelos relatorios antigos.
   t.linha([
     {
       w: W / 2,
       label: 'ELABORADO POR / ELABORATED BY',
-      valor: txt(r.elaboradoPor),
+      valor: txt(r.criadoPor?.nome) || txt(r.elaboradoPor),
     },
     {
       w: W / 2,
       label: 'INSPECIONADO POR / INSPECTED BY',
-      valor: txt(r.inspecionadoPor),
+      valor: txt(r.criadoPor?.nome) || txt(r.inspecionadoPor),
     },
   ]);
 

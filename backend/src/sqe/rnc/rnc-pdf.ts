@@ -151,7 +151,14 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   const r1 = [
     { w: 76, pt: 'RNC Nº', en: 'NCR Nº', v: rnc.numero, orange: true },
     { w: 74, pt: 'Data de Abertura', en: 'Opening Date', v: fmtData(rnc.dataAbertura) },
-    { w: 90, pt: 'Responsável', en: 'Responsible', v: rnc.solicitante ?? 'Qualidade' },
+    // Responsavel = quem abriu a RNC. O "solicitante" so entra como reserva
+    // para as RNCs antigas, gravadas antes do usuario ser carimbado.
+    {
+      w: 90,
+      pt: 'Responsável',
+      en: 'Responsible',
+      v: rnc.criadoPor?.nome ?? rnc.solicitante ?? 'Qualidade',
+    },
     { w: 80, pt: 'Setor', en: 'Department', v: 'Qualidade / Quality' },
     { w: 115, pt: 'Fornecedor', en: 'Vendor', v: rnc.fornecedor?.nome ?? '' },
     { w: 80, pt: 'Código', en: 'Code', v: rnc.fornecedor?.codigo ?? '' },

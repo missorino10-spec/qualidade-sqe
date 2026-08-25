@@ -135,6 +135,9 @@ function resumo(
 export function gerarPdfCnq(
   lancamentos: any[],
   filtro: { de?: string; ate?: string; maquina?: string } = {},
+  // O CNQ e um relatorio de periodo, nao um documento de um lancamento so:
+  // quem responde pelo papel e quem o emitiu.
+  emitidoPor?: string,
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({
     size: 'A4',
@@ -184,10 +187,12 @@ export function gerarPdfCnq(
     .font('Helvetica')
     .fontSize(8)
     .fillColor(CINZA)
-    .text(`Emissão: ${hojeNoBrasil()}`, X1 - 150, 36, {
-      width: 150,
-      align: 'right',
-    });
+    .text(
+      `Emissão: ${hojeNoBrasil()}${emitidoPor ? `\nEmitido por: ${emitidoPor}` : ''}`,
+      X1 - 150,
+      36,
+      { width: 150, align: 'right' },
+    );
   y = 62;
 
   // Periodo e maquina vem do filtro da tela: o papel tem que dizer exatamente

@@ -63,6 +63,7 @@ export class CnqController {
   @Get('pdf')
   async pdf(
     @Res() res: Response,
+    @CurrentUser() user: AuthUser,
     @Query('de') de?: string,
     @Query('ate') ate?: string,
     @Query('maquinaId') maquinaId?: string,
@@ -72,7 +73,7 @@ export class CnqController {
     const maquina = id ? await this.service.nomeMaquina(id) : undefined;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="cnq.pdf"');
-    const doc = gerarPdfCnq(lancamentos, { de, ate, maquina });
+    const doc = gerarPdfCnq(lancamentos, { de, ate, maquina }, user.nome);
     doc.pipe(res);
     doc.end();
   }

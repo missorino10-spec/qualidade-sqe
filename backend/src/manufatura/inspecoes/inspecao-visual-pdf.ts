@@ -312,8 +312,18 @@ export function gerarPdfInspecaoVisual(
   y += 6;
   linha(
     [
-      { w: 170, label: 'ELABORADO POR', valor: txt(insp.elaboradoPor) },
-      { w: 170, label: 'INSPECIONADO POR', valor: txt(insp.inspecionadoPor) },
+      // Quem assina e quem lancou a inspecao, tirado do login. Os campos
+      // digitados so respondem pelas inspecoes antigas.
+      {
+        w: 170,
+        label: 'ELABORADO POR',
+        valor: txt(insp.inspetor?.nome) || txt(insp.elaboradoPor),
+      },
+      {
+        w: 170,
+        label: 'INSPECIONADO POR',
+        valor: txt(insp.inspetor?.nome) || txt(insp.inspecionadoPor),
+      },
       {
         w: W - 170 - 170,
         label: 'DATA',

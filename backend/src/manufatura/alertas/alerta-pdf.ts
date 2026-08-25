@@ -272,7 +272,9 @@ export function gerarPdfAlerta(
     .fontSize(9)
     .fillColor(PRETO)
     .text(
-      `Elaborado por: ${txt(alerta.elaboradoPor) || txt(alerta.criadoPor?.nome) || '-'}`,
+      // Quem assina e quem abriu o alerta, tirado do login. O campo digitado
+      // so responde pelos alertas antigos.
+      `Elaborado por: ${txt(alerta.criadoPor?.nome) || txt(alerta.elaboradoPor) || '-'}`,
       X0,
       yRodape + 7,
       { width: W * 0.6 },

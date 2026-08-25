@@ -32,6 +32,7 @@ import dayjs from 'dayjs';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { dataBR, dataInput } from '../../formatos';
 import { EVID } from '../../inspecao';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 import {
   alertaEmAberto,
   alertaVencido,
@@ -427,12 +428,9 @@ export default function Alertas() {
                 <Input type="date" />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="elaboradoPor" label="Elaborado por">
-                <Input />
-              </Form.Item>
-            </Col>
           </Row>
+
+          <AssinaturaDoLogin rotulo="Elaborado por" />
 
           <Form.Item
             name="titulo"
@@ -624,7 +622,7 @@ export default function Alertas() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Elaborado por" span={2}>
-                {detalhe.elaboradoPor || detalhe.criadoPor?.nome || '-'}
+                {detalhe.criadoPor?.nome || detalhe.elaboradoPor || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Ação obrigatória" span={2}>
                 <span style={{ whiteSpace: 'pre-wrap' }}>{detalhe.acao}</span>

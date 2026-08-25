@@ -92,7 +92,12 @@ const COLUNAS: Coluna[] = [
   { titulo: 'LOCALIZAÇÃO', peso: 90, valor: (i) => txt(i.localizacao) },
 ];
 
-export function gerarInventarioPdf(instrumentos: any[]): PDFKit.PDFDocument {
+export function gerarInventarioPdf(
+  instrumentos: any[],
+  // O inventario e uma foto do cadastro num instante: quem responde pelo papel
+  // afixado na metrologia e quem o emitiu.
+  emitidoPor?: string,
+): PDFKit.PDFDocument {
   const doc = new PDFDocument({
     size: 'A4',
     layout: 'landscape',
@@ -183,7 +188,7 @@ export function gerarInventarioPdf(instrumentos: any[]): PDFKit.PDFDocument {
     .fontSize(8)
     .fillColor(PRETO)
     .text(
-      `Instrumentos: ${instrumentos.length}     |     Calibração vencida: ${vencidos}     |     Vence em até 30 dias: ${aVencer}     |     Emissão: ${hojeNoBrasil()}`,
+      `Instrumentos: ${instrumentos.length}     |     Calibração vencida: ${vencidos}     |     Vence em até 30 dias: ${aVencer}     |     Emissão: ${hojeNoBrasil()}${emitidoPor ? `     |     Emitido por: ${emitidoPor}` : ''}`,
       X0 + 6,
       y + 5,
       { width: W - 12, lineBreak: false },

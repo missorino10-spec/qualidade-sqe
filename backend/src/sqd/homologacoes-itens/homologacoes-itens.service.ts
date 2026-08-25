@@ -29,7 +29,12 @@ import type {
 
 const includeHomologacao = {
   criadoPor: { select: { id: true, nome: true } },
-  relatorios: { orderBy: { tentativa: 'asc' } as const },
+  // O relatorio traz o autor junto: e ele que assina "Elaborado / Inspecionado
+  // por" na tela e no PDF.
+  relatorios: {
+    orderBy: { tentativa: 'asc' } as const,
+    include: { criadoPor: { select: { id: true, nome: true } } },
+  },
 };
 
 export const TIPO_ANEXO_RELATORIO_ITEM = 'HOMOLOGACAO_ITEM_RELATORIO';
@@ -245,8 +250,8 @@ export class HomologacoesItensService {
       po: dto.po ?? null,
       qtdInspecionada: numero(dto.qtdInspecionada),
       qtdTotal: numero(dto.qtdTotal),
-      elaboradoPor: dto.elaboradoPor ?? null,
-      inspecionadoPor: dto.inspecionadoPor ?? null,
+      // "Elaborado / Inspecionado por" saiu do formulario: quem assina e o
+      // usuario logado, gravado em criadoPorId.
       cotas: cotas as any,
       observacoesAmostras: dto.observacoesAmostras ?? null,
       resultadoAmostras: resAmostras,

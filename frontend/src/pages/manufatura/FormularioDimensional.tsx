@@ -21,6 +21,7 @@ import { ORIGENS_INSPECAO } from '../../inspecao';
 import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
 import Tabela from '../../components/Tabela';
 import { CamposItem } from '../../components/CamposItem';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Os campos e a ordem seguem o formulario em papel, sem acrescimos.
@@ -342,18 +343,7 @@ export function CamposRelatorio({
         </Row>
       )}
 
-      <Row gutter={12}>
-        <Col span={12}>
-          <Form.Item name="elaboradoPor" label="Elaborado por">
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item name="inspecionadoPor" label="Inspecionado por">
-            <Input />
-          </Form.Item>
-        </Col>
-      </Row>
+      <AssinaturaDoLogin />
     </>
   );
 }

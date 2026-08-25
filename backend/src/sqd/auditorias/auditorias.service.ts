@@ -20,7 +20,12 @@ import {
 
 const includeAuditoria = {
   criadoPor: { select: { id: true, nome: true } },
-  rodadas: { orderBy: { rodada: 'asc' } as const },
+  // A rodada traz o autor junto: e ele que assina "Auditores responsáveis" no
+  // checklist impresso.
+  rodadas: {
+    orderBy: { rodada: 'asc' } as const,
+    include: { criadoPor: { select: { id: true, nome: true } } },
+  },
 };
 
 export const TIPO_ANEXO_RELATORIO_AUDITORIA = 'AUDITORIA_RELATORIO';
@@ -159,7 +164,8 @@ export class AuditoriasService {
             codigoFornecedor: texto(dto.codigoFornecedor),
             motivo: texto(dto.motivo),
             local: texto(dto.local),
-            auditores: texto(dto.auditores),
+            // "Auditores responsáveis" saiu do formulario: quem assina e o
+            // usuario logado, gravado em criadoPorId.
             participantes: texto(dto.participantes),
             dataAuditoria,
             observacoes: texto(dto.observacoes),
@@ -231,7 +237,8 @@ export class AuditoriasService {
     const dados = {
       revisao: String(rodada).padStart(2, '0'),
       dataAuditoria,
-      auditores: texto(dto.auditores) ?? atual.auditores,
+      // "Auditores responsáveis" saiu do formulario: quem assina a rodada e o
+      // usuario logado, gravado em criadoPorId.
       participantes: texto(dto.participantes) ?? atual.participantes,
       local: texto(dto.local) ?? atual.local,
       respostas: respostas as any,
@@ -334,8 +341,6 @@ export class AuditoriasService {
             : undefined,
         motivo: dto.motivo !== undefined ? texto(dto.motivo) : undefined,
         local: dto.local !== undefined ? texto(dto.local) : undefined,
-        auditores:
-          dto.auditores !== undefined ? texto(dto.auditores) : undefined,
         participantes:
           dto.participantes !== undefined
             ? texto(dto.participantes)

@@ -13,6 +13,7 @@ import {
   normaCurta,
   toleranciaPadrao,
 } from '../inspecao';
+import { useInstrumentos, opcoesInstrumento } from '../hooks';
 import Tabela from './Tabela';
 
 // Tabela de cotas do RELATORIO DE INSPECAO DIMENSIONAL (BDBR.QUA.FMR.011.06).
@@ -68,6 +69,52 @@ export function cotaVaziaPecas(norma: NormaTolerancia = 'ISO2768'): CotaPecas {
     conformeManual: null,
     conforme: null,
   };
+}
+
+/**
+ * Lista fechada: o instrumento sai do cadastro de metrologia, nao da digitacao.
+ * Antes disso o mesmo paquimetro aparecia como "PAQ001", "paquimetro",
+ * "Paquimetro", "Paquimetro" e "paquimentro" - cinco instrumentos diferentes
+ * para o sistema.
+ *
+ * Nao tem "cadastrar na hora" de proposito: instrumento carrega certificado,
+ * data e periodo de calibracao. Um registro criado pela metade aqui furaria o
+ * controle de calibracao. Quem tem Cadastros > Instrumentos cadastra la e ele
+ * aparece na lista na hora.
+ */
+function SelectInstrumento({
+  valor,
+  onChange,
+}: {
+  valor?: string;
+  onChange: (v: string) => void;
+}) {
+  const { data, isLoading } = useInstrumentos();
+  const opcoes = opcoesInstrumento(data);
+
+  // Relatorio antigo tem instrumento digitado a mao, fora do cadastro. Ele
+  // continua aparecendo como esta - nada do que ja foi gravado se perde.
+  const atual = String(valor ?? '').trim();
+  const foraDoCadastro = !!atual && !opcoes.some((o) => o.value === atual);
+
+  return (
+    <Select
+      size="small"
+      style={{ width: '100%' }}
+      showSearch
+      allowClear
+      loading={isLoading}
+      placeholder="Escolha o instrumento"
+      optionFilterProp="label"
+      value={atual || undefined}
+      options={
+        foraDoCadastro
+          ? [{ value: atual, label: `${atual} (fora do cadastro)` }, ...opcoes]
+          : opcoes
+      }
+      onChange={(v) => onChange(v ?? '')}
+    />
+  );
 }
 
 // Numeros na tela seguem o padrao BR (virgula decimal).
@@ -199,7 +246,16 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
     },
     upper: somenteLeitura('UPPER', 90, (r) => br(r.upper)),
     lower: somenteLeitura('LOWER', 90, (r) => br(r.lower)),
-    instrumento: txt('INSTRUMENTO UTILIZADO', 'instrumento', 160),
+    instrumento: {
+      title: 'INSTRUMENTO UTILIZADO',
+      width: 200,
+      render: (_: any, r: any, i: number) => (
+        <SelectInstrumento
+          valor={r.instrumento}
+          onChange={(v) => edit(i, 'instrumento', v)}
+        />
+      ),
+    },
     desvio: {
       title: 'DESVIO',
       children: [

@@ -2,6 +2,7 @@ import { Col, Divider, Form, Input, InputNumber, Row, Select } from 'antd';
 import { ORIGENS_INSPECAO } from '../../inspecao';
 import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
 import { CamposItem } from '../../components/CamposItem';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 
 // INSPECAO VISUAL DA MANUFATURA - documento proprio, sem cotas.
 // O cabecalho e o mesmo do relatorio dimensional (011.06); o que muda e o
@@ -116,18 +117,7 @@ export function CamposVisual({
       <Divider orientation="left" plain>
         Assinaturas
       </Divider>
-      <Row gutter={12}>
-        <Col span={12}>
-          <Form.Item name="elaboradoPor" label="Elaborado por">
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item name="inspecionadoPor" label="Inspecionado por">
-            <Input />
-          </Form.Item>
-        </Col>
-      </Row>
+      <AssinaturaDoLogin />
     </>
   );
 }

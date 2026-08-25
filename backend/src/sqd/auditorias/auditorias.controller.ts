@@ -39,7 +39,9 @@ class AuditoriaDto {
   @IsOptional() @IsString() codigoFornecedor?: string;
   @IsOptional() @IsString() motivo?: string;
   @IsOptional() @IsString() local?: string;
-  @IsOptional() @IsString() auditores?: string;
+  // "Auditores responsáveis" nao vem mais do formulario: o sistema assina com
+  // o usuario logado. "Participantes" continua digitado - sao as pessoas do
+  // fornecedor, que nao tem login aqui.
   @IsOptional() @IsString() participantes?: string;
   @IsOptional() @IsString() dataAuditoria?: string;
 
@@ -58,7 +60,7 @@ class AuditoriaDto {
 class RodadaAuditoriaDto {
   @IsOptional() @IsNumber() rodada?: number;
   @IsOptional() @IsString() dataAuditoria?: string;
-  @IsOptional() @IsString() auditores?: string;
+  // Idem: quem assina a rodada e o usuario logado (criadoPorId).
   @IsOptional() @IsString() participantes?: string;
   @IsOptional() @IsString() local?: string;
   // [{ codigo, resposta: SIM|PARCIAL|NAO|NAO_APLICAVEL, evidencia }]

@@ -54,12 +54,16 @@ type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
 const corResultado: Record<string, string> = {
   APROVADO: 'green',
+  // Passou no recebimento, mas com desvio apontado e sem RNC: nao e um
+  // aprovado limpo, entao nao pode sair verde na listagem.
+  APROVADO_COM_DESVIO: 'orange',
   REPROVADO: 'red',
   SEM_INSPECAO: 'default',
 };
 
 const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
+  APROVADO_COM_DESVIO: 'Aprovado com desvio registrado',
   REPROVADO: 'Reprovado',
   SEM_INSPECAO: 'Sem inspeção recomendada',
 };
@@ -165,6 +169,11 @@ export default function Inspecoes() {
   const [openFornecedor, setOpenFornecedor] = useState(false);
   const [formFornecedor] = Form.useForm();
   const [salvandoFornecedor, setSalvandoFornecedor] = useState(false);
+
+  // Pergunta "Abrir RNC?" quando o formulario reprova. Guarda os valores do
+  // formulario ate o inspetor decidir; nada e gravado antes disso.
+  const [decisaoRnc, setDecisaoRnc] = useState<any | null>(null);
+  const [formDesvio] = Form.useForm();
 
   // Preenchimento obrigatorio da RNC ao concluir a inspecao
   const [rncObrigatoria, setRncObrigatoria] = useState<any | null>(null);
@@ -285,6 +294,23 @@ export default function Inspecoes() {
     return reprovou ? 'REPROVADO' : 'APROVADO';
   }, [tipo, grupos, cotas]);
 
+  // O que exatamente reprovou, para o inspetor decidir sobre a RNC olhando o
+  // desvio e nao um aviso generico.
+  const desviosApontados = useMemo<string[]>(() => {
+    if (tipo === 'VISUAL')
+      return grupos.flatMap((g) =>
+        (g.itens ?? [])
+          .filter((i: any) => i.status === 'REPROVADO')
+          .map((i: any) => i.texto),
+      );
+    return cotas
+      .filter((c) => c.conforme === false)
+      .map(
+        (c) =>
+          `${c.localizacao || 'Cota'}: especificado ${c.especificado ?? '-'}, encontrado ${c.encontradoMin ?? '-'} / ${c.encontradoMax ?? '-'}`,
+      );
+  }, [tipo, grupos, cotas]);
+
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['inspecoes'] });
     qc.invalidateQueries({ queryKey: ['entregas'] });
@@ -397,7 +423,30 @@ export default function Inspecoes() {
     }
   }
 
+  // Desvio apontado nao abre RNC sozinho: a decisao e do inspetor, tomada
+  // AQUI, antes de gravar. E por isso que a pergunta vem antes do POST - o
+  // servidor so numera uma RNC depois do "sim", entao dizer "nao" nao queima
+  // numero na sequencia.
+  //
+  // Nao se pergunta quando o recebimento ja tem RNC aberta (o Visual reprovou
+  // e o Dimensional reprovou depois): ali o desvio novo complementa a RNC que
+  // existe, como sempre foi.
   async function onFinish(v: any) {
+    if (
+      preencheFormulario &&
+      resultadoAuto === 'REPROVADO' &&
+      !rncDaInspecao
+    ) {
+      setDecisaoRnc(v);
+      return;
+    }
+    return salvarFormulario(v);
+  }
+
+  async function salvarFormulario(
+    v: any,
+    decisao?: { abrirRnc: boolean; observacaoDesvio?: string },
+  ) {
     setSalvando(true);
     try {
       // Fora do ciclo e sem inspecao extra: registra apenas o recebimento
@@ -437,6 +486,9 @@ export default function Inspecoes() {
         extra: extraAtivo,
         // Reaproveita a carga do formulario anterior: 1 recebimento = 1 inspecao
         entregaId: entregaAtual,
+        // Resposta do inspetor a pergunta "Abrir RNC?". Ausente = fluxo antigo.
+        abrirRnc: decisao?.abrirRnc,
+        observacaoDesvio: decisao?.observacaoDesvio,
       };
       if (tipo === 'VISUAL') payload.checklist = grupos;
       else payload.cotas = cotas;
@@ -475,15 +527,23 @@ export default function Inspecoes() {
       setOpen(false);
       invalidar();
       if (rnc) {
-        // RNC obrigatoria: a inspecao so se encerra com os desvios preenchidos.
+        // Escolheu abrir a RNC: dai em diante ela e obrigatoria, a inspecao so
+        // se encerra com os desvios preenchidos.
         abrirRncObrigatoria(rnc);
+      } else if (decisao?.abrirRnc === false) {
+        message.success(
+          `Inspeção ${res.numeroInspecao ?? ''} encerrada como aprovada. O desvio ficou registrado no relatório, sem RNC.`,
+        );
       } else {
         message.success(
           `Inspeção ${res.numeroInspecao ?? ''} registrada. Recebimento aprovado.`,
         );
       }
-    } catch {
-      message.error('Não foi possível registrar o recebimento.');
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ??
+          'Não foi possível registrar o recebimento.',
+      );
     } finally {
       setSalvando(false);
     }
@@ -667,7 +727,7 @@ export default function Inspecoes() {
           {
             title: 'Resultado',
             dataIndex: 'resultado',
-            width: 190,
+            width: 240,
             filters: Object.entries(labelResultado).map(([value, text]) => ({
               text,
               value,
@@ -927,7 +987,11 @@ export default function Inspecoes() {
                   showIcon
                   style={{ marginBottom: 12 }}
                   message="Esta inspeção já tem desvio registrado."
-                  description="Ao concluir a inspeção completa será aberta UMA RNC, reunindo os desvios de todos os formulários."
+                  description={
+                    rncDaInspecao
+                      ? `A RNC ${rncDaInspecao.numero} já foi aberta: um novo desvio entra nela, sem abrir outra.`
+                      : 'O desvio anterior foi encerrado sem RNC. Se este formulário reprovar, a decisão de abrir a RNC será feita de novo.'
+                  }
                 />
               )}
 
@@ -1038,9 +1102,9 @@ export default function Inspecoes() {
                 message={
                   resultadoAuto === 'APROVADO'
                     ? `Resultado: APROVADO — ${labelFormulario[tipo]} sem desvios.`
-                    : ultimoPasso
-                      ? 'Resultado: REPROVADO — ao concluir será aberta a RNC desta inspeção, de preenchimento obrigatório.'
-                      : 'Resultado: REPROVADO — será aberta UMA RNC ao término da inspeção completa.'
+                    : rncDaInspecao
+                      ? `Resultado: REPROVADO — o desvio entra na RNC ${rncDaInspecao.numero}, já aberta nesta inspeção.`
+                      : 'Resultado: REPROVADO — ao concluir você decide se abre a RNC ou encerra como aprovado, com o desvio registrado.'
                 }
               />
             </>
@@ -1072,6 +1136,88 @@ export default function Inspecoes() {
           onFinish={salvarFornecedorPontual}
         >
           <CamposFornecedor />
+        </Form>
+      </Modal>
+
+      {/* Pergunta "Abrir RNC?" - a decisao do inspetor. Nada foi gravado
+          ainda: e por isso que dizer "nao" nao queima numero de RNC. */}
+      <Modal
+        title="Desvio apontado — abrir RNC?"
+        open={!!decisaoRnc}
+        onCancel={() => setDecisaoRnc(null)}
+        footer={null}
+        width={640}
+        destroyOnClose
+      >
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            tipo === 'VISUAL'
+              ? `${desviosApontados.length} item(ns) do checklist visual reprovado(s)`
+              : `${desviosApontados.length} cota(s) fora da tolerância`
+          }
+          description={
+            desviosApontados.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {desviosApontados.slice(0, 8).map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+                {desviosApontados.length > 8 && (
+                  <li>+ {desviosApontados.length - 8} outro(s)</li>
+                )}
+              </ul>
+            ) : null
+          }
+        />
+        <Form
+          form={formDesvio}
+          layout="vertical"
+          onFinish={(v) => {
+            const dados = decisaoRnc;
+            setDecisaoRnc(null);
+            formDesvio.resetFields();
+            salvarFormulario(dados, {
+              abrirRnc: false,
+              observacaoDesvio: v.observacaoDesvio,
+            });
+          }}
+        >
+          <Form.Item
+            name="observacaoDesvio"
+            label="Por que a inspeção foi encerrada como aprovada?"
+            extra="Sai impresso no relatório. Os itens e cotas reprovados continuam marcados no documento — o que muda é o veredito do recebimento."
+            rules={[
+              {
+                required: true,
+                message: 'Explique por que o desvio não gerou RNC.',
+              },
+            ]}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="Ex.: desvio aceito por engenharia, peça segue para uso conforme concessão."
+            />
+          </Form.Item>
+          <Space>
+            <Button
+              type="primary"
+              danger
+              loading={salvando}
+              onClick={() => {
+                const dados = decisaoRnc;
+                setDecisaoRnc(null);
+                formDesvio.resetFields();
+                salvarFormulario(dados, { abrirRnc: true });
+              }}
+            >
+              Sim, abrir RNC
+            </Button>
+            <Button htmlType="submit" loading={salvando}>
+              Não abrir — encerrar como aprovado
+            </Button>
+          </Space>
         </Form>
       </Modal>
 

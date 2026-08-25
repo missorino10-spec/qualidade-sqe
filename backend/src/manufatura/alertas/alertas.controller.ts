@@ -37,7 +37,8 @@ class AlertaDto {
   @IsOptional() @IsString() legendaErrado?: string;
   @IsOptional() @IsString() legendaCerto?: string;
   @IsOptional() @IsString() prazo?: string;
-  @IsOptional() @IsString() elaboradoPor?: string;
+  // "Elaborado por" nao vem mais do formulario: o sistema assina com o usuario
+  // logado.
 }
 
 class RenovacaoDto {

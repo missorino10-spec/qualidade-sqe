@@ -22,6 +22,7 @@ import {
   resultadoVisual,
 } from '../../inspecao';
 import Tabela from '../../components/Tabela';
+import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 
 // Relatorio de inspecao da HOMOLOGACAO DE ITENS: as duas abas que substituem a
 // autoavaliacao do modulo de fornecedores.
@@ -219,15 +220,8 @@ export function CamposCabecalhoInspecao() {
           <InputNumber style={{ width: '100%' }} min={0} />
         </Form.Item>
       </Col>
-      <Col xs={12} md={6}>
-        <Form.Item name="elaboradoPor" label="Elaborado por">
-          <Input />
-        </Form.Item>
-      </Col>
-      <Col xs={12} md={6}>
-        <Form.Item name="inspecionadoPor" label="Inspecionado por">
-          <Input />
-        </Form.Item>
+      <Col xs={24} md={12}>
+        <AssinaturaDoLogin />
       </Col>
       <Col xs={24} md={12}>
         <Form.Item

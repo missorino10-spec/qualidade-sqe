@@ -146,7 +146,13 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
     { w: W / 2, label: 'MOTIVO DA AUDITORIA', valor: txt(a.motivo) },
     { w: W / 2, label: 'LOCAL DE REALIZAÇÃO', valor: txt(a.local) },
   ]);
-  t.bloco('Auditores responsáveis', txt(a.auditores), 26);
+  // Auditor responsavel e quem abriu a auditoria, tirado do login. O campo
+  // digitado so responde pelas auditorias antigas.
+  t.bloco(
+    'Auditores responsáveis',
+    txt(a.criadoPor?.nome) || txt(a.auditores),
+    26,
+  );
   t.bloco('Participantes do fornecedor', txt(a.participantes), 26);
 
   // ------------------------------------------------ 2. resultado
@@ -263,7 +269,7 @@ export function gerarPdfRegistroAuditoria(a: any): PDFKit.PDFDocument {
         fmtData(r.dataAuditoria),
         fmtNota(r.nota),
         LABEL_RESULTADO[r.resultado] ?? '',
-        txt(r.auditores),
+        txt(r.criadoPor?.nome) || txt(r.auditores),
       ];
       let x = X0;
       colunas.forEach((c, i) => {
@@ -364,7 +370,12 @@ export function gerarPdfChecklistAuditoria(
     {
       w: W - 110 - 55,
       label: 'AUDITORES RESPONSÁVEIS',
-      valor: txt(r.auditores ?? a.auditores),
+      // Quem preencheu o checklist, tirado do login; o texto digitado so
+      // responde pelas rodadas antigas.
+      valor:
+        txt(r.criadoPor?.nome) ||
+        txt(a.criadoPor?.nome) ||
+        txt(r.auditores ?? a.auditores),
     },
     { w: 110, label: 'DATA DA AUDITORIA', valor: fmtData(r.dataAuditoria) },
     { w: 55, label: 'REVISÃO', valor: txt(r.revisao) },

@@ -155,10 +155,10 @@ export default function InspecaoVisualDetalhe() {
             {data.inspetor?.nome ?? '-'}
           </Descriptions.Item>
           <Descriptions.Item label="Elaborado por">
-            {data.elaboradoPor ?? '-'}
+            {data.inspetor?.nome ?? data.elaboradoPor ?? '-'}
           </Descriptions.Item>
           <Descriptions.Item label="Inspecionado por" span={2}>
-            {data.inspecionadoPor ?? '-'}
+            {data.inspetor?.nome ?? data.inspecionadoPor ?? '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>

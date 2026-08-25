@@ -121,8 +121,9 @@ export class InspecoesManufaturaService {
             defeitos: dto.defeitos ?? undefined,
             qtdAfetada: dto.qtdAfetada ?? null,
             descricaoDesvio: dto.descricaoDesvio ?? null,
-            elaboradoPor: dto.elaboradoPor ?? null,
-            inspecionadoPor: dto.inspecionadoPor ?? null,
+            // Elaborado/inspecionado por saiu do formulario: quem assina e o
+            // usuario logado, gravado em inspetorId. As colunas de texto ficam
+            // vazias e sobrevivem so pelos relatorios antigos.
             inspetorId: usuarioId,
           },
         });

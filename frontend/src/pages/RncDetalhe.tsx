@@ -532,8 +532,8 @@ export default function RncDetalhe() {
               <Descriptions.Item label="Abertura">
                 {dayjs(rnc.dataAbertura).format('DD/MM/YYYY')}
               </Descriptions.Item>
-              <Descriptions.Item label="Solicitante">
-                {rnc.solicitante ?? '-'}
+              <Descriptions.Item label="Responsável">
+                {rnc.criadoPor?.nome ?? rnc.solicitante ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Fornecedor" span={2}>
                 {rnc.fornecedor?.codigo} — {rnc.fornecedor?.nome}

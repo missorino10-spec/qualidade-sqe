@@ -178,10 +178,10 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
 
       <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} style={{ marginTop: 12 }}>
         <Descriptions.Item label="Elaborado por">
-          {rel.elaboradoPor ?? '-'}
+          {rel.inspetor?.nome ?? rel.elaboradoPor ?? '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Inspecionado por">
-          {rel.inspecionadoPor ?? '-'}
+          {rel.inspetor?.nome ?? rel.inspecionadoPor ?? '-'}
         </Descriptions.Item>
       </Descriptions>
     </Card>
