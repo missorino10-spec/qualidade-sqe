@@ -388,6 +388,25 @@ export class InspecoesService {
     });
   }
 
+  // Formulario ja gravado deste recebimento que reprovou e ainda espera a
+  // decisao da RNC. Existe porque a decisao e UMA por inspecao, tomada no
+  // ultimo formulario: o Visual que reprova numa inspecao Visual + Dimensional
+  // fica reprovado, sem RNC, ate o ciclo terminar.
+  private async temDesvioPendente(entregaId?: number) {
+    if (!entregaId) return false;
+    const entrega = await this.prisma.entregaPortaria.findUnique({
+      where: { id: entregaId },
+      include: {
+        inspecoesVisual: { select: { resultado: true } },
+        inspecoesLote: { select: { resultado: true } },
+      },
+    });
+    return [
+      ...(entrega?.inspecoesVisual ?? []),
+      ...(entrega?.inspecoesLote ?? []),
+    ].some((f) => f.resultado === 'REPROVADO');
+  }
+
   // Abrir RNC e decisao do inspetor, tomada na tela antes de gravar. Dizendo
   // NAO, o recebimento encerra APROVADO e as cotas / itens reprovados
   // continuam marcados no relatorio: muda o veredito, nao o que foi medido.
@@ -396,15 +415,112 @@ export class InspecoesService {
   // caso o desvio novo complementa a RNC existente.
   // Roda ANTES de preparar a inspecao: prepararInspecao cria e numera a
   // entrega, entao recusar depois deixaria um INSP orfao na sequencia.
-  private exigirJustificativa(dto: any, resultadoApurado: string) {
+  //
+  // O desvio pode estar no formulario anterior e nao neste: Visual reprovado
+  // seguido de Dimensional aprovado ainda e uma inspecao com desvio, e a
+  // justificativa continua obrigatoria.
+  private async exigirJustificativa(dto: any, resultadoApurado: string) {
+    if (dto.abrirRnc !== false) return;
+    if (String(dto.observacaoDesvio ?? '').trim()) return;
     if (
-      resultadoApurado === 'REPROVADO' &&
-      dto.abrirRnc === false &&
-      !String(dto.observacaoDesvio ?? '').trim()
+      resultadoApurado === 'REPROVADO' ||
+      (await this.temDesvioPendente(dto.entregaId))
     )
       throw new BadRequestException(
         'Explique por que a inspeção foi encerrada como aprovada mesmo com desvio apontado.',
       );
+  }
+
+  // Aplica a decisao do inspetor aos formularios que ficaram esperando.
+  //
+  // Roda no ultimo formulario do ciclo, depois que ele foi gravado. Os
+  // anteriores vieram com `decidirNoFim`: reprovados, sem RNC e sem veredito,
+  // porque a pergunta e uma so por recebimento. Aqui os dois formularios
+  // terminam com a MESMA resposta - uma RNC unica ou a mesma justificativa.
+  private async fecharDecisaoDaInspecao(
+    ctx: { entregaId: number; jaTemRnc: boolean },
+    dto: any,
+    usuarioId: number,
+    atual: { visualId?: number; loteId?: number },
+  ) {
+    const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
+      where: { id: ctx.entregaId },
+      include: { inspecoesVisual: true, inspecoesLote: true },
+    });
+    // O formulario recem-criado ja resolveu a propria decisao; aqui so entram
+    // os que ficaram para tras.
+    const visuais = entrega.inspecoesVisual.filter(
+      (f) => f.id !== atual.visualId && f.resultado === 'REPROVADO',
+    );
+    const lotes = entrega.inspecoesLote.filter(
+      (f) => f.id !== atual.loteId && f.resultado === 'REPROVADO',
+    );
+    if (!visuais.length && !lotes.length) return null;
+
+    if (dto.abrirRnc === false && !ctx.jaTemRnc) {
+      const dados = {
+        resultado: 'APROVADO' as any,
+        desvioSemRnc: true,
+        observacaoDesvio: String(dto.observacaoDesvio ?? '').trim(),
+      };
+      if (visuais.length)
+        await this.prisma.inspecaoVisual.updateMany({
+          where: { id: { in: visuais.map((f) => f.id) } },
+          data: dados,
+        });
+      if (lotes.length)
+        await this.prisma.inspecaoLote.updateMany({
+          where: { id: { in: lotes.map((f) => f.id) } },
+          data: dados,
+        });
+      return null;
+    }
+
+    // Escolheu abrir: os desvios represados entram na mesma RNC do
+    // recebimento, cada um com o seu tipo e a sua descricao.
+    let rnc: any = null;
+    for (const f of visuais) {
+      const itens = this.itensReprovados(f.checklist);
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId: ctx.entregaId,
+          inspecaoVisualId: f.id,
+          fornecedorId: f.fornecedorId,
+          itemId: f.itemId,
+          notaFiscal: f.notaFiscal,
+          po: f.po,
+          quantidadeLote: f.qtdTotal,
+          quantidadePecas: f.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.VISUAL,
+          descricaoDesvio:
+            f.observacoes ||
+            (itens.length
+              ? `Itens reprovados: ${itens.join('; ')}`
+              : 'Não conformidade identificada na inspeção visual.'),
+        },
+        usuarioId,
+      );
+    }
+    for (const f of lotes) {
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId: ctx.entregaId,
+          inspecaoLoteId: f.id,
+          fornecedorId: f.fornecedorId,
+          itemId: f.itemId,
+          notaFiscal: f.notaFiscal,
+          po: f.po,
+          quantidadeLote: f.qtdTotal,
+          quantidadePecas: f.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.DIMENSIONAL,
+          descricaoDesvio:
+            f.observacoes ||
+            'Não conformidade dimensional identificada na inspeção de lote.',
+        },
+        usuarioId,
+      );
+    }
+    return rnc;
   }
 
   private decidirDesvio(
@@ -429,7 +545,7 @@ export class InspecoesService {
   async criarVisual(dto: any, usuarioId: number) {
     const checklist = dto.checklist ?? checklistVisualInicial();
     const apurado = dto.resultado ?? resultadoVisual(checklist);
-    this.exigirJustificativa(dto, apurado);
+    await this.exigirJustificativa(dto, apurado);
 
     const ctx = await this.prepararInspecao(dto, usuarioId);
     const desvio = this.decidirDesvio(dto, ctx, apurado);
@@ -473,8 +589,11 @@ export class InspecoesService {
       jaEstavaReprovado: ctx.jaEstavaReprovado,
     });
 
+    // `decidirNoFim`: ainda vem outro formulario nesta inspecao, entao o desvio
+    // fica gravado como reprovado e espera. Quem abre (ou dispensa) a RNC e o
+    // ultimo formulario do ciclo, com a resposta valendo para os dois.
     let rnc: any = null;
-    if (reprovado) {
+    if (reprovado && !dto.decidirNoFim) {
       const itensReprovados = this.itensReprovados(dto.checklist);
       rnc = await this.rnc.abrirOuComplementar(
         {
@@ -501,7 +620,19 @@ export class InspecoesService {
       );
     }
 
-    return { inspecao: insp, numeroInspecao: ctx.entrega.numeroInspecao, rnc };
+    const rncPendentes = dto.decidirNoFim
+      ? null
+      : await this.fecharDecisaoDaInspecao(ctx, dto, usuarioId, {
+          visualId: insp.id,
+        });
+
+    return {
+      inspecao: insp,
+      numeroInspecao: ctx.entrega.numeroInspecao,
+      // A RNC dos pendentes e a mais recente: ela ja inclui o desvio deste
+      // formulario, porque complementou a que acabou de ser aberta.
+      rnc: rncPendentes ?? rnc,
+    };
   }
 
   async criarLote(dto: any, usuarioId: number) {
@@ -509,7 +640,7 @@ export class InspecoesService {
     // exatamente o que vai para o banco e para o PDF.
     const cotas = (dto.cotas ?? []).map((c: CotaMaxMin) => calcularCotaMaxMin(c));
     const apurado = dto.resultado ?? resultadoDimensional(cotas);
-    this.exigirJustificativa(dto, apurado);
+    await this.exigirJustificativa(dto, apurado);
 
     const ctx = await this.prepararInspecao(dto, usuarioId);
     const desvio = this.decidirDesvio(dto, ctx, apurado);
@@ -551,8 +682,10 @@ export class InspecoesService {
       jaEstavaReprovado: ctx.jaEstavaReprovado,
     });
 
+    // Mesma regra do Visual: com formulario pendente na inspecao, a RNC so e
+    // decidida no ultimo do ciclo.
     let rnc: any = null;
-    if (reprovado) {
+    if (reprovado && !dto.decidirNoFim) {
       rnc = await this.rnc.abrirOuComplementar(
         {
           entregaId: ctx.entregaId,
@@ -573,7 +706,17 @@ export class InspecoesService {
       );
     }
 
-    return { inspecao: insp, numeroInspecao: ctx.entrega.numeroInspecao, rnc };
+    const rncPendentes = dto.decidirNoFim
+      ? null
+      : await this.fecharDecisaoDaInspecao(ctx, dto, usuarioId, {
+          loteId: insp.id,
+        });
+
+    return {
+      inspecao: insp,
+      numeroInspecao: ctx.entrega.numeroInspecao,
+      rnc: rncPendentes ?? rnc,
+    };
   }
 
   private itensReprovados(checklist: any): string[] {

@@ -168,10 +168,16 @@ export default function Inspecoes() {
   const [formFornecedor] = Form.useForm();
   const [salvandoFornecedor, setSalvandoFornecedor] = useState(false);
 
-  // Pergunta "Abrir RNC?" quando o formulario reprova. Guarda os valores do
+  // Pergunta "Abrir RNC?" no FIM do ciclo. Guarda os valores do ultimo
   // formulario ate o inspetor decidir; nada e gravado antes disso.
   const [decisaoRnc, setDecisaoRnc] = useState<any | null>(null);
   const [formDesvio] = Form.useForm();
+  // Desvios dos formularios ja gravados nesta inspecao, esperando a decisao.
+  // A pergunta e uma so por recebimento, entao ela precisa mostrar o que
+  // reprovou no Visual E no Dimensional, junto.
+  const [desviosPendentes, setDesviosPendentes] = useState<
+    { formulario: string; itens: string[] }[]
+  >([]);
 
   // Preenchimento obrigatorio da RNC ao concluir a inspecao
   const [rncObrigatoria, setRncObrigatoria] = useState<any | null>(null);
@@ -271,6 +277,7 @@ export default function Inspecoes() {
     setNumeroInspecao(undefined);
     setDesvioAnterior(false);
     setRncDaInspecao(null);
+    setDesviosPendentes([]);
     limparEtapa();
     form.setFieldsValue({
       origem: 'PLANO_INSPECAO',
@@ -308,6 +315,37 @@ export default function Inspecoes() {
           `${c.localizacao || 'Cota'}: especificado ${c.especificado ?? '-'}, encontrado ${c.encontradoMin ?? '-'} / ${c.encontradoMax ?? '-'}`,
       );
   }, [tipo, grupos, cotas]);
+
+  // Tudo que reprovou na INSPECAO, nao so no formulario da tela: a decisao e
+  // uma so para o recebimento, entao ela e tomada olhando os dois formularios.
+  const blocosDesvio = useMemo(() => {
+    const blocos = [...desviosPendentes];
+    if (resultadoAuto === 'REPROVADO')
+      blocos.push({
+        formulario: labelFormulario[tipo],
+        itens: desviosApontados,
+      });
+    return blocos;
+  }, [desviosPendentes, resultadoAuto, desviosApontados, tipo]);
+
+  const totalDesvios = blocosDesvio.reduce((s, b) => s + b.itens.length, 0);
+
+  // Desvio ja GRAVADO esperando a decisao da RNC. Sair agora deixaria a
+  // inspecao reprovada sem ninguem ter decidido, e a decisao so acontece no
+  // fim do ciclo - entao o ciclo tem que terminar.
+  const desvioPendente = desviosPendentes.length > 0;
+
+  function fecharInspecao() {
+    if (desvioPendente) {
+      Modal.warning({
+        title: 'Inspeção com desvio pendente',
+        content: `A inspeção ${numeroInspecao ?? ''} já tem desvio registrado e a decisão sobre a RNC é tomada ao final. Conclua a inspeção de ${labelFormulario[tipo]} para decidir.`,
+        okText: 'Continuar a inspeção',
+      });
+      return;
+    }
+    setOpen(false);
+  }
 
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['inspecoes'] });
@@ -421,18 +459,21 @@ export default function Inspecoes() {
     }
   }
 
-  // Desvio apontado nao abre RNC sozinho: a decisao e do inspetor, tomada
-  // AQUI, antes de gravar. E por isso que a pergunta vem antes do POST - o
-  // servidor so numera uma RNC depois do "sim", entao dizer "nao" nao queima
-  // numero na sequencia.
+  // Desvio apontado nao abre RNC sozinho: a decisao e do inspetor e vem UMA
+  // VEZ, no fim do ciclo. Numa inspecao Visual + Dimensional o desvio do
+  // primeiro formulario fica gravado esperando, para a pergunta ser feita com
+  // o recebimento inteiro na mesa - e nao duas vezes, uma por formulario.
   //
-  // Nao se pergunta quando o recebimento ja tem RNC aberta (o Visual reprovou
-  // e o Dimensional reprovou depois): ali o desvio novo complementa a RNC que
-  // existe, como sempre foi.
+  // A pergunta continua ANTES do POST final: o servidor so numera a RNC depois
+  // do "sim", entao dizer "nao" nao queima numero na sequencia.
+  //
+  // Nao se pergunta quando o recebimento ja tem RNC aberta: ali o desvio novo
+  // complementa a RNC que existe, como sempre foi.
   async function onFinish(v: any) {
     if (
       preencheFormulario &&
-      resultadoAuto === 'REPROVADO' &&
+      ultimoPasso &&
+      blocosDesvio.length > 0 &&
       !rncDaInspecao
     ) {
       setDecisaoRnc(v);
@@ -487,6 +528,8 @@ export default function Inspecoes() {
         // Resposta do inspetor a pergunta "Abrir RNC?". Ausente = fluxo antigo.
         abrirRnc: decisao?.abrirRnc,
         observacaoDesvio: decisao?.observacaoDesvio,
+        // Ainda vem outro formulario: o desvio grava e espera o fim do ciclo.
+        decidirNoFim: !ultimoPasso,
       };
       if (tipo === 'VISUAL') payload.checklist = grupos;
       else payload.cotas = cotas;
@@ -512,6 +555,13 @@ export default function Inspecoes() {
       // Ha proxima etapa (Visual -> Lote da MESMA inspecao)?
       if (!ultimoPasso) {
         const proximo = passos[passoIdx + 1];
+        // O desvio deste formulario vai junto para a pergunta do fim: o
+        // inspetor decide vendo o que reprovou nos dois.
+        if (resultadoAuto === 'REPROVADO')
+          setDesviosPendentes((atual) => [
+            ...atual,
+            { formulario: labelFormulario[tipo], itens: desviosApontados },
+          ]);
         setPassoIdx(passoIdx + 1);
         limparEtapa();
         message.success(
@@ -779,7 +829,9 @@ export default function Inspecoes() {
             : 'Nova inspeção de recebimento'
         }
         open={open}
-        onCancel={() => setOpen(false)}
+        onCancel={fecharInspecao}
+        maskClosable={!desvioPendente}
+        keyboard={!desvioPendente}
         onOk={() => form.submit()}
         confirmLoading={salvando}
         okText={
@@ -988,7 +1040,7 @@ export default function Inspecoes() {
                   description={
                     rncDaInspecao
                       ? `A RNC ${rncDaInspecao.numero} já foi aberta: um novo desvio entra nela, sem abrir outra.`
-                      : 'O desvio anterior foi encerrado sem RNC. Se este formulário reprovar, a decisão de abrir a RNC será feita de novo.'
+                      : 'O desvio do formulário anterior está aguardando. Ao concluir esta inspeção você decide de uma vez, para os dois formulários, se abre a RNC.'
                   }
                 />
               )}
@@ -1102,7 +1154,9 @@ export default function Inspecoes() {
                     ? `Resultado: APROVADO — ${labelFormulario[tipo]} sem desvios.`
                     : rncDaInspecao
                       ? `Resultado: REPROVADO — o desvio entra na RNC ${rncDaInspecao.numero}, já aberta nesta inspeção.`
-                      : 'Resultado: REPROVADO — ao concluir você decide se abre a RNC ou encerra como aprovado, com o desvio registrado.'
+                      : ultimoPasso
+                        ? 'Resultado: REPROVADO — ao concluir você decide se abre a RNC ou encerra como aprovado, com o desvio registrado.'
+                        : `Resultado: REPROVADO — o desvio fica registrado e a decisão sobre a RNC vem ao final, depois da inspeção de ${labelFormulario[passos[passoIdx + 1]]}.`
                 }
               />
             </>
@@ -1137,8 +1191,9 @@ export default function Inspecoes() {
         </Form>
       </Modal>
 
-      {/* Pergunta "Abrir RNC?" - a decisao do inspetor. Nada foi gravado
-          ainda: e por isso que dizer "nao" nao queima numero de RNC. */}
+      {/* Pergunta "Abrir RNC?" - a decisao do inspetor, UMA por inspecao, no
+          fim do ciclo. Nada do ultimo formulario foi gravado ainda: e por isso
+          que dizer "nao" nao queima numero de RNC. */}
       <Modal
         title="Desvio apontado — abrir RNC?"
         open={!!decisaoRnc}
@@ -1151,22 +1206,26 @@ export default function Inspecoes() {
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message={
-            tipo === 'VISUAL'
-              ? `${desviosApontados.length} item(ns) do checklist visual reprovado(s)`
-              : `${desviosApontados.length} cota(s) fora da tolerância`
-          }
+          message={`${totalDesvios} desvio(s) apontado(s) nesta inspeção`}
           description={
-            desviosApontados.length ? (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {desviosApontados.slice(0, 8).map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-                {desviosApontados.length > 8 && (
-                  <li>+ {desviosApontados.length - 8} outro(s)</li>
-                )}
-              </ul>
-            ) : null
+            <>
+              {blocosDesvio.map((b) => (
+                <div key={b.formulario} style={{ marginTop: 4 }}>
+                  <b>{b.formulario}</b>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {b.itens.slice(0, 8).map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                    {b.itens.length > 8 && (
+                      <li>+ {b.itens.length - 8} outro(s)</li>
+                    )}
+                  </ul>
+                </div>
+              ))}
+              <div style={{ marginTop: 8 }}>
+                A resposta vale para a inspeção inteira.
+              </div>
+            </>
           }
         />
         <Form

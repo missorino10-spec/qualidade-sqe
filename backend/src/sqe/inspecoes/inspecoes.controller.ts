@@ -72,6 +72,11 @@ class CabecalhoDto {
   // obrigatoria.
   @IsOptional() @IsBoolean() abrirRnc?: boolean;
   @IsOptional() @IsString() observacaoDesvio?: string;
+
+  // Ainda vem outro formulario nesta inspecao (Visual -> Dimensional). O
+  // desvio fica gravado esperando: a pergunta da RNC e uma so, no fim do
+  // ciclo, para o inspetor decidir olhando o recebimento inteiro.
+  @IsOptional() @IsBoolean() decidirNoFim?: boolean;
 }
 
 class CreateVisualDto extends CabecalhoDto {
