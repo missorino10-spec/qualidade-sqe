@@ -30,6 +30,8 @@ class CnqDto {
   @IsOptional() @IsString() itemCodigo?: string;
   @IsOptional() @IsString() itemDescricao?: string;
   @IsOptional() @IsInt() tipoDefeitoId?: number;
+  // Defeito digitado quando o tipo escolhido e "Outros"
+  @IsOptional() @IsString() defeitoOutros?: string;
   @IsOptional() @IsNumber() quantidade?: number;
   @IsOptional() @IsNumber() valorUnitario?: number;
   // So vem preenchido quando a pessoa digita o total a mao. Sem ele o servico

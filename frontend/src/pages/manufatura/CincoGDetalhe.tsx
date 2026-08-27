@@ -32,8 +32,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataInput } from '../../formatos';
 import { AuthImage } from '../../components/AuthImage';
+import DocumentoReferenciado from '../../components/DocumentoReferenciado';
 import {
   CINCO_G,
+  DOC_5G,
   EVID_5G,
   NOTA_5G,
   checklist5G,
@@ -128,6 +130,8 @@ export default function CincoGDetalhe() {
   const [form] = Form.useForm();
   const [avaliacoes, setAvaliacoes] = useState<any[]>(checklist5GInicial());
   const [salvando, setSalvando] = useState(false);
+  // "Outros" so vale escrito: o rotulo sozinho nao diz de onde veio o problema.
+  const origem = Form.useWatch('origem', form);
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ['manufatura-5g', id],
@@ -372,6 +376,28 @@ export default function CincoGDetalhe() {
             <Col xs={12} md={6}>
               <Form.Item name="turno" label="Turno">
                 <Select options={TURNOS_8D} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            {origem === 'OUTROS' && (
+              <Col xs={24} md={8}>
+                <Form.Item name="origemOutros" label="Especifique a origem">
+                  <Input maxLength={120} />
+                </Form.Item>
+              </Col>
+            )}
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="documentoReferencia"
+                label="Documento referenciado"
+              >
+                <Input maxLength={120} placeholder="Nº do documento" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label="Arquivo do documento">
+                <DocumentoReferenciado entidadeTipo={DOC_5G} entidadeId={id} />
               </Form.Item>
             </Col>
           </Row>

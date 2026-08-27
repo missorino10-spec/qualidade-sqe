@@ -25,7 +25,7 @@ import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import type { Response } from 'express';
 import { CincoGService } from './cincog.service';
 import { gerarPdfCincoG, FotosCincoG } from './cincog-pdf';
-import { EVID_5G } from '../../comum/cincog';
+import { DOC_5G, EVID_5G } from '../../comum/cincog';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
 import { ModuloSistema } from '@prisma/client';
@@ -41,8 +41,19 @@ class CincoGDto {
   status?: any;
   @IsOptional() @IsString() dataAbertura?: string;
   @IsOptional()
-  @IsIn(['RELATORIO_RO', 'PRODUCAO', 'INSPECAO_EXTRA', 'SETUP'])
+  @IsIn([
+    'RELATORIO_RO',
+    'PRODUCAO',
+    'INSPECAO_EXTRA',
+    'SETUP',
+    'RNC',
+    'OUTROS',
+  ])
   origem?: any;
+  // Origem digitada quando a escolhida e OUTROS
+  @IsOptional() @IsString() origemOutros?: string;
+  // Numero do documento que motivou a abertura; o arquivo vai nos anexos
+  @IsOptional() @IsString() documentoReferencia?: string;
   @IsOptional() @IsIn(['COMERCIAL', 'SEGUNDO_TURNO']) turno?: any;
   @IsOptional() @IsString() produtoItem?: string;
   @IsOptional() @IsString() codigoDesenho?: string;
@@ -87,6 +98,17 @@ export class CincoGController {
     return validas.length ? { evidencias: validas } : {};
   }
 
+  // Nomes dos arquivos anexados como documento de referencia. So o nome: o PDF
+  // registra que o documento existe, quem quiser o arquivo abre pela tela.
+  private async docsDoCincoG(id: number): Promise<string[]> {
+    const anexos = await this.prisma.anexo.findMany({
+      where: { entidadeTipo: DOC_5G as any, entidadeId: id },
+      orderBy: { createdAt: 'asc' },
+      select: { nomeArquivo: true },
+    });
+    return anexos.map((a) => a.nomeArquivo);
+  }
+
   @Get()
   listar(@Query('status') status?: string) {
     return this.service.listar(status);
@@ -101,10 +123,11 @@ export class CincoGController {
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const reg = await this.service.detalhe(id);
     const fotos = await this.fotosDoCincoG(id);
+    const docs = await this.docsDoCincoG(id);
     const nomeArquivo = `${(reg.numero ?? `5g-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfCincoG(reg, fotos);
+    const doc = gerarPdfCincoG(reg, fotos, docs);
     doc.pipe(res);
     doc.end();
   }

@@ -606,6 +606,9 @@ model TipoDefeito {
   nome  String  @unique
   ordem Int     @default(0)
   ativo Boolean @default(true)
+  // "Outros": o lancamento tem de dizer qual foi o defeito. Marcado por flag e
+  // nao pelo nome, senao renomear a linha no cadastro apagaria o campo aberto.
+  exigeDetalhe Boolean @default(false)
 
   cnqs Cnq[]
 }
@@ -801,6 +804,9 @@ model Cnq {
 
   tipoDefeitoId Int
   tipoDefeito   TipoDefeito @relation(fields: [tipoDefeitoId], references: [id])
+  // Defeito digitado quando o tipo escolhido e "Outros". Aparece junto do nome
+  // no relatorio, mas o Pareto continua somando tudo como "Outros".
+  defeitoOutros String?
 
   quantidade    Float
   // Valor da peca digitado no lancamento (nao ha base de precos ainda)
@@ -833,6 +839,10 @@ enum OrigemOitoD {
   PRODUCAO
   INSPECAO_EXTRA
   SETUP
+  // RNC e so o motivo da abertura: nao ha vinculo com a RNC do SQE. O numero
+  // dela, quando houver, vai no campo "documento referenciado".
+  RNC
+  OUTROS
 }
 
 enum TurnoManufatura {
@@ -859,6 +869,11 @@ model OitoD {
   produtoItem       String?
   codigoDesenho     String?
   origem            OrigemOitoD     @default(PRODUCAO)
+  // Origem digitada quando "origem" e OUTROS
+  origemOutros      String?
+  // Documento que motivou a abertura (RNC, relatorio, e-mail...): o numero e
+  // digitado aqui e o arquivo entra como anexo OITO_D_DOC.
+  documentoReferencia String?
   local             String?
   processoOperacao  String?
   equipamento       String?
@@ -960,6 +975,10 @@ model CincoG {
   dataAbertura     DateTime        @default(now())
   status           StatusOitoD     @default(AGUARDANDO)
   origem           OrigemOitoD     @default(PRODUCAO)
+  // Mesmo par do 8D: origem digitada quando e OUTROS e o documento que motivou
+  // a abertura (numero aqui, arquivo no anexo CINCO_G_DOC).
+  origemOutros        String?
+  documentoReferencia String?
   turno            TurnoManufatura @default(COMERCIAL)
   produtoItem      String?
   codigoDesenho    String?

@@ -174,6 +174,19 @@ async function main() {
     });
   }
 
+  // Saidas de emergencia da lista, sempre no fim. "Outros" pede o texto do
+  // defeito no lancamento - dai o exigeDetalhe.
+  for (const saida of [
+    { nome: 'Não Definido', ordem: 900, exigeDetalhe: false },
+    { nome: 'Outros', ordem: 901, exigeDetalhe: true },
+  ]) {
+    await prisma.tipoDefeito.upsert({
+      where: { nome: saida.nome },
+      update: { exigeDetalhe: saida.exigeDetalhe },
+      create: saida,
+    });
+  }
+
   // A senha NAO e impressa no log (o log do provedor fica visivel no painel).
   console.log(
     `Seed (nuvem) concluido. Admin: ${admin.email}. ` +

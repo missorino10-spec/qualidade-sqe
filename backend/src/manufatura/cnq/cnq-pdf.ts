@@ -92,9 +92,15 @@ const COLUNAS: Coluna[] = [
       [txt(c.itemCodigo), txt(c.itemDescricao)].filter(Boolean).join(' — '),
   },
   {
+    // O texto digitado em "Outros" sai aqui, na linha do lancamento. No resumo
+    // do periodo ele NAO entra: la tudo soma como "Outros", senao cada
+    // digitacao viraria uma fatia e o Pareto perderia o sentido.
     titulo: 'DESCRIÇÃO DO DEFEITO',
     peso: 96,
-    valor: (c) => txt(c.tipoDefeito?.nome),
+    valor: (c) =>
+      [txt(c.tipoDefeito?.nome), txt(c.defeitoOutros)]
+        .filter(Boolean)
+        .join(' — '),
   },
   { titulo: 'QTD.', peso: 32, valor: (c) => inteiro(c.quantidade), direita: true },
   {

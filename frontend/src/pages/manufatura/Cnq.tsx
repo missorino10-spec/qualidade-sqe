@@ -124,6 +124,13 @@ export default function Cnq() {
     queryFn: async () => (await api.get('/tipos-defeito')).data,
   });
 
+  // "Outros" pede o defeito por escrito. Quem manda e a flag do cadastro, e nao
+  // o nome do tipo: renomear a linha no cadastro nao pode apagar o campo.
+  const tipoDefeitoId = Form.useWatch('tipoDefeitoId', form);
+  const defeitoPedeDetalhe = !!(tipos ?? []).find(
+    (t) => t.id === tipoDefeitoId,
+  )?.exigeDetalhe;
+
   const total = (data ?? []).reduce((s, c) => s + (c.valorTotal ?? 0), 0);
   const pecas = (data ?? []).reduce((s, c) => s + (c.quantidade ?? 0), 0);
 
@@ -318,7 +325,12 @@ export default function Cnq() {
                 (data ?? []).map((r: any) => r.tipoDefeito?.nome),
               ),
               onFilter: (v: any, r: any) => r.tipoDefeito?.nome === v,
-              render: (_: any, r: any) => r.tipoDefeito?.nome ?? '-',
+              // O filtro continua pelo tipo da lista: em "Outros" o texto
+              // digitado acompanha o nome, mas nao vira uma opcao de filtro.
+              render: (_: any, r: any) =>
+                [r.tipoDefeito?.nome, r.defeitoOutros]
+                  .filter(Boolean)
+                  .join(' — ') || '-',
             },
             {
               title: 'Qtd.',
@@ -458,6 +470,17 @@ export default function Cnq() {
               }))}
             />
           </Form.Item>
+          {/* "Outros" nao diz nada sozinho: o defeito tem de ser escrito. O
+              campo aparece pela flag do cadastro, nao pelo nome do tipo. */}
+          {defeitoPedeDetalhe && (
+            <Form.Item
+              name="defeitoOutros"
+              label="Qual defeito?"
+              rules={[{ required: true, message: 'Descreva o defeito.' }]}
+            >
+              <Input maxLength={120} placeholder="Descreva o defeito" />
+            </Form.Item>
+          )}
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item name="quantidade" label="Quantidade">

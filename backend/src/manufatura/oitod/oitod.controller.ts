@@ -27,7 +27,7 @@ import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import type { Response } from 'express';
 import { OitoDService } from './oitod.service';
 import { gerarPdfOitoD, FotosOitoD } from './oitod-pdf';
-import { EVID_8D } from '../../comum/oitod';
+import { DOC_8D, EVID_8D } from '../../comum/oitod';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
 import { ModuloSistema } from '@prisma/client';
@@ -46,8 +46,19 @@ class OitoDDto {
   @IsOptional() @IsString() produtoItem?: string;
   @IsOptional() @IsString() codigoDesenho?: string;
   @IsOptional()
-  @IsIn(['RELATORIO_RO', 'PRODUCAO', 'INSPECAO_EXTRA', 'SETUP'])
+  @IsIn([
+    'RELATORIO_RO',
+    'PRODUCAO',
+    'INSPECAO_EXTRA',
+    'SETUP',
+    'RNC',
+    'OUTROS',
+  ])
   origem?: any;
+  // Origem digitada quando a escolhida e OUTROS
+  @IsOptional() @IsString() origemOutros?: string;
+  // Numero do documento que motivou a abertura; o arquivo vai nos anexos
+  @IsOptional() @IsString() documentoReferencia?: string;
   @IsOptional() @IsString() local?: string;
   @IsOptional() @IsString() processoOperacao?: string;
   @IsOptional() @IsString() equipamento?: string;
@@ -118,6 +129,17 @@ export class OitoDController {
     return fotos;
   }
 
+  // Nomes dos arquivos anexados como documento de referencia. So o nome: o PDF
+  // registra que o documento existe, quem quiser o arquivo abre pela tela.
+  private async docsDoOitoD(id: number): Promise<string[]> {
+    const anexos = await this.prisma.anexo.findMany({
+      where: { entidadeTipo: DOC_8D as any, entidadeId: id },
+      orderBy: { createdAt: 'asc' },
+      select: { nomeArquivo: true },
+    });
+    return anexos.map((a) => a.nomeArquivo);
+  }
+
   @Get()
   listar(@Query('status') status?: string) {
     return this.service.listar(status);
@@ -132,10 +154,11 @@ export class OitoDController {
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const d8 = await this.service.detalhe(id);
     const fotos = await this.fotosDoOitoD(id);
+    const docs = await this.docsDoOitoD(id);
     const nomeArquivo = `${(d8.numero ?? `8d-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfOitoD(d8, fotos);
+    const doc = gerarPdfOitoD(d8, fotos, docs);
     doc.pipe(res);
     doc.end();
   }

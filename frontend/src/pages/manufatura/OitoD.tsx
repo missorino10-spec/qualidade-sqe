@@ -11,9 +11,10 @@ import {
   Select,
   Space,
   Tag,
+  Upload,
   message,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,6 +22,8 @@ import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import { DOC_8D } from '../../oitod';
+import { DOC_5G } from '../../cincog';
 
 // Analise de Problemas da Qualidade — Doc BDBR.QUA.FMR.007.01.
 // A tela reune os dois documentos do formulario: o 8D (analise completa) e o
@@ -53,12 +56,27 @@ const DOCS: Record<
   },
 };
 
+// Rotulo do anexo "documento que motivou a abertura", por tipo de documento.
+const DOC_ANEXO: Record<TipoDoc, string> = { '8D': DOC_8D, '5G': DOC_5G };
+
+// "RNC" e so o motivo da abertura: nao ha vinculo com a RNC do SQE. O numero
+// dela, quando houver, vai no campo "Documento referenciado".
 export const ORIGENS_8D = [
   { value: 'RELATORIO_RO', label: 'Relatório R.O' },
   { value: 'PRODUCAO', label: 'Produção' },
   { value: 'INSPECAO_EXTRA', label: 'Inspeção extra' },
   { value: 'SETUP', label: 'Setup' },
+  { value: 'RNC', label: 'RNC' },
+  { value: 'OUTROS', label: 'Outros' },
 ];
+
+// Na lista e no detalhe, "Outros" sozinho nao diz nada: o que aparece e o texto
+// digitado pelo usuario.
+export function textoOrigem8D(reg: any): string {
+  const rotulo = ORIGENS_8D.find((o) => o.value === reg?.origem)?.label;
+  if (reg?.origem === 'OUTROS' && reg?.origemOutros) return reg.origemOutros;
+  return rotulo ?? '-';
+}
 
 export const TURNOS_8D = [
   { value: 'COMERCIAL', label: 'Comercial' },
@@ -87,6 +105,11 @@ export default function OitoD() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
+  // Arquivos escolhidos na abertura. Ficam retidos aqui porque o anexo precisa
+  // do id do documento, que so existe depois que ele e numerado.
+  const [arquivos, setArquivos] = useState<any[]>([]);
+  // "Outros" so vale escrito: o rotulo sozinho nao diz de onde veio o problema.
+  const origem = Form.useWatch('origem', form);
 
   const doc = DOCS[tipo];
   const inspecaoId = params.get('inspecaoId');
@@ -100,6 +123,7 @@ export default function OitoD() {
 
   function abrir(origemVinculo?: { inspecaoId?: number; cnqId?: number }) {
     form.resetFields();
+    setArquivos([]);
     form.setFieldsValue({
       dataAbertura: dayjs().format('YYYY-MM-DD'),
       status: 'AGUARDANDO',
@@ -149,11 +173,28 @@ export default function OitoD() {
     });
   }
 
+  // O documento ja foi aberto quando isto roda: uma falha aqui nao desfaz a
+  // abertura, so avisa - o arquivo pode ser anexado de novo pelo detalhe.
+  async function enviarDocumentos(id: number) {
+    for (const arquivo of arquivos) {
+      const fd = new FormData();
+      fd.append('file', arquivo.originFileObj ?? arquivo);
+      try {
+        await api.post('/anexos', fd, {
+          params: { entidadeTipo: DOC_ANEXO[tipo], entidadeId: id },
+        });
+      } catch {
+        message.warning(`Não foi possível anexar "${arquivo.name}".`);
+      }
+    }
+  }
+
   async function salvar() {
     const v = await form.validateFields();
     setSalvando(true);
     try {
       const res = await api.post(`/manufatura/${doc.rota}`, v);
+      await enviarDocumentos(res.data.id);
       message.success(`${tipo} ${res.data.numero} aberto.`);
       qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
       setOpen(false);
@@ -217,8 +258,13 @@ export default function OitoD() {
               width: 140,
               filters: ORIGENS_8D.map((o) => ({ text: o.label, value: o.value })),
               onFilter: (v: any, r: any) => r.origem === v,
-              render: (_: any, r: any) =>
-                ORIGENS_8D.find((o) => o.value === r.origem)?.label ?? '-',
+              render: (_: any, r: any) => textoOrigem8D(r),
+            },
+            {
+              title: 'Documento',
+              dataIndex: 'documentoReferencia',
+              width: 140,
+              render: (v: string) => v || '-',
             },
             {
               title: 'Vínculo',
@@ -313,6 +359,41 @@ export default function OitoD() {
                 rules={[{ required: true, message: 'Informe a origem.' }]}
               >
                 <Select options={ORIGENS_8D} />
+              </Form.Item>
+            </Col>
+          </Row>
+          {origem === 'OUTROS' && (
+            <Form.Item
+              name="origemOutros"
+              label="Especifique a origem"
+              rules={[{ required: true, message: 'Informe a origem.' }]}
+            >
+              <Input maxLength={120} />
+            </Form.Item>
+          )}
+          <Row gutter={12}>
+            <Col span={12}>
+              {/* Numero do documento que motivou a abertura (RNC, relatorio,
+                  e-mail...). Opcional: nem toda abertura tem documento. */}
+              <Form.Item
+                name="documentoReferencia"
+                label="Documento referenciado"
+              >
+                <Input maxLength={120} placeholder="Nº do documento" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Anexar documento">
+                <Upload
+                  multiple
+                  fileList={arquivos}
+                  // O arquivo so sobe depois que o documento e numerado: aqui
+                  // ele fica retido na lista.
+                  beforeUpload={() => false}
+                  onChange={({ fileList }) => setArquivos(fileList)}
+                >
+                  <Button icon={<UploadOutlined />}>Escolher arquivo</Button>
+                </Upload>
               </Form.Item>
             </Col>
           </Row>

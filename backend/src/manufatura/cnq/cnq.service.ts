@@ -8,7 +8,7 @@ import { numeroManufatura } from '../manufatura-utils';
 
 const includeCnq = {
   maquina: { select: { id: true, codigo: true, nome: true, area: true } },
-  tipoDefeito: { select: { id: true, nome: true } },
+  tipoDefeito: { select: { id: true, nome: true, exigeDetalhe: true } },
   criadoPor: { select: { id: true, nome: true } },
   oitoDs: { select: { id: true, numero: true, status: true } },
   cincoGs: { select: { id: true, numero: true, status: true } },
@@ -68,6 +68,19 @@ export class CnqService {
     };
   }
 
+  // Texto livre do defeito, so quando o tipo escolhido pede detalhe ("Outros").
+  // Trocar de "Outros" para um defeito da lista limpa o texto, senao ele ficaria
+  // pendurado no lancamento contando uma historia que nao e mais a dele.
+  private async detalheDoDefeito(dto: any) {
+    if (!dto.tipoDefeitoId) return null;
+    const tipo = await this.prisma.tipoDefeito.findUnique({
+      where: { id: dto.tipoDefeitoId },
+      select: { exigeDetalhe: true },
+    });
+    if (!tipo?.exigeDetalhe) return null;
+    return String(dto.defeitoOutros ?? '').trim() || null;
+  }
+
   async criar(dto: any, usuarioId: number) {
     const data = dto.data ? new Date(dto.data) : new Date();
     const ano = data.getFullYear();
@@ -91,6 +104,7 @@ export class CnqService {
             itemCodigo: dto.itemCodigo,
             itemDescricao: dto.itemDescricao ?? null,
             tipoDefeitoId: dto.tipoDefeitoId,
+            defeitoOutros: await this.detalheDoDefeito(dto),
             ...valores,
             observacoes: dto.observacoes ?? null,
             acao: dto.acao ?? null,
@@ -122,6 +136,10 @@ export class CnqService {
         itemCodigo: dto.itemCodigo ?? undefined,
         itemDescricao: dto.itemDescricao ?? undefined,
         tipoDefeitoId: dto.tipoDefeitoId ?? undefined,
+        defeitoOutros: await this.detalheDoDefeito({
+          tipoDefeitoId: dto.tipoDefeitoId ?? atual.tipoDefeitoId,
+          defeitoOutros: dto.defeitoOutros,
+        }),
         ...valores,
         observacoes: dto.observacoes ?? undefined,
         acao: dto.acao ?? undefined,

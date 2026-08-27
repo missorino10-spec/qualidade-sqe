@@ -35,7 +35,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataInput } from '../../formatos';
 import { AuthImage } from '../../components/AuthImage';
+import DocumentoReferenciado from '../../components/DocumentoReferenciado';
 import {
+  DOC_8D,
   ESPINHAS_6M,
   EVID_8D,
   SITUACOES_ACAO,
@@ -416,6 +418,8 @@ export default function OitoDDetalhe() {
 
   const efeito = Form.useWatch('efeito', form);
   const causas6M = Form.useWatch('causas6M', form);
+  // "Outros" so vale escrito: o rotulo sozinho nao diz de onde veio o problema.
+  const origem = Form.useWatch('origem', form);
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ['manufatura-8d', id],
@@ -613,6 +617,28 @@ export default function OitoDDetalhe() {
             <Col xs={12} md={6}>
               <Form.Item name="turno" label="Turno">
                 <Select options={TURNOS_8D} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            {origem === 'OUTROS' && (
+              <Col xs={24} md={8}>
+                <Form.Item name="origemOutros" label="Especifique a origem">
+                  <Input maxLength={120} />
+                </Form.Item>
+              </Col>
+            )}
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="documentoReferencia"
+                label="Documento referenciado"
+              >
+                <Input maxLength={120} placeholder="Nº do documento" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label="Arquivo do documento">
+                <DocumentoReferenciado entidadeTipo={DOC_8D} entidadeId={id} />
               </Form.Item>
             </Col>
           </Row>

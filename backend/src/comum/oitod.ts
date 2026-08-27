@@ -142,3 +142,8 @@ export const EVID_8D = {
   estratificacao: 'OITO_D_PARETO',
   resultados: 'OITO_D_RESULTADOS',
 } as const;
+
+// Documento que motivou a abertura (RNC, relatorio, e-mail...). Fica FORA de
+// EVID_8D de proposito: aqueles sao os quadros de foto dos passos, e este e um
+// arquivo qualquer, que nao entra em quadro nenhum.
+export const DOC_8D = 'OITO_D_DOC';

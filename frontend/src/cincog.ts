@@ -126,3 +126,6 @@ export function restauracoesPendentes(avaliacoes: unknown): any[] {
 export const EVID_5G = {
   evidencias: 'CINCO_G_EVID',
 } as const;
+
+// Documento que motivou a abertura. Fora de EVID_5G: nao e foto de evidencia.
+export const DOC_5G = 'CINCO_G_DOC';

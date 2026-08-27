@@ -34,7 +34,24 @@ const LABEL_ORIGEM: Record<string, string> = {
   PRODUCAO: 'Produção',
   INSPECAO_EXTRA: 'Inspeção Extra',
   SETUP: 'Setup',
+  RNC: 'RNC',
+  OUTROS: 'Outros',
 };
+
+// Em OUTROS o que interessa e o que foi digitado; o rotulo "Outros" sozinho nao
+// diz nada a quem le o documento.
+function textoOrigem(reg: any) {
+  const rotulo = LABEL_ORIGEM[reg?.origem] ?? txt(reg?.origem);
+  const livre = txt(reg?.origemOutros);
+  return reg?.origem === 'OUTROS' && livre ? livre : rotulo;
+}
+
+// Numero do documento e nomes dos arquivos anexados, no mesmo campo. Os dois
+// sao opcionais: sem nenhum dos dois o campo sai com traco, como os demais.
+function textoDocumento(reg: any, docs: string[] = []): string {
+  const partes = [txt(reg?.documentoReferencia), ...docs.map((d) => txt(d))];
+  return partes.filter(Boolean).join(' — ') || '-';
+}
 
 const LABEL_TURNO: Record<string, string> = {
   COMERCIAL: 'Comercial',
@@ -85,6 +102,9 @@ export type FotosOitoD = Partial<Record<keyof typeof EVID_8D, Buffer[]>>;
 export function gerarPdfOitoD(
   d8: any,
   fotos: FotosOitoD = {},
+  // Nomes dos arquivos anexados como documento de referencia: o PDF nao carrega
+  // o arquivo, so registra que ele existe e como se chama.
+  docs: string[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   let y = 0;
@@ -489,7 +509,7 @@ export function gerarPdfOitoD(
     {
       w: W - 180 - 120 - 110,
       label: 'ORIGEM',
-      valor: LABEL_ORIGEM[d8.origem] ?? txt(d8.origem),
+      valor: textoOrigem(d8),
     },
   ]);
   linha([
@@ -503,8 +523,16 @@ export function gerarPdfOitoD(
     { w: W - 160 - 150 - 80, label: 'QTD. AFETADA', valor: txt(d8.qtdAfetada) },
   ]);
   linha([
-    { w: W / 2, label: 'INSPEÇÃO VINCULADA', valor: txt(d8.inspecao?.numero) || '-' },
-    { w: W / 2, label: 'CNQ VINCULADO', valor: txt(d8.cnq?.numero) || '-' },
+    {
+      // Documento que motivou a abertura. O numero e digitado no formulario e o
+      // arquivo fica nos anexos: aqui saem os dois, para quem le o PDF saber o
+      // que procurar.
+      w: W - 320,
+      label: 'DOCUMENTO REFERENCIADO',
+      valor: textoDocumento(d8, docs),
+    },
+    { w: 160, label: 'INSPEÇÃO VINCULADA', valor: txt(d8.inspecao?.numero) || '-' },
+    { w: 160, label: 'CNQ VINCULADO', valor: txt(d8.cnq?.numero) || '-' },
   ]);
 
   // ------------------------------------------------------------- passo 1

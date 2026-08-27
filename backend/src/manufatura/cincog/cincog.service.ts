@@ -28,6 +28,8 @@ const includeCincoG = {
 const CAMPOS = [
   'status',
   'origem',
+  'origemOutros',
+  'documentoReferencia',
   'turno',
   'produtoItem',
   'codigoDesenho',

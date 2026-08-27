@@ -1,7 +1,7 @@
 import { ModuloSistema } from '@prisma/client';
 import { EVID } from '../comum/inspecao';
-import { EVID_8D } from '../comum/oitod';
-import { EVID_5G } from '../comum/cincog';
+import { DOC_8D, EVID_8D } from '../comum/oitod';
+import { DOC_5G, EVID_5G } from '../comum/cincog';
 import { DESVIO } from '../comum/desvio-qualidade';
 import {
   TIPO_ANEXO_RELATORIO,
@@ -44,6 +44,9 @@ export const MODULO_DA_ENTIDADE: Record<string, ModuloSistema> = {
   [EVID_8D.estratificacao]: ModuloSistema.MANUFATURA,
   [EVID_8D.resultados]: ModuloSistema.MANUFATURA,
   [EVID_5G.evidencias]: ModuloSistema.MANUFATURA,
+  // Documento que motivou a abertura do 8D / 5G
+  [DOC_8D]: ModuloSistema.MANUFATURA,
+  [DOC_5G]: ModuloSistema.MANUFATURA,
 
   // SQD
   [TIPO_ANEXO_RELATORIO]: ModuloSistema.SQD,

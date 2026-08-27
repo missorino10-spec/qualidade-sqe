@@ -35,7 +35,24 @@ const LABEL_ORIGEM: Record<string, string> = {
   PRODUCAO: 'Produção',
   INSPECAO_EXTRA: 'Inspeção Extra',
   SETUP: 'Setup',
+  RNC: 'RNC',
+  OUTROS: 'Outros',
 };
+
+// Em OUTROS o que interessa e o que foi digitado; o rotulo "Outros" sozinho nao
+// diz nada a quem le o documento.
+function textoOrigem(reg: any): string {
+  const rotulo = LABEL_ORIGEM[reg?.origem] ?? txt(reg?.origem);
+  const livre = txt(reg?.origemOutros);
+  return reg?.origem === 'OUTROS' && livre ? livre : rotulo;
+}
+
+// Numero do documento e nomes dos arquivos anexados, no mesmo campo. Os dois
+// sao opcionais: sem nenhum dos dois o campo sai com traco, como os demais.
+function textoDocumento(reg: any, docs: string[] = []): string {
+  const partes = [txt(reg?.documentoReferencia), ...docs.map((d) => txt(d))];
+  return partes.filter(Boolean).join(' — ') || '-';
+}
 
 const LABEL_TURNO: Record<string, string> = {
   COMERCIAL: 'Comercial',
@@ -64,6 +81,9 @@ export type FotosCincoG = Partial<Record<keyof typeof EVID_5G, Buffer[]>>;
 export function gerarPdfCincoG(
   reg: any,
   fotos: FotosCincoG = {},
+  // Nomes dos arquivos anexados como documento de referencia: o PDF nao carrega
+  // o arquivo, so registra que ele existe e como se chama.
+  docs: string[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   let y = 0;
@@ -345,7 +365,7 @@ export function gerarPdfCincoG(
     {
       w: W - 180 - 120 - 110,
       label: 'ORIGEM',
-      valor: LABEL_ORIGEM[reg.origem] ?? txt(reg.origem),
+      valor: textoOrigem(reg),
     },
   ]);
   linha([
@@ -358,8 +378,16 @@ export function gerarPdfCincoG(
     },
   ]);
   linha([
-    { w: W / 2, label: 'INSPEÇÃO VINCULADA', valor: txt(reg.inspecao?.numero) || '-' },
-    { w: W / 2, label: 'CNQ VINCULADO', valor: txt(reg.cnq?.numero) || '-' },
+    {
+      // Documento que motivou a abertura. O numero e digitado no formulario e o
+      // arquivo fica nos anexos: aqui saem os dois, para quem le o PDF saber o
+      // que procurar.
+      w: W - 320,
+      label: 'DOCUMENTO REFERENCIADO',
+      valor: textoDocumento(reg, docs),
+    },
+    { w: 160, label: 'INSPEÇÃO VINCULADA', valor: txt(reg.inspecao?.numero) || '-' },
+    { w: 160, label: 'CNQ VINCULADO', valor: txt(reg.cnq?.numero) || '-' },
   ]);
 
   // ---------------------------------------------------------- problema

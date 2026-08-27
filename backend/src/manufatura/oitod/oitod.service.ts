@@ -30,6 +30,8 @@ const CAMPOS = [
   'produtoItem',
   'codigoDesenho',
   'origem',
+  'origemOutros',
+  'documentoReferencia',
   'local',
   'processoOperacao',
   'equipamento',
