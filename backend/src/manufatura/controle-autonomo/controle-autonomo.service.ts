@@ -103,8 +103,8 @@ export class ControleAutonomoService {
   }
 
   // As linhas sao atualizadas no lugar, uma a uma pelo numero, e nunca
-  // apagadas e recriadas: a foto de evidencia aponta para o id da LINHA, e
-  // recriar a linha desligaria a foto do checklist.
+  // apagadas e recriadas: assim o id de cada verificacao continua o mesmo ao
+  // longo das correcoes da auditoria.
   async atualizar(id: number, dto: any) {
     await this.detalhe(id);
     const { itens, nota, classificacao } = montarItensIcaq(dto.itens);
@@ -126,14 +126,11 @@ export class ControleAutonomoService {
   }
 
   async remover(id: number) {
-    const reg = await this.detalhe(id);
-    // O anexo e uma tabela generica: apagar a auditoria leva as linhas junto
-    // (cascade), mas as fotos delas ficariam soltas se nao forem apagadas aqui.
+    await this.detalhe(id);
+    // O anexo e uma tabela generica: as fotos da auditoria ficariam soltas se
+    // nao forem apagadas aqui.
     await this.prisma.anexo.deleteMany({
-      where: {
-        entidadeTipo: FOTO_ICAQ,
-        entidadeId: { in: reg.itens.map((i) => i.id) },
-      },
+      where: { entidadeTipo: FOTO_ICAQ, entidadeId: id },
     });
     await this.prisma.controleAutonomo.delete({ where: { id } });
     return { ok: true };

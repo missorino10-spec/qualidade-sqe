@@ -53,30 +53,20 @@ export class ControleAutonomoController {
     private storage: StorageService,
   ) {}
 
-  // As fotos de evidencia ficam presas ao id da LINHA do checklist; o PDF as
-  // quer pelo numero da verificacao, entao a traducao acontece aqui.
-  private async fotosDaAuditoria(itens: any[]): Promise<FotosIcaq> {
-    const porId = new Map<number, number>();
-    for (const i of itens) porId.set(i.id, i.numero);
-    if (!porId.size) return {};
-
+  // As fotos de evidencia sao da auditoria inteira, nao de cada verificacao:
+  // entram num bloco unico no fim do PDF.
+  private async fotosDaAuditoria(id: number): Promise<FotosIcaq> {
     const anexos = await this.prisma.anexo.findMany({
-      where: {
-        entidadeTipo: FOTO_ICAQ as any,
-        entidadeId: { in: [...porId.keys()] },
-      },
+      where: { entidadeTipo: FOTO_ICAQ as any, entidadeId: id },
       orderBy: { createdAt: 'asc' },
     });
 
-    const fotos: FotosIcaq = {};
+    const fotos: FotosIcaq = [];
     for (const a of anexos) {
       if (!a.mimeType?.startsWith('image/')) continue;
-      const numero = porId.get(a.entidadeId);
-      if (!numero) continue;
-      const lista = (fotos[numero] ??= []);
-      if (lista.length >= 4) continue;
+      if (fotos.length >= 4) break;
       const bytes = await this.storage.baixarOuNulo(a.caminho);
-      if (bytes) lista.push(bytes);
+      if (bytes) fotos.push(bytes);
     }
     return fotos;
   }
@@ -109,7 +99,7 @@ export class ControleAutonomoController {
   @Get(':id/pdf')
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const reg = await this.service.detalhe(id);
-    const fotos = await this.fotosDaAuditoria(reg.itens);
+    const fotos = await this.fotosDaAuditoria(id);
     const nomeArquivo = `${(reg.numero ?? `icaq-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);

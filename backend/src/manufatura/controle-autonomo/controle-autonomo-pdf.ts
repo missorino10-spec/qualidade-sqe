@@ -46,12 +46,12 @@ function fmtNumero(v: number, casas: number): string {
   });
 }
 
-// Fotos de evidencia, indexadas pelo NUMERO da linha do checklist.
-export type FotosIcaq = Record<number, Buffer[]>;
+// Fotos de evidencia da auditoria inteira, em um bloco unico no fim.
+export type FotosIcaq = Buffer[];
 
 export function gerarPdfControleAutonomo(
   reg: any,
-  fotos: FotosIcaq = {},
+  fotos: FotosIcaq = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   let y = 0;
@@ -408,16 +408,10 @@ export function gerarPdfControleAutonomo(
   );
 
   // ------------------------------------------------------------ evidencias
-  const comFoto = (reg.itens ?? []).filter(
-    (i: any) => (fotos[i.numero] ?? []).length,
-  );
-  if (comFoto.length) {
+  if (fotos.length) {
     y += 5;
-    faixa('EVIDÊNCIAS');
-    for (const i of comFoto) {
-      quadroFotos(`Item ${i.numero} — ${i.verificacao}`, fotos[i.numero]);
-      y += 4;
-    }
+    faixa('EVIDÊNCIAS FOTOGRÁFICAS');
+    quadroFotos('Fotos da auditoria', fotos);
   }
 
   // ------------------------------------------- criterio e ponderacao

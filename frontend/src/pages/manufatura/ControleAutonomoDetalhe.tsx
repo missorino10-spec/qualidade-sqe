@@ -45,8 +45,9 @@ import {
 // checklist vao juntos num unico salvamento. A nota e a classificacao aparecem
 // enquanto o auditor marca as linhas, com a mesma conta que o servidor faz.
 //
-// As fotos de evidencia so podem subir depois: elas se prendem ao id da LINHA
-// do checklist, que so existe quando a auditoria e gravada.
+// As fotos de evidencia sao da auditoria inteira, num espaco unico no fim da
+// tela, e so podem subir depois: elas se prendem ao id da auditoria, que so
+// existe quando ela e gravada.
 
 type Resposta = { resultado?: string; evidencia?: string; responsavel?: string };
 
@@ -58,9 +59,9 @@ export default function ControleAutonomoDetalhe() {
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
   const [respostas, setRespostas] = useState<Record<number, Resposta>>({});
-  // Fotos escolhidas antes de gravar, por numero de verificacao. Ficam retidas
-  // aqui porque o anexo precisa do id da linha, que so existe depois do POST.
-  const [fotos, setFotos] = useState<Record<number, any[]>>({});
+  // Fotos escolhidas antes de gravar. Ficam retidas aqui porque o anexo precisa
+  // do id da auditoria, que so existe depois do POST.
+  const [fotos, setFotos] = useState<any[]>([]);
 
   const { data: modelo } = useQuery<VerificacaoIcaq[]>({
     queryKey: ['icaq-modelo'],
@@ -124,18 +125,10 @@ export default function ControleAutonomoDetalhe() {
     }));
   }
 
-  // Id da linha gravada, por numero da verificacao: e a chave do anexo.
-  const idDaLinha = (registro: any, numero: number) =>
-    (registro?.itens ?? []).find((i: any) => i.numero === numero)?.id;
-
   async function enviarFotosPendentes(registro: any) {
-    for (const [numero, arquivos] of Object.entries(fotos)) {
-      if (!arquivos?.length) continue;
-      const linhaId = idDaLinha(registro, Number(numero));
-      if (!linhaId) continue;
-      await enviarFotosEvidencia(arquivos, FOTO_ICAQ, linhaId);
-    }
-    setFotos({});
+    if (!fotos.length) return;
+    await enviarFotosEvidencia(fotos, FOTO_ICAQ, registro.id);
+    setFotos([]);
   }
 
   async function salvar() {
@@ -333,7 +326,6 @@ export default function ControleAutonomoDetalhe() {
           {linhas.map((l) => {
             const r = respostas[l.numero] ?? {};
             const pontos = pontosDaLinha(linhas, l.dimensao, r.resultado);
-            const linhaId = idDaLinha(reg, l.numero);
             return (
               <Card
                 key={l.numero}
@@ -400,32 +392,38 @@ export default function ControleAutonomoDetalhe() {
                       }
                     />
                   </Col>
-                  <Col xs={24}>
-                    {/* A foto e sempre opcional. */}
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Fotos de evidência (opcional)
-                    </Typography.Text>
-                    {linhaId && (
-                      <div style={{ margin: '8px 0' }}>
-                        <FotosEvidenciaSalvas
-                          entidadeTipo={FOTO_ICAQ}
-                          entidadeId={linhaId}
-                        />
-                      </div>
-                    )}
-                    <UploadFotosEvidencia
-                      fotos={fotos[l.numero] ?? []}
-                      setFotos={(f) =>
-                        setFotos((atual) => ({ ...atual, [l.numero]: f }))
-                      }
-                    />
-                  </Col>
                 </Row>
               </Card>
             );
           })}
         </Space>
       </Card>
+
+      {/* Um espaco unico para as fotos da auditoria inteira, sempre opcional:
+          o auditor fotografa o que precisar ao fechar a visita, sem ter que
+          decidir a qual das dez linhas cada foto pertence. */}
+      <Card title="Fotos de evidência (opcional)">
+        {!novo && (
+          <div style={{ marginBottom: 12 }}>
+            <FotosEvidenciaSalvas entidadeTipo={FOTO_ICAQ} entidadeId={Number(id)} />
+          </div>
+        )}
+        <UploadFotosEvidencia fotos={fotos} setFotos={setFotos} />
+      </Card>
+
+      {/* O mesmo botao do topo, repetido aqui: a auditoria termina na ultima
+          pergunta e a inspetora fecha sem ter que rolar a tela de volta. */}
+      <Row justify="end">
+        <Button
+          type="primary"
+          size="large"
+          icon={<SaveOutlined />}
+          loading={salvando}
+          onClick={salvar}
+        >
+          {novo ? 'Lançar auditoria' : 'Salvar'}
+        </Button>
+      </Row>
     </Space>
   );
 }
