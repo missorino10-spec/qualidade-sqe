@@ -22,6 +22,7 @@ import { CnqModule } from './manufatura/cnq/cnq.module';
 import { OitoDModule } from './manufatura/oitod/oitod.module';
 import { CincoGModule } from './manufatura/cincog/cincog.module';
 import { AlertasModule } from './manufatura/alertas/alertas.module';
+import { ControleAutonomoModule } from './manufatura/controle-autonomo/controle-autonomo.module';
 import { PainelManufaturaModule } from './manufatura/painel/painel.module';
 import { HomologacoesModule } from './sqd/homologacoes/homologacoes.module';
 import { HomologacoesItensModule } from './sqd/homologacoes-itens/homologacoes-itens.module';
@@ -65,6 +66,7 @@ const servirFrontend = existsSync(frontendDir);
     OitoDModule,
     CincoGModule,
     AlertasModule,
+    ControleAutonomoModule,
     PainelManufaturaModule,
     HomologacoesModule,
     HomologacoesItensModule,

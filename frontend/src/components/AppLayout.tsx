@@ -21,6 +21,7 @@ import {
   ColumnWidthOutlined,
   DatabaseOutlined,
   TeamOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -80,6 +81,11 @@ const itensMenu: {
         key: '/manufatura/inspecoes/producao',
         icon: <AuditOutlined />,
         label: 'Inspeção de Produção',
+      },
+      {
+        key: '/manufatura/controle-autonomo',
+        icon: <CheckSquareOutlined />,
+        label: 'Controle Autônomo',
       },
       { key: '/manufatura/cnq', icon: <DollarOutlined />, label: 'CNQ' },
       { key: '/manufatura/8d', icon: <FileProtectOutlined />, label: '8D / 5G' },

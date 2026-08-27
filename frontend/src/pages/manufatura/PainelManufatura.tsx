@@ -67,6 +67,7 @@ export default function PainelManufatura() {
 
   const ind = kpis?.indicadores ?? {};
   const cont = kpis?.contadores ?? {};
+  const icaq = kpis?.icaq ?? {};
 
   const podeAdmin = usuario?.papel === 'ADMIN' || usuario?.papel === 'QUALIDADE';
 
@@ -192,6 +193,98 @@ export default function PainelManufatura() {
           </Col>
         ))}
       </Row>
+
+      {/* ICAQ — como esta o programa de controle autonomo no periodo. Os dois
+          rankings saem da PIOR nota para a melhor: quem precisa de atencao
+          aparece primeiro. */}
+      <Card title="ICAQ — Controle Autônomo da Qualidade">
+        <Row gutter={[16, 16]}>
+          {[
+            { t: 'Auditorias no período', v: icaq.auditorias },
+            {
+              t: 'Nota média',
+              v: icaq.notaMedia,
+              sufixo: '%',
+              casas: 1,
+            },
+            {
+              t: 'Dentro do padrão',
+              v: icaq.pctConforme,
+              sufixo: '%',
+              casas: 1,
+              cor: '#3f8600',
+            },
+            {
+              t: 'Fora do padrão',
+              v: icaq.pctForaDoPadrao,
+              sufixo: '%',
+              casas: 1,
+              cor: '#cf1322',
+            },
+            { t: 'Conformes', v: icaq.conformes, cor: '#3f8600' },
+            { t: 'Em atenção', v: icaq.atencao, cor: '#D37119' },
+            { t: 'Não conformes', v: icaq.naoConformes, cor: '#cf1322' },
+          ].map((c) => (
+            <Col xs={12} sm={8} lg={6} key={c.t}>
+              <Card size="small" style={{ height: '100%' }}>
+                <Statistic
+                  title={c.t}
+                  value={c.v ?? 0}
+                  {...separadoresBR}
+                  suffix={c.sufixo}
+                  precision={c.casas}
+                  loading={isLoading}
+                  valueStyle={c.cor ? { color: c.cor } : undefined}
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          {[
+            { titulo: 'Por operador auditado', coluna: 'Operador auditado', dados: icaq.porOperador },
+            { titulo: 'Por equipamento', coluna: 'Equipamento', dados: icaq.porEquipamento },
+          ].map((bloco) => (
+            <Col xs={24} lg={12} key={bloco.titulo}>
+              <Card size="small" title={bloco.titulo}>
+                <Tabela
+                  rowKey="nome"
+                  size="small"
+                  loading={isLoading}
+                  dataSource={bloco.dados}
+                  pagination={false}
+                  scroll={{ x: 'max-content' }}
+                  locale={{ emptyText: 'Nenhuma auditoria no período' }}
+                  columns={[
+                    { title: bloco.coluna, dataIndex: 'nome' },
+                    {
+                      title: 'Auditorias',
+                      dataIndex: 'auditorias',
+                      width: 100,
+                      align: 'center',
+                    },
+                    {
+                      title: 'Nota média',
+                      dataIndex: 'notaMedia',
+                      width: 110,
+                      align: 'right',
+                      render: (v: number) => <strong>{(v ?? 0).toFixed(1)}%</strong>,
+                    },
+                    {
+                      title: 'Conforme',
+                      dataIndex: 'pctConforme',
+                      width: 110,
+                      align: 'right',
+                      render: (v: number) => `${(v ?? 0).toFixed(1)}%`,
+                    },
+                  ]}
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
       <Card title="Defeitos mais recorrentes">
         <Tabela

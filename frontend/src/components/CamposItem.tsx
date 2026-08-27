@@ -316,11 +316,17 @@ export function CamposItem({
  * Entregas). A busca e feita no servidor porque a base tem ~14.400 codigos:
  * baixar tudo para filtrar no navegador travava a tela.
  */
-export function SelectItem(props: {
+export function SelectItem({
+  atual,
+  ...props
+}: {
   value?: number;
   onChange?: (v?: number) => void;
   allowClear?: boolean;
   placeholder?: string;
+  /** Item ja gravado no registro. Sem ele, ao abrir um registro para edicao o
+   *  campo mostraria o id cru: a busca comeca vazia e o item nao esta na lista. */
+  atual?: { value: number; label: string };
 }) {
   const [termo, setTermo] = useState('');
   const { data, isFetching } = useQuery<ItemDaBase[]>({
@@ -328,6 +334,12 @@ export function SelectItem(props: {
     queryFn: async () =>
       (await api.get('/itens', { params: { busca: termo, limite: 30 } })).data,
   });
+
+  const opcoes = (data ?? []).map((i) => ({
+    value: i.id,
+    label: `${i.codigo} — ${i.descricao}`,
+  }));
+  if (atual && !opcoes.some((o) => o.value === atual.value)) opcoes.unshift(atual);
 
   return (
     <Select
@@ -338,10 +350,7 @@ export function SelectItem(props: {
       loading={isFetching}
       placeholder={props.placeholder ?? 'Digite o código ou a descrição'}
       notFoundContent={isFetching ? 'Buscando...' : 'Nenhum item encontrado'}
-      options={(data ?? []).map((i) => ({
-        value: i.id,
-        label: `${i.codigo} — ${i.descricao}`,
-      }))}
+      options={opcoes}
     />
   );
 }

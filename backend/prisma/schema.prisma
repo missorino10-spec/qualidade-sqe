@@ -73,6 +73,9 @@ model Usuario {
   alertasEncerrados  AlertaQualidade[] @relation("AlertaEncerradoPor")
   renovacoesAlerta   RenovacaoAlerta[] @relation("RenovacaoAlertaCriadoPor")
 
+  icaqAuditados ControleAutonomo[] @relation("IcaqAuditor")
+  icaqCriados   ControleAutonomo[] @relation("IcaqCriadoPor")
+
   // SQD
   homologacoes           HomologacaoFornecedor[] @relation("HomologacaoCriadoPor")
   homologacoesItem       HomologacaoItem[]       @relation("HomologacaoItemCriadoPor")
@@ -205,10 +208,11 @@ model Item {
   fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
   createdAt    DateTime    @default(now())
 
-  entregas        EntregaPortaria[]
-  inspecoesVisual InspecaoVisual[]
-  inspecoesLote   InspecaoLote[]
-  rncs            Rnc[]
+  entregas          EntregaPortaria[]
+  inspecoesVisual   InspecaoVisual[]
+  inspecoesLote     InspecaoLote[]
+  rncs              Rnc[]
+  controlesAutonomo ControleAutonomo[]
 }
 
 // Tabela de referencia de periodicidade por classificacao (pre-setada e editavel)
@@ -573,12 +577,13 @@ model Maquina {
   ativa     Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  producaoDiaria  ProducaoDiaria[]
-  inspecoes       InspecaoManufatura[]
-  inspecoesVisual InspecaoVisualManufatura[]
-  cnqs            Cnq[]
-  historico       HistoricoMaquina[]
-  alertas         AlertaQualidade[]
+  producaoDiaria    ProducaoDiaria[]
+  inspecoes         InspecaoManufatura[]
+  inspecoesVisual   InspecaoVisualManufatura[]
+  cnqs              Cnq[]
+  historico         HistoricoMaquina[]
+  alertas           AlertaQualidade[]
+  controlesAutonomo ControleAutonomo[]
 }
 
 // Apontamento diario que os operadores entregam em papel e a Qualidade digita.
@@ -1086,6 +1091,96 @@ model RenovacaoAlerta {
   createdAt   DateTime @default(now())
 
   @@index([alertaId])
+}
+
+// ICAQ - Auditoria do Controle Autonomo da Qualidade.
+// Espelha o "Checklist ICAQ": 10 verificacoes distribuidas em 4 dimensoes
+// ponderadas. A auditoria e lancada e fechada de uma vez - nao ha rascunho.
+
+// Este formulario e o unico da manufatura que trabalha com os tres turnos de
+// producao; os demais so conhecem Comercial e 2o turno.
+enum TurnoIcaq {
+  PRIMEIRO_TURNO
+  SEGUNDO_TURNO
+  TERCEIRO_TURNO
+  COMERCIAL
+}
+
+// A planilha nao preve "nao aplicavel": ou o requisito foi atendido, ou nao.
+enum ResultadoIcaq {
+  CONFORME
+  NAO_CONFORME
+}
+
+enum ClassificacaoIcaq {
+  CONFORME // 90% a 100%
+  ATENCAO // 80% a 89,99%
+  NAO_CONFORME // abaixo de 80%
+}
+
+model ControleAutonomo {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // ICAQ0001/2026
+  ano        Int
+  sequencial Int
+
+  dataAuditoria DateTime  @db.Date
+  turno         TurnoIcaq @default(COMERCIAL)
+
+  maquinaId Int
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+
+  // O item da lista preenche Produto e Codigo de uma vez.
+  itemId Int?
+  item   Item? @relation(fields: [itemId], references: [id])
+
+  ordemLote String?
+  // Operador auditado e digitado: quem esta na maquina nem sempre tem cadastro.
+  operador  String
+
+  auditorId Int
+  auditor   Usuario @relation("IcaqAuditor", fields: [auditorId], references: [id])
+
+  observacoesIniciais String?
+
+  // Nota de 0 a 100 e classificacao, gravadas no fechamento para o painel nao
+  // ter de recalcular linha a linha.
+  nota          Float             @default(0)
+  classificacao ClassificacaoIcaq @default(NAO_CONFORME)
+
+  itens ItemControleAutonomo[]
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("IcaqCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ano, sequencial])
+  @@index([dataAuditoria])
+}
+
+// Uma linha do checklist. A dimensao, o peso e o texto da verificacao vivem no
+// codigo (icaq-utils.ts) e sao copiados para ca no lancamento, para que uma
+// revisao futura do formulario nao mude a nota de auditoria ja realizada.
+model ItemControleAutonomo {
+  id         Int              @id @default(autoincrement())
+  controleId Int
+  controle   ControleAutonomo @relation(fields: [controleId], references: [id], onDelete: Cascade)
+
+  numero      Int // 1 a 10
+  dimensao    String
+  peso        Float
+  verificacao String
+
+  resultado ResultadoIcaq
+  // Peso da dimensao dividido pelo numero de perguntas dela, e so quando
+  // Conforme. A soma dos dez pontos fecha em 1,00.
+  pontos    Float         @default(0)
+
+  evidencia   String?
+  responsavel String?
+
+  @@unique([controleId, numero])
 }
 
 // Snapshot do trimestre fiscal por maquina: o fechamento congela os numeros

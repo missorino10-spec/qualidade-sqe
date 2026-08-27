@@ -11,11 +11,12 @@ export type PrefixoManufatura =
   | 'PRODV'
   | 'CNQ'
   | '8D'
-  | '5G';
+  | '5G'
+  | 'ICAQ';
 
 // Numeracao dos documentos da manufatura, no mesmo padrao do SQE:
 // SET0001/2026, PROD0001/2026, SETV0001/2026, PRODV0001/2026, CNQ0001/2026,
-// 8D0001/2026, 5G0001/2026.
+// 8D0001/2026, 5G0001/2026, ICAQ0001/2026.
 export function numeroManufatura(
   prefixo: PrefixoManufatura,
   sequencial: number,

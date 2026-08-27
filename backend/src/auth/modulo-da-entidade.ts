@@ -2,6 +2,7 @@ import { ModuloSistema } from '@prisma/client';
 import { EVID } from '../comum/inspecao';
 import { DOC_8D, EVID_8D } from '../comum/oitod';
 import { DOC_5G, EVID_5G } from '../comum/cincog';
+import { FOTO_ICAQ } from '../comum/icaq';
 import { DESVIO } from '../comum/desvio-qualidade';
 import {
   TIPO_ANEXO_RELATORIO,
@@ -47,6 +48,8 @@ export const MODULO_DA_ENTIDADE: Record<string, ModuloSistema> = {
   // Documento que motivou a abertura do 8D / 5G
   [DOC_8D]: ModuloSistema.MANUFATURA,
   [DOC_5G]: ModuloSistema.MANUFATURA,
+  // Foto de evidencia de uma linha do checklist do ICAQ
+  [FOTO_ICAQ]: ModuloSistema.MANUFATURA,
 
   // SQD
   [TIPO_ANEXO_RELATORIO]: ModuloSistema.SQD,

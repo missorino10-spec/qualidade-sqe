@@ -17,6 +17,8 @@ import InspecoesManufatura from './pages/manufatura/InspecoesManufatura';
 import InspecaoManufaturaDetalhe from './pages/manufatura/InspecaoManufaturaDetalhe';
 import InspecaoVisualDetalhe from './pages/manufatura/InspecaoVisualDetalhe';
 import Cnq from './pages/manufatura/Cnq';
+import ControleAutonomo from './pages/manufatura/ControleAutonomo';
+import ControleAutonomoDetalhe from './pages/manufatura/ControleAutonomoDetalhe';
 import OitoD from './pages/manufatura/OitoD';
 import OitoDDetalhe from './pages/manufatura/OitoDDetalhe';
 import CincoGDetalhe from './pages/manufatura/CincoGDetalhe';
@@ -116,6 +118,15 @@ export default function App() {
       <Route
         path="/manufatura/inspecoes/:id"
         element={<Privado modulo="MANUFATURA"><InspecaoManufaturaDetalhe /></Privado>}
+      />
+      <Route
+        path="/manufatura/controle-autonomo"
+        element={<Privado modulo="MANUFATURA"><ControleAutonomo /></Privado>}
+      />
+      {/* ":id" tambem aceita "nova": e a mesma tela, em branco. */}
+      <Route
+        path="/manufatura/controle-autonomo/:id"
+        element={<Privado modulo="MANUFATURA"><ControleAutonomoDetalhe /></Privado>}
       />
       <Route path="/manufatura/cnq" element={<Privado modulo="MANUFATURA"><Cnq /></Privado>} />
       <Route path="/manufatura/8d" element={<Privado modulo="MANUFATURA"><OitoD /></Privado>} />

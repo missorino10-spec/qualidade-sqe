@@ -19,7 +19,7 @@ export class PainelManufaturaService {
     const temPeriodo = !!(de || ate);
 
     // prettier-ignore
-    const [producao, inspecoes, cnqs, oitoDs, cincoGs, maquinas] = await Promise.all([
+    const [producao, inspecoes, cnqs, oitoDs, cincoGs, maquinas, icaqs] = await Promise.all([
       this.prisma.producaoDiaria.findMany({
         where: temPeriodo ? { data: periodo } : {},
         include: { maquina: { select: { id: true, nome: true, area: true } } },
@@ -46,6 +46,15 @@ export class PainelManufaturaService {
         select: { status: true },
       }),
       this.prisma.maquina.findMany({ where: { ativa: true } }),
+      this.prisma.controleAutonomo.findMany({
+        where: temPeriodo ? { dataAuditoria: periodo } : {},
+        select: {
+          nota: true,
+          classificacao: true,
+          operador: true,
+          maquina: { select: { id: true, codigo: true, nome: true } },
+        },
+      }),
     ]);
 
     const pecasProduzidas = producao.reduce((s, p) => s + p.qtdProduzida, 0);
@@ -97,7 +106,51 @@ export class PainelManufaturaService {
       .map((m) => ({ ...m, ppm: calcularPpm(m.produzidas, m.defeitos) }))
       .sort((a, b) => b.ppm - a.ppm);
 
+    // ICAQ: como esta o programa de controle autonomo no periodo. O ranking sai
+    // da PIOR nota para a melhor: quem precisa de atencao aparece primeiro.
+    const somaIcaq = icaqs.reduce((s, a) => s + a.nota, 0);
+    const conformes = icaqs.filter((a) => a.classificacao === 'CONFORME').length;
+    const atencao = icaqs.filter((a) => a.classificacao === 'ATENCAO').length;
+    const naoConformes = icaqs.filter(
+      (a) => a.classificacao === 'NAO_CONFORME',
+    ).length;
+
+    const agrupar = (chave: (a: (typeof icaqs)[number]) => string) => {
+      const mapa = new Map<string, { nome: string; auditorias: number; soma: number; conformes: number }>();
+      for (const a of icaqs) {
+        const nome = chave(a);
+        const atual = mapa.get(nome) ?? { nome, auditorias: 0, soma: 0, conformes: 0 };
+        atual.auditorias++;
+        atual.soma += a.nota;
+        if (a.classificacao === 'CONFORME') atual.conformes++;
+        mapa.set(nome, atual);
+      }
+      return [...mapa.values()]
+        .map((g) => ({
+          nome: g.nome,
+          auditorias: g.auditorias,
+          notaMedia: Math.round((g.soma / g.auditorias) * 10) / 10,
+          pctConforme: pct(g.conformes, g.auditorias),
+        }))
+        .sort((a, b) => a.notaMedia - b.notaMedia);
+    };
+
     return {
+      icaq: {
+        auditorias: icaqs.length,
+        notaMedia: icaqs.length
+          ? Math.round((somaIcaq / icaqs.length) * 10) / 10
+          : 0,
+        conformes,
+        atencao,
+        naoConformes,
+        pctConforme: pct(conformes, icaqs.length),
+        pctForaDoPadrao: pct(atencao + naoConformes, icaqs.length),
+        porOperador: agrupar((a) => a.operador || '(sem operador)'),
+        porEquipamento: agrupar((a) =>
+          a.maquina ? `${a.maquina.codigo} — ${a.maquina.nome}` : '(sem equipamento)',
+        ),
+      },
       indicadores: {
         ppm: calcularPpm(pecasProduzidas, pecasComDefeito),
         pecasProduzidas,
