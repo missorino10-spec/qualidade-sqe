@@ -222,6 +222,102 @@ export class InspecoesManufaturaService {
     return this.detalhe(insp.id);
   }
 
+  // Correcao de um relatorio ja lancado. Nao e reinspecao: e o MESMO
+  // relatorio, com o mesmo numero e a mesma tentativa, sendo consertado -
+  // inclusive o resultado. A reinspecao continua sendo uma medicao nova.
+  async corrigirRelatorio(
+    inspecaoId: number,
+    relatorioId: number,
+    dto: any,
+    usuarioId: number,
+  ) {
+    const atual = await this.prisma.relatorioDimensional.findUnique({
+      where: { id: relatorioId },
+    });
+    if (!atual || atual.inspecaoId !== inspecaoId)
+      throw new NotFoundException('Relatório não encontrado nesta inspeção.');
+
+    const cotas = (dto.cotas ?? (atual.cotas as any) ?? []).map(
+      (c: CotaMaxMin) => calcularCotaMaxMin(c),
+    );
+    const data = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+
+    const relatorio = await this.prisma.relatorioDimensional.update({
+      where: { id: relatorioId },
+      data: {
+        revisao: dto.revisao ?? atual.revisao,
+        dataInspecao: data,
+        origem: dto.origem ?? atual.origem,
+        origemOutros: dto.origemOutros ?? null,
+        itemCodigo: dto.itemCodigo ?? null,
+        itemDescricao: dto.itemDescricao ?? null,
+        desenhoRev: dto.desenhoRev ?? null,
+        desenho: dto.desenho ?? null,
+        desenhoRevisao: dto.desenhoRevisao ?? null,
+        po: dto.po ?? null,
+        qtdInspecionada: dto.qtdInspecionada ?? null,
+        qtdTotal: dto.qtdTotal ?? null,
+        toleranciasNorm: dto.toleranciasNorm ?? null,
+        cotas,
+        inspecaoVisual: dto.inspecaoVisual ?? null,
+        observacoesFinais: dto.observacoesFinais ?? null,
+        resultado: dto.resultado ?? resultadoDimensional(cotas),
+        observacaoResultado: dto.observacaoResultado ?? null,
+        defeitos: dto.defeitos ?? undefined,
+        qtdAfetada: dto.qtdAfetada ?? null,
+        descricaoDesvio: dto.descricaoDesvio ?? null,
+        // Quem corrigiu passa a assinar o relatorio: e ele que responde pelo
+        // que esta escrito la agora.
+        inspetorId: usuarioId,
+      },
+    });
+
+    const insp = await this.prisma.inspecaoManufatura.findUniqueOrThrow({
+      where: { id: inspecaoId },
+      include: { relatorios: { orderBy: { tentativa: 'desc' }, take: 1 } },
+    });
+
+    // O status da inspecao sai sempre da ULTIMA tentativa - corrigir a
+    // primeira nao reabre uma inspecao que a reinspecao ja aprovou.
+    const cabecalho: any = {
+      status: statusPorResultado(insp.relatorios[0].resultado),
+      itemCodigo: relatorio.itemCodigo,
+      itemDescricao: relatorio.itemDescricao,
+      po: relatorio.po,
+    };
+    // A data da inspecao e a da abertura: so a primeira tentativa a define.
+    if (relatorio.tentativa === 1) {
+      const { semana, ano } = semanaAno(data);
+      Object.assign(cabecalho, { dataInspecao: data, semana, ano });
+    }
+    await this.prisma.inspecaoManufatura.update({
+      where: { id: inspecaoId },
+      data: cabecalho,
+    });
+
+    // O indicador de reprovas da maquina conta um por relatorio reprovado.
+    // Se a correcao mudou o veredito, a conta acompanha.
+    const eraReprovado = atual.resultado === 'REPROVADO';
+    const agoraReprovado = relatorio.resultado === 'REPROVADO';
+    if (eraReprovado !== agoraReprovado) {
+      const maquina = await this.prisma.maquina.findUniqueOrThrow({
+        where: { id: insp.maquinaId },
+      });
+      await this.prisma.maquina.update({
+        where: { id: maquina.id },
+        data: {
+          inspecoesReprovadas: agoraReprovado
+            ? maquina.inspecoesReprovadas + 1
+            : Math.max(0, maquina.inspecoesReprovadas - 1),
+        },
+      });
+    }
+
+    return this.detalhe(inspecaoId);
+  }
+
   // Contadores da maquina, atualizados so na abertura da inspecao.
   private async contabilizar(
     maquinaId: number,

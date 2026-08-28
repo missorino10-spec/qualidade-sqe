@@ -158,6 +158,7 @@ export function CamposRelatorio({
   setups,
   fotosDimensional,
   setFotosDimensional,
+  maquinaFixa,
 }: {
   form: any;
   maquinas?: any[];
@@ -170,6 +171,9 @@ export function CamposRelatorio({
   setups?: any[];
   fotosDimensional: any[];
   setFotosDimensional: (f: any[]) => void;
+  // Correcao de relatorio ja lancado: trocar de maquina seria outra inspecao,
+  // nao um conserto do que foi digitado errado.
+  maquinaFixa?: boolean;
 }) {
   const origem = Form.useWatch('origem', form);
   const resultado = Form.useWatch('resultado', form);
@@ -186,6 +190,7 @@ export function CamposRelatorio({
           >
             <Select
               showSearch
+              disabled={maquinaFixa}
               optionFilterProp="label"
               placeholder="Selecione a máquina"
               options={(maquinas ?? []).map((m) => ({

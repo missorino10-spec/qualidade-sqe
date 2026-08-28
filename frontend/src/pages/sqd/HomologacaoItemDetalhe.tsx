@@ -262,14 +262,22 @@ export default function HomologacaoItemDetalhe() {
   // item e o tempo de resposta do fornecedor.
   const salvarInspecao = useMutation({
     mutationFn: async (v: any) => {
-      const res = await api.post(`/sqd/homologacoes-itens/${id}/relatorio`, {
+      const corpo = {
         ...v,
-        tentativa: tentativaEdicao ?? undefined,
         cotas,
         checklistVisual: checklist,
         resultadoAmostras: cotasComDesvio(cotas) ? 'REPROVADO' : 'APROVADO',
         resultadoVisual: resultadoVisual(checklist),
-      });
+      };
+      // Corrigir um relatorio ja lancado tem rota propria (PATCH), aberta a
+      // quem enxerga o modulo. Lancar uma tentativa nova continua sendo POST,
+      // restrito a Qualidade.
+      const res = tentativaEdicao
+        ? await api.patch(
+            `/sqd/homologacoes-itens/${id}/relatorio/${tentativaEdicao}`,
+            corpo,
+          )
+        : await api.post(`/sqd/homologacoes-itens/${id}/relatorio`, corpo);
       // As fotos dos blocos EVIDENCIAS so podem subir depois: elas precisam do
       // id do relatorio da tentativa que acabou de ser gravada.
       if (fotosDimensional.length || fotosVisual.length) {
@@ -659,13 +667,16 @@ export default function HomologacaoItemDetalhe() {
                               )
                             }
                           />
+                          {/* Corrigir o que foi digitado errado nao depende da
+                              Qualidade: quem enxerga o modulo conserta. */}
+                          <Button
+                            size="small"
+                            title="Corrigir esta tentativa"
+                            icon={<EditOutlined />}
+                            onClick={() => abrirInspecao(r.tentativa)}
+                          />
                           {podeEditar && (
                             <>
-                              <Button
-                                size="small"
-                                icon={<EditOutlined />}
-                                onClick={() => abrirInspecao(r.tentativa)}
-                              />
                               <Button
                                 size="small"
                                 danger

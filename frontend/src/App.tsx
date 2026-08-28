@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Fornecedores from './pages/Fornecedores';
 import Itens from './pages/Itens';
+import RegistrosEntrada from './pages/RegistrosEntrada';
 import Inspecoes from './pages/Inspecoes';
 import InspecaoDetalhe from './pages/InspecaoDetalhe';
 import RncLista from './pages/RncLista';
@@ -95,6 +96,7 @@ export default function App() {
       <Route path="/periodicidade" element={<Privado modulo="SQE"><Periodicidade /></Privado>} />
       <Route path="/fornecedores" element={<Privado modulo="CAD_FORNECEDORES"><Fornecedores /></Privado>} />
       <Route path="/itens" element={<Privado modulo="CAD_ITENS"><Itens /></Privado>} />
+      <Route path="/registros-entrada" element={<Privado modulo="SQE"><RegistrosEntrada /></Privado>} />
       <Route path="/inspecoes" element={<Privado modulo="SQE"><Inspecoes /></Privado>} />
       <Route path="/inspecoes/:id" element={<Privado modulo="SQE"><InspecaoDetalhe /></Privado>} />
       <Route path="/rnc" element={<Privado modulo="SQE"><RncLista /></Privado>} />

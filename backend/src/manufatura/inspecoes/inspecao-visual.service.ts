@@ -100,6 +100,40 @@ export class InspecaoVisualManufaturaService {
     );
   }
 
+  // Correcao do que foi digitado errado: o mesmo registro, com o mesmo numero
+  // e a mesma serie. So a maquina fica de fora - trocar de maquina seria outra
+  // inspecao, nao um conserto.
+  async corrigir(id: number, dto: any, usuarioId: number) {
+    const atual = await this.detalhe(id);
+    const data = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+    const { semana } = semanaAno(data);
+
+    await this.prisma.inspecaoVisualManufatura.update({
+      where: { id },
+      data: {
+        revisao: dto.revisao ?? atual.revisao,
+        dataInspecao: data,
+        semana,
+        origem: dto.origem ?? atual.origem,
+        origemOutros: dto.origemOutros ?? null,
+        itemCodigo: dto.itemCodigo ?? null,
+        itemDescricao: dto.itemDescricao ?? null,
+        desenho: dto.desenho ?? null,
+        desenhoRevisao: dto.desenhoRevisao ?? null,
+        po: dto.po ?? null,
+        qtdInspecionada: dto.qtdInspecionada ?? null,
+        qtdTotal: dto.qtdTotal ?? null,
+        observacoes: dto.observacoes ?? null,
+        // Quem corrigiu passa a assinar: e ele que responde pelo que esta
+        // escrito no documento agora.
+        inspetorId: usuarioId,
+      },
+    });
+    return this.detalhe(id);
+  }
+
   async remover(id: number) {
     await this.detalhe(id);
     await this.prisma.inspecaoVisualManufatura.delete({ where: { id } });

@@ -14,11 +14,15 @@ export function CamposVisual({
   maquinas,
   fotos,
   setFotos,
+  maquinaFixa,
 }: {
   form: any;
   maquinas?: any[];
   fotos: any[];
   setFotos: (f: any[]) => void;
+  // Correcao de inspecao ja lancada: trocar de maquina seria outra inspecao,
+  // nao um conserto do que foi digitado errado.
+  maquinaFixa?: boolean;
 }) {
   const origem = Form.useWatch('origem', form);
 
@@ -33,6 +37,7 @@ export function CamposVisual({
           >
             <Select
               showSearch
+              disabled={maquinaFixa}
               optionFilterProp="label"
               placeholder="Selecione a máquina"
               options={(maquinas ?? []).map((m) => ({

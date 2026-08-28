@@ -98,9 +98,17 @@ export class InspecoesService {
     };
   }
 
+  // So as inspecoes de fato realizadas. A chegada sem inspecao (fora do ciclo)
+  // fica no Registro de Entrada, que e onde ela nasce e onde ela termina.
   async listarTodas(fornecedorId?: number) {
     const entregas = await this.prisma.entregaPortaria.findMany({
-      where: fornecedorId ? { fornecedorId } : {},
+      where: {
+        ...(fornecedorId ? { fornecedorId } : {}),
+        OR: [
+          { inspecoesVisual: { some: {} } },
+          { inspecoesLote: { some: {} } },
+        ],
+      },
       include: includeInspecao,
       orderBy: { createdAt: 'desc' },
     });
@@ -206,8 +214,11 @@ export class InspecoesService {
     return criado.id;
   }
 
-  // Registra uma entrega sem inspecao (quando o ciclo de periodicidade nao
-  // exige inspecao neste recebimento). Avanca o contador ciclico.
+  // Registra a chegada da carga. E o ponto de partida de tudo: aqui o ciclo de
+  // periodicidade avanca e o sistema decide se esta entrega vai ser
+  // inspecionada. Fora do ciclo o registro se encerra aqui mesmo; dentro do
+  // ciclo (ou por inspecao extra) a tela leva o inspetor para a inspecao, que
+  // se prende a esta entrega pelo entregaId.
   async registrarRecebimento(dto: any, usuarioId: number) {
     const fornecedor = await this.prisma.fornecedor.findUniqueOrThrow({
       where: { id: dto.fornecedorId },
@@ -217,7 +228,10 @@ export class InspecoesService {
     });
     const frequenciaN = config?.frequenciaN ?? 1;
     const novoContador = fornecedor.contadorEntregas + 1;
-    const passivelInspecao = novoContador >= frequenciaN;
+    // Fornecedor eventual nunca entra no plano: so e inspecionado no extra.
+    const noCiclo =
+      !fornecedor.eventual && novoContador >= frequenciaN;
+    const extra = !noCiclo && !!dto.extra;
 
     const data = dto.dataEntrega ? new Date(dto.dataEntrega) : new Date();
     const { semana, ano } = semanaAno(data);
@@ -233,7 +247,8 @@ export class InspecoesService {
         po: dto.po ?? null,
         quantidade: dto.qtdTotal ?? dto.quantidade ?? null,
         numeroEntregaAcumulado: novoContador,
-        passivelInspecao,
+        passivelInspecao: noCiclo || extra,
+        inspecaoExtra: extra,
         confirmadoPorId: usuarioId,
       },
     });
@@ -242,12 +257,109 @@ export class InspecoesService {
       where: { id: fornecedor.id },
       data: {
         totalEntregas: { increment: 1 },
-        contadorEntregas: passivelInspecao ? 0 : novoContador,
+        // A extra zera o ciclo so quando a inspecao e gravada (contabilizar).
+        contadorEntregas: noCiclo ? 0 : novoContador,
       },
     });
 
-    return { entrega, inspecionado: false, passivelInspecao };
+    return {
+      entrega,
+      noCiclo,
+      extra,
+      // A tela usa isso para decidir se encerra aqui ou abre a inspecao.
+      irParaInspecao: noCiclo || extra,
+    };
   }
+
+  // ------------------------------------------------- registros de entrada
+
+  // Situacao da entrada, do jeito que a lista mostra. Ela sai do que existe de
+  // fato (a inspecao foi gravada?) e nao so da intencao registrada na chegada:
+  // uma entrada que caiu no ciclo mas cuja inspecao foi abandonada no meio
+  // aparece como pendente, nao como inspecionada.
+  private situacaoEntrada(e: any) {
+    const temInspecao = !!(e.inspecoesVisual?.length || e.inspecoesLote?.length);
+    if (temInspecao)
+      return e.inspecaoExtra ? 'INSPECAO_EXTRA' : 'INSPECAO_REALIZADA';
+    if (e.passivelInspecao || e.inspecaoExtra) return 'INSPECAO_PENDENTE';
+    return 'FORA_DO_CICLO';
+  }
+
+  async listarEntradas(fornecedorId?: number) {
+    const entregas = await this.prisma.entregaPortaria.findMany({
+      where: fornecedorId ? { fornecedorId } : {},
+      include: {
+        fornecedor: {
+          select: {
+            id: true,
+            nome: true,
+            codigo: true,
+            classificacaoFornecimento: true,
+            eventual: true,
+          },
+        },
+        item: { select: { id: true, codigo: true, descricao: true } },
+        confirmadoPor: { select: { id: true, nome: true } },
+        inspecoesVisual: { select: { id: true, resultado: true } },
+        inspecoesLote: { select: { id: true, resultado: true } },
+      },
+      orderBy: { dataEntrega: 'desc' },
+    });
+
+    return entregas.map((e) => {
+      const formularios = [...e.inspecoesVisual, ...e.inspecoesLote];
+      return {
+        id: e.id,
+        dataEntrega: e.dataEntrega,
+        semana: e.semana,
+        ano: e.ano,
+        fornecedor: e.fornecedor,
+        item: e.item,
+        notaFiscal: e.notaFiscal,
+        po: e.po,
+        quantidade: e.quantidade,
+        numeroEntregaAcumulado: e.numeroEntregaAcumulado,
+        situacao: this.situacaoEntrada(e),
+        numeroInspecao: e.numeroInspecao,
+        resultado: !formularios.length
+          ? null
+          : formularios.some((f) => f.resultado === 'REPROVADO')
+            ? 'REPROVADO'
+            : 'APROVADO',
+        registradoPor: e.confirmadoPor,
+        createdAt: e.createdAt,
+      };
+    });
+  }
+
+  // Entrada aberta na tela de inspecao: o cabecalho ja vem preenchido com o
+  // que foi informado na chegada, e o inspetor nao redigita nada.
+  async entrada(id: number) {
+    const e = await this.prisma.entregaPortaria.findUnique({
+      where: { id },
+      include: {
+        fornecedor: true,
+        item: { select: { id: true, codigo: true, descricao: true } },
+        inspecoesVisual: { select: { id: true } },
+        inspecoesLote: { select: { id: true } },
+      },
+    });
+    if (!e) throw new NotFoundException('Registro de entrada não encontrado');
+    return {
+      id: e.id,
+      dataEntrega: e.dataEntrega,
+      fornecedor: e.fornecedor,
+      item: e.item,
+      notaFiscal: e.notaFiscal,
+      po: e.po,
+      quantidade: e.quantidade,
+      passivelInspecao: e.passivelInspecao,
+      inspecaoExtra: e.inspecaoExtra,
+      numeroInspecao: e.numeroInspecao,
+      situacao: this.situacaoEntrada(e),
+    };
+  }
+
 
   // Toda inspecao representa uma carga recebida: cria (ou reaproveita, no
   // encadeamento Visual->Lote) a EntregaPortaria correspondente.
@@ -257,7 +369,21 @@ export class InspecoesService {
     dataInsp: Date,
     usuarioId: number,
   ): Promise<number> {
-    if (dto.entregaId) return dto.entregaId;
+    // Entrada que ja existe: veio do Registro de Entrada ou do formulario
+    // anterior da mesma inspecao. O que o inspetor preencheu agora completa o
+    // registro da chegada, que muitas vezes entrou so com o fornecedor.
+    if (dto.entregaId) {
+      await this.prisma.entregaPortaria.update({
+        where: { id: dto.entregaId },
+        data: {
+          itemId,
+          notaFiscal: dto.notaFiscal ?? undefined,
+          po: dto.po ?? undefined,
+          quantidade: dto.qtdTotal ?? undefined,
+        },
+      });
+      return dto.entregaId;
+    }
     const { semana, ano } = semanaAno(dataInsp);
     const entrega = await this.prisma.entregaPortaria.create({
       data: {
@@ -717,6 +843,286 @@ export class InspecoesService {
       numeroInspecao: ctx.entrega.numeroInspecao,
       rnc: rncPendentes ?? rnc,
     };
+  }
+
+  // ----------------------------------------------------------------- edicao
+
+  // Correcao de uma inspecao ja realizada. Nao e reinspecao: aqui se conserta
+  // o que foi digitado errado, entao o numero INSP, a entrega e o fornecedor
+  // ficam de pe e so o conteudo do formulario e reescrito.
+  private camposEditaveis(dto: any, itemId: number, dataInsp: Date) {
+    const { semana, ano } = semanaAno(dataInsp);
+    return {
+      itemId,
+      dataInspecao: dataInsp,
+      semana,
+      ano,
+      desenhoRev: dto.desenhoRev ?? null,
+      desenho: dto.desenho ?? null,
+      revisao: dto.revisao ?? null,
+      toleranciasNorm: dto.toleranciasNorm ?? null,
+      notaFiscal: dto.notaFiscal ?? null,
+      po: dto.po ?? null,
+      qtdInspecionada: dto.qtdInspecionada ?? null,
+      qtdTotal: dto.qtdTotal ?? null,
+      origem: dto.origem ?? 'PLANO_INSPECAO',
+      origemOutros: dto.origemOutros ?? null,
+      observacoes: dto.observacoes ?? null,
+    };
+  }
+
+  // Estado da inspecao ANTES da correcao. O veredito que conta e o do
+  // RECEBIMENTO inteiro: Visual + Dimensional sao uma inspecao so, e e ela que
+  // aparece nos indicadores e que motivou (ou nao) a RNC.
+  private async antesDaEdicao(entregaId: number) {
+    const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
+      where: { id: entregaId },
+      include: {
+        inspecoesVisual: { select: { resultado: true } },
+        inspecoesLote: { select: { resultado: true } },
+        rncs: { select: { id: true, numero: true, status: true } },
+      },
+    });
+    const abertas = entrega.rncs.filter((r) => r.status !== 'CANCELADA');
+    return {
+      entrega,
+      reprovadoAntes: [
+        ...entrega.inspecoesVisual,
+        ...entrega.inspecoesLote,
+      ].some((f) => f.resultado === 'REPROVADO'),
+      jaTemRnc: abertas.length > 0,
+    };
+  }
+
+  // Acerta o que a correcao mexeu fora do formulario: o indicador de lotes
+  // reprovados do fornecedor e a RNC que nasceu do desvio.
+  private async reconciliarEdicao(
+    entregaId: number,
+    reprovadoAntes: boolean,
+    usuarioId: number,
+  ) {
+    const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
+      where: { id: entregaId },
+      include: {
+        inspecoesVisual: { select: { resultado: true } },
+        inspecoesLote: { select: { resultado: true } },
+        rncs: { select: { id: true, numero: true, status: true } },
+        fornecedor: { select: { id: true, lotesReprovados: true } },
+      },
+    });
+    const reprovadoAgora = [
+      ...entrega.inspecoesVisual,
+      ...entrega.inspecoesLote,
+    ].some((f) => f.resultado === 'REPROVADO');
+
+    if (reprovadoAntes !== reprovadoAgora)
+      await this.prisma.fornecedor.update({
+        where: { id: entrega.fornecedorId },
+        data: {
+          lotesReprovados: reprovadoAgora
+            ? { increment: 1 }
+            : // Nunca abaixo de zero: se o historico ja estava torto, a
+              // correcao nao piora a conta do fornecedor.
+              { decrement: Math.min(1, entrega.fornecedor.lotesReprovados) },
+        },
+      });
+
+    // Voltou a ser aprovada: a RNC perde o objeto e e cancelada. O motivo sai
+    // pronto, dizendo qual inspecao foi corrigida, por quem e quando.
+    const rncsCanceladas: string[] = [];
+    if (reprovadoAntes && !reprovadoAgora) {
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { nome: true },
+      });
+      const quando = new Date().toLocaleDateString('pt-BR');
+      const quem = usuario?.nome ?? 'usuário do sistema';
+      for (const r of entrega.rncs) {
+        if (r.status === 'CANCELADA') continue;
+        await this.rnc.cancelar(
+          r.id,
+          `Inspeção ${entrega.numeroInspecao ?? ''} corrigida por ${quem} em ${quando}: o resultado voltou para APROVADO e o desvio que originou esta RNC deixou de existir.`,
+          usuarioId,
+        );
+        rncsCanceladas.push(r.numero);
+      }
+    }
+    return { reprovadoAgora, rncsCanceladas };
+  }
+
+  // A decisao sobre a RNC ja foi tomada quando a inspecao foi salva. Se a
+  // correcao nao traz resposta nova, vale a que estava: sem isso, reabrir e
+  // salvar de novo uma inspecao encerrada como "desvio sem RNC" abriria uma
+  // RNC do nada, so por ter passado pela tela.
+  private decisaoDaEdicao(dto: any, atual: any) {
+    return {
+      ...dto,
+      abrirRnc: dto.abrirRnc ?? (atual.desvioSemRnc ? false : undefined),
+      observacaoDesvio: dto.observacaoDesvio ?? atual.observacaoDesvio,
+    };
+  }
+
+  async editarVisual(id: number, dto: any, usuarioId: number) {
+    const atual = await this.prisma.inspecaoVisual.findUnique({
+      where: { id },
+    });
+    if (!atual) throw new NotFoundException('Inspeção não encontrada');
+    // Toda inspecao nasce de um registro de entrada; sem ele nao da para
+    // reconciliar o veredito do recebimento nem a RNC.
+    if (!atual.entregaId)
+      throw new BadRequestException(
+        'Esta inspeção não tem registro de entrada vinculado e não pode ser corrigida.',
+      );
+    const entregaId = atual.entregaId;
+
+    const checklist = dto.checklist ?? (atual.checklist as any);
+    const apurado = dto.resultado ?? resultadoVisual(checklist);
+    const { reprovadoAntes, jaTemRnc } = await this.antesDaEdicao(
+      entregaId,
+    );
+    const decisao = this.decisaoDaEdicao(dto, atual);
+    // Encerrar com desvio e sem RNC continua exigindo justificativa: o
+    // relatorio corrigido tem que se explicar igual ao original.
+    if (apurado === 'REPROVADO' && !jaTemRnc)
+      await this.exigirJustificativa(decisao, apurado);
+
+    const desvio = this.decidirDesvio(decisao, { jaTemRnc }, apurado);
+    const itemId = await this.resolverItemId({
+      ...dto,
+      fornecedorId: atual.fornecedorId,
+    });
+    const dataInsp = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+
+    const insp = await this.prisma.inspecaoVisual.update({
+      where: { id },
+      data: {
+        ...this.camposEditaveis(dto, itemId, dataInsp),
+        checklist,
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
+      },
+      include: includeFormulario,
+    });
+
+    // A correcao pode ter criado o desvio que nao existia. Nesse caso a RNC
+    // nasce agora, como nasceria se a inspecao tivesse sido salva assim.
+    let rnc: any = null;
+    if (
+      insp.resultado === 'REPROVADO' &&
+      !reprovadoAntes &&
+      !jaTemRnc &&
+      !desvio.semRnc
+    ) {
+      const itens = this.itensReprovados(checklist);
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId: entregaId,
+          inspecaoVisualId: insp.id,
+          fornecedorId: atual.fornecedorId,
+          itemId,
+          notaFiscal: dto.notaFiscal,
+          po: dto.po,
+          quantidadeLote: dto.qtdTotal,
+          quantidadePecas: dto.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.VISUAL,
+          descricaoDesvio:
+            dto.observacoes ||
+            (itens.length
+              ? `Itens reprovados: ${itens.join('; ')}`
+              : 'Não conformidade identificada na inspeção visual.'),
+          disposicao: dto.disposicao ?? null,
+        },
+        usuarioId,
+      );
+    }
+
+    const acerto = await this.reconciliarEdicao(
+      entregaId,
+      reprovadoAntes,
+      usuarioId,
+    );
+    return { inspecao: insp, rnc, ...acerto };
+  }
+
+  async editarLote(id: number, dto: any, usuarioId: number) {
+    const atual = await this.prisma.inspecaoLote.findUnique({ where: { id } });
+    if (!atual) throw new NotFoundException('Inspeção não encontrada');
+    // Toda inspecao nasce de um registro de entrada; sem ele nao da para
+    // reconciliar o veredito do recebimento nem a RNC.
+    if (!atual.entregaId)
+      throw new BadRequestException(
+        'Esta inspeção não tem registro de entrada vinculado e não pode ser corrigida.',
+      );
+    const entregaId = atual.entregaId;
+
+    const cotas = dto.cotas
+      ? dto.cotas.map((c: CotaMaxMin) => calcularCotaMaxMin(c))
+      : (atual.cotas as any);
+    const apurado = dto.resultado ?? resultadoDimensional(cotas);
+    const { reprovadoAntes, jaTemRnc } = await this.antesDaEdicao(
+      entregaId,
+    );
+    const decisao = this.decisaoDaEdicao(dto, atual);
+    if (apurado === 'REPROVADO' && !jaTemRnc)
+      await this.exigirJustificativa(decisao, apurado);
+
+    const desvio = this.decidirDesvio(decisao, { jaTemRnc }, apurado);
+    const itemId = await this.resolverItemId({
+      ...dto,
+      fornecedorId: atual.fornecedorId,
+    });
+    const dataInsp = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+
+    const insp = await this.prisma.inspecaoLote.update({
+      where: { id },
+      data: {
+        ...this.camposEditaveis(dto, itemId, dataInsp),
+        cotas,
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
+      },
+      include: includeFormulario,
+    });
+
+    let rnc: any = null;
+    if (
+      insp.resultado === 'REPROVADO' &&
+      !reprovadoAntes &&
+      !jaTemRnc &&
+      !desvio.semRnc
+    ) {
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId: entregaId,
+          inspecaoLoteId: insp.id,
+          fornecedorId: atual.fornecedorId,
+          itemId,
+          notaFiscal: dto.notaFiscal,
+          po: dto.po,
+          quantidadeLote: dto.qtdTotal,
+          quantidadePecas: dto.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.DIMENSIONAL,
+          descricaoDesvio:
+            dto.observacoes ||
+            'Não conformidade dimensional identificada na inspeção de lote.',
+          disposicao: dto.disposicao ?? null,
+        },
+        usuarioId,
+      );
+    }
+
+    const acerto = await this.reconciliarEdicao(
+      entregaId,
+      reprovadoAntes,
+      usuarioId,
+    );
+    return { inspecao: insp, rnc, ...acerto };
   }
 
   private itensReprovados(checklist: any): string[] {

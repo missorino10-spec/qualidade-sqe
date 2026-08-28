@@ -22,6 +22,7 @@ import {
   DatabaseOutlined,
   TeamOutlined,
   CheckSquareOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -56,6 +57,11 @@ const itensMenu: {
     modulo: 'SQE',
     children: [
       { key: '/', icon: <DashboardOutlined />, label: 'Painel' },
+      {
+        key: '/registros-entrada',
+        icon: <InboxOutlined />,
+        label: 'Registro de Entrada',
+      },
       { key: '/inspecoes', icon: <AuditOutlined />, label: 'Inspeções' },
       { key: '/rnc', icon: <WarningOutlined />, label: 'RNC' },
       {

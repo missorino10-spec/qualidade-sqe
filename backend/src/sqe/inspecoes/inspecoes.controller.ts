@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -40,9 +41,10 @@ import { PermissaoGuard } from '../../auth/permissao.guard';
 // na Manufatura.
 const ORIGENS = ORIGENS_RECEBIMENTO.map((o) => o.value);
 
-class CabecalhoDto {
-  @IsOptional() @Type(() => Number) @IsInt() entregaId?: number;
-  @Type(() => Number) @IsInt() fornecedorId: number;
+// Campos que descrevem o formulario. Ficam separados do fornecedor e da
+// entrega porque a correcao de uma inspecao ja realizada reescreve so estes:
+// a chegada nasce no Registro de Entrada e e ela que manda no ciclo.
+class CamposInspecaoDto {
   @IsOptional() @Type(() => Number) @IsInt() itemId?: number;
   @IsOptional() @IsString() itemCodigo?: string;
   @IsOptional() @IsString() itemDescricao?: string;
@@ -79,6 +81,11 @@ class CabecalhoDto {
   @IsOptional() @IsBoolean() decidirNoFim?: boolean;
 }
 
+class CabecalhoDto extends CamposInspecaoDto {
+  @IsOptional() @Type(() => Number) @IsInt() entregaId?: number;
+  @Type(() => Number) @IsInt() fornecedorId: number;
+}
+
 class CreateVisualDto extends CabecalhoDto {
   @IsOptional() @IsArray() checklist?: any[];
 }
@@ -87,13 +94,12 @@ class CreateLoteDto extends CabecalhoDto {
   @IsOptional() @IsArray() cotas?: any[];
 }
 
-class RecebimentoDto {
-  @Type(() => Number) @IsInt() fornecedorId: number;
-  @IsOptional() @Type(() => Number) @IsInt() itemId?: number;
-  @IsOptional() @IsString() dataEntrega?: string;
-  @IsOptional() @IsString() notaFiscal?: string;
-  @IsOptional() @IsString() po?: string;
-  @IsOptional() @Type(() => Number) @IsNumber() qtdTotal?: number;
+class EditarVisualDto extends CamposInspecaoDto {
+  @IsOptional() @IsArray() checklist?: any[];
+}
+
+class EditarLoteDto extends CamposInspecaoDto {
+  @IsOptional() @IsArray() cotas?: any[];
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
@@ -123,13 +129,6 @@ export class InspecoesController {
   @Get('avaliar')
   avaliar(@Query('fornecedorId', ParseIntPipe) fornecedorId: number) {
     return this.service.avaliarRecebimento(fornecedorId);
-  }
-
-  // Registra recebimento sem inspecao (ciclo de periodicidade nao exige)
-  @Roles('QUALIDADE', 'ADMIN')
-  @Post('recebimento')
-  recebimento(@Body() dto: RecebimentoDto, @CurrentUser() user: AuthUser) {
-    return this.service.registrarRecebimento(dto, user.id);
   }
 
   @Get('visual/:id')
@@ -208,6 +207,26 @@ export class InspecoesController {
   @Post('lote')
   criarLote(@Body() dto: CreateLoteDto, @CurrentUser() user: AuthUser) {
     return this.service.criarLote(dto, user.id);
+  }
+
+  // Correcao de inspecao ja realizada. Sem @Roles de proposito: quem enxerga o
+  // modulo corrige o que digitou errado, sem depender da Qualidade.
+  @Patch('visual/:id')
+  editarVisual(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EditarVisualDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.editarVisual(id, dto, user.id);
+  }
+
+  @Patch('lote/:id')
+  editarLote(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EditarLoteDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.editarLote(id, dto, user.id);
   }
 
   // Exclusao permanente - restrito a ADMIN.

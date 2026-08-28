@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import {
   Button,
   Card,
   Descriptions,
+  Form,
+  Modal,
   Popconfirm,
   Space,
   Spin,
@@ -12,15 +15,21 @@ import {
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  EditOutlined,
   FilePdfOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataBR } from '../../formatos';
-import { FotosEvidenciaSalvas } from '../../components/FotosEvidencia';
+import {
+  FotosEvidenciaSalvas,
+  enviarFotosEvidencia,
+} from '../../components/FotosEvidencia';
 import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
 import { ORIGENS_INSPECAO } from './FormularioDimensional';
+import { CamposVisual } from './FormularioVisual';
 import NomeAssinatura from '../../components/NomeAssinatura';
 
 // Detalhe da INSPECAO VISUAL da Manufatura: documento proprio, sem cotas e sem
@@ -35,6 +44,10 @@ export default function InspecaoVisualDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [form] = Form.useForm();
+  const [open, setOpen] = useState(false);
+  const [fotos, setFotos] = useState<any[]>([]);
+  const [salvando, setSalvando] = useState(false);
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ['manufatura-inspecao-visual', id],
@@ -43,12 +56,64 @@ export default function InspecaoVisualDetalhe() {
     enabled: !!id,
   });
 
+  const { data: maquinas } = useQuery<any[]>({
+    queryKey: ['maquinas'],
+    queryFn: async () => (await api.get('/maquinas')).data,
+  });
+
   if (isLoading || !data)
     return (
       <Card>
         <Spin />
       </Card>
     );
+
+  // Correcao do que foi digitado errado: o mesmo documento, com o mesmo
+  // numero. Nao existe reinspecao no visual - este e o unico caminho.
+  function abrirCorrecao() {
+    form.resetFields();
+    form.setFieldsValue({
+      maquinaId: data.maquinaId,
+      dataInspecao: dayjs(data.dataInspecao).format('YYYY-MM-DD'),
+      revisao: data.revisao ?? '01',
+      origem: data.origem,
+      origemOutros: data.origemOutros ?? undefined,
+      itemCodigo: data.itemCodigo ?? undefined,
+      itemDescricao: data.itemDescricao ?? undefined,
+      desenho: data.desenho ?? undefined,
+      desenhoRevisao: data.desenhoRevisao ?? undefined,
+      po: data.po ?? undefined,
+      qtdInspecionada: data.qtdInspecionada ?? undefined,
+      qtdTotal: data.qtdTotal ?? undefined,
+      observacoes: data.observacoes ?? undefined,
+    });
+    setFotos([]);
+    setOpen(true);
+  }
+
+  async function salvarCorrecao() {
+    const v = await form.validateFields();
+    setSalvando(true);
+    try {
+      await api.patch(`/manufatura/inspecoes-visuais/${id}`, v);
+      if (fotos.length)
+        await enviarFotosEvidencia(
+          fotos,
+          EVID.manufaturaVisualInspecao,
+          Number(id),
+        );
+      message.success(`Inspeção visual ${data.numero} corrigida.`);
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecao-visual', id] });
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecoes-visuais'] });
+      setOpen(false);
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível salvar a correção.',
+      );
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   async function remover() {
     try {
@@ -91,6 +156,9 @@ export default function InspecaoVisualDetalhe() {
         }
         extra={
           <Space>
+            <Button icon={<EditOutlined />} onClick={abrirCorrecao}>
+              Corrigir
+            </Button>
             <Popconfirm
               title="Excluir esta inspeção visual?"
               okText="Excluir"
@@ -184,6 +252,32 @@ export default function InspecaoVisualDetalhe() {
           entidadeId={data.id}
         />
       </Card>
+
+      <Modal
+        open={open}
+        title={`Corrigir inspeção visual ${data.numero}`}
+        width={1000}
+        okText="Salvar correção"
+        cancelText="Cancelar"
+        confirmLoading={salvando}
+        onOk={salvarCorrecao}
+        onCancel={() => setOpen(false)}
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          Este é o mesmo documento: o número não muda. As fotos já enviadas
+          continuam salvas; o que for anexado aqui é acrescentado a elas.
+        </Typography.Paragraph>
+        <Form form={form} layout="vertical">
+          <CamposVisual
+            form={form}
+            maquinas={maquinas}
+            fotos={fotos}
+            setFotos={setFotos}
+            maquinaFixa
+          />
+        </Form>
+      </Modal>
     </Space>
   );
 }

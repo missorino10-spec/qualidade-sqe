@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
@@ -7,6 +7,7 @@ import {
   Col,
   Descriptions,
   Divider,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -25,13 +26,14 @@ import {
 import {
   PlusOutlined,
   DeleteOutlined,
+  EditOutlined,
   FileTextOutlined,
   UploadOutlined,
   UserAddOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
@@ -57,13 +59,11 @@ type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 const corResultado: Record<string, string> = {
   APROVADO: 'green',
   REPROVADO: 'red',
-  SEM_INSPECAO: 'default',
 };
 
 const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
   REPROVADO: 'Reprovado',
-  SEM_INSPECAO: 'Sem inspeção recomendada',
 };
 
 const labelFormulario: Record<string, string> = {
@@ -145,6 +145,7 @@ function ChecklistVisual({
 export default function Inspecoes() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { usuario } = useAuth();
   const isAdmin = usuario?.papel === 'ADMIN';
   const [open, setOpen] = useState(false);
@@ -162,6 +163,18 @@ export default function Inspecoes() {
   const [desvioAnterior, setDesvioAnterior] = useState(false);
   const [rncDaInspecao, setRncDaInspecao] = useState<any | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Toda inspecao nasce de um registro de entrada. Quando a tela e aberta com
+  // "?entrada=<id>" a chegada ja foi registrada la: o fornecedor, a decisao do
+  // ciclo e os dados da carga vem prontos e nao se decide nada de novo aqui.
+  const [entradaVinculada, setEntradaVinculada] = useState<any | null>(null);
+  // Correcao de uma inspecao ja realizada. Nao e reinspecao: e o mesmo
+  // relatorio, com o mesmo numero, sendo consertado. Guarda qual formulario
+  // esta sendo corrigido, porque Visual e Dimensional se corrigem separados.
+  const [edicao, setEdicao] = useState<{
+    tipo: 'VISUAL' | 'LOTE';
+    id: number;
+    numero?: string;
+  } | null>(null);
 
   // Cadastro pontual de fornecedor, sem sair da inspecao
   const [openFornecedor, setOpenFornecedor] = useState(false);
@@ -214,18 +227,33 @@ export default function Inspecoes() {
     queryFn: async () => (await api.get('/inspecoes')).data,
   });
 
-  // Avalia recebimento (classificacao + periodicidade + contador ciclico)
+  // Avalia recebimento (classificacao + periodicidade + contador ciclico).
+  // Vindo do Registro de Entrada nao se avalia de novo: o ciclo ja avancou na
+  // chegada e reavaliar agora mostraria o contador seguinte, nao o desta carga.
   const { data: avaliacao } = useQuery<any>({
     queryKey: ['avaliar', fornecedorId],
     queryFn: async () =>
       (await api.get(`/inspecoes/avaliar?fornecedorId=${fornecedorId}`)).data,
-    enabled: !!fornecedorId,
+    enabled: !!fornecedorId && !entradaVinculada && !edicao,
   });
 
-  const precisaInspecionar = avaliacao?.precisaInspecionar ?? true;
+  const daEntrada = !!entradaVinculada;
+  // Na correcao o ciclo nao se discute: a inspecao ja aconteceu. Sem esta
+  // ressalva, uma avaliacao antiga em cache reabriria o bloco da inspecao
+  // extra por cima do relatorio que esta sendo consertado.
+  const precisaInspecionar = edicao
+    ? true
+    : daEntrada
+      ? !entradaVinculada.inspecaoExtra
+      : (avaliacao?.precisaInspecionar ?? true);
   // Inspecao extra: fora da janela do ciclo ou fornecedor eventual. Aqui a
   // Qualidade escolhe os formularios na mao, ignorando o cadastro.
-  const extraAtivo = !precisaInspecionar && !!extra;
+  // Vindo do Registro de Entrada quem manda e a decisao ja tomada la: o campo
+  // "extra" nao e renderizado nesta tela, e o useWatch so enxerga campo em
+  // tela, entao ele voltaria vazio e a inspeção abriria sem formulario nenhum.
+  const extraAtivo = daEntrada
+    ? !!entradaVinculada.inspecaoExtra
+    : !precisaInspecionar && !!extra;
 
   const fornecedorSel = useMemo(
     () => (fornecedores ?? []).find((f: any) => f.id === fornecedorId),
@@ -236,6 +264,9 @@ export default function Inspecoes() {
   // do cadastro do fornecedor; na extra, da escolha manual.
   const passos = useMemo<('VISUAL' | 'LOTE')[]>(() => {
     const seq: ('VISUAL' | 'LOTE')[] = [];
+    // Correcao: um formulario de cada vez, o que foi escolhido na listagem.
+    // Nao ha encadeamento, porque a inspecao ja aconteceu inteira.
+    if (edicao) return [edicao.tipo];
     if (extraAtivo) {
       if (formulariosExtra?.includes('VISUAL')) seq.push('VISUAL');
       if (formulariosExtra?.includes('LOTE')) seq.push('LOTE');
@@ -246,7 +277,7 @@ export default function Inspecoes() {
     if (fazVisual) seq.push('VISUAL');
     if (fornecedorSel?.fazLote) seq.push('LOTE');
     return seq.length ? seq : ['VISUAL'];
-  }, [extraAtivo, formulariosExtra, precisaInspecionar, fornecedorSel]);
+  }, [edicao, extraAtivo, formulariosExtra, precisaInspecionar, fornecedorSel]);
 
   const tipo = passos[passoIdx] ?? 'VISUAL';
   const encadeado = passos.length > 1;
@@ -270,10 +301,12 @@ export default function Inspecoes() {
     form.setFieldsValue({ observacoes: undefined });
   }
 
-  function novaInspecao() {
+  function novaInspecao(entrada?: any) {
     form.resetFields();
     setPassoIdx(0);
-    setEntregaAtual(undefined);
+    setEdicao(null);
+    setEntregaAtual(entrada?.id);
+    setEntradaVinculada(entrada ?? null);
     setNumeroInspecao(undefined);
     setDesvioAnterior(false);
     setRncDaInspecao(null);
@@ -281,11 +314,98 @@ export default function Inspecoes() {
     limparEtapa();
     form.setFieldsValue({
       origem: 'PLANO_INSPECAO',
-      extra: false,
+      extra: !!entrada?.inspecaoExtra,
+      // Na extra os formularios sao escolha da Qualidade; o cadastro do
+      // fornecedor entra so como sugestao, e o inspetor ajusta se quiser.
+      formulariosExtra: entrada?.inspecaoExtra
+        ? [
+            ...(entrada.fornecedor?.fazVisual === false ? [] : ['VISUAL']),
+            ...(entrada.fornecedor?.fazLote ? ['LOTE'] : []),
+          ]
+        : undefined,
       toleranciasNorm: 'ISO2768',
+      // Tudo que a chegada ja trouxe: o inspetor nao redigita nada.
+      fornecedorId: entrada?.fornecedor?.id,
+      itemCodigo: entrada?.item?.codigo,
+      itemDescricao: entrada?.item?.descricao,
+      notaFiscal: entrada?.notaFiscal ?? undefined,
+      po: entrada?.po ?? undefined,
+      qtdTotal: entrada?.quantidade ?? undefined,
     });
     setOpen(true);
   }
+
+  // Correcao de uma inspecao ja realizada: o mesmo relatorio, com o mesmo
+  // numero, reaberto para consertar o que foi digitado errado - inclusive o
+  // resultado. Nao confundir com reinspecao, que e uma medicao nova.
+  async function abrirEdicao(linha: any, tipoForm: 'VISUAL' | 'LOTE') {
+    try {
+      const insp = (await api.get(`/inspecoes/${linha.id}`)).data;
+      const f = tipoForm === 'VISUAL' ? insp.visual : insp.lote;
+      if (!f) {
+        message.error('Formulário não encontrado nesta inspeção.');
+        return;
+      }
+      form.resetFields();
+      setPassoIdx(0);
+      setEntradaVinculada(null);
+      setEntregaAtual(insp.id);
+      setNumeroInspecao(insp.numeroInspecao);
+      setDesvioAnterior(false);
+      setDesviosPendentes([]);
+      setFotosVisual([]);
+      // RNC cancelada nao conta: se a inspecao voltar a reprovar, o desvio
+      // precisa de uma RNC nova, e a pergunta tem que ser feita de novo.
+      setRncDaInspecao(
+        (insp.rncs ?? []).find((r: any) => r.status !== 'CANCELADA') ?? null,
+      );
+      setEdicao({ tipo: tipoForm, id: f.id, numero: insp.numeroInspecao });
+      setGrupos(tipoForm === 'VISUAL' ? (f.checklist ?? []) : []);
+      setCotas(tipoForm === 'LOTE' ? (f.cotas ?? []) : []);
+      form.setFieldsValue({
+        fornecedorId: f.fornecedorId ?? insp.fornecedor?.id,
+        itemCodigo: f.item?.codigo ?? insp.item?.codigo,
+        itemDescricao: f.item?.descricao ?? insp.item?.descricao,
+        notaFiscal: f.notaFiscal ?? undefined,
+        po: f.po ?? undefined,
+        qtdInspecionada: f.qtdInspecionada ?? undefined,
+        qtdTotal: f.qtdTotal ?? undefined,
+        desenho: f.desenho ?? undefined,
+        revisao: f.revisao ?? undefined,
+        toleranciasNorm: f.toleranciasNorm ?? 'ISO2768',
+        origem: f.origem ?? 'PLANO_INSPECAO',
+        origemOutros: f.origemOutros ?? undefined,
+        observacoes: f.observacoes ?? undefined,
+      });
+      setOpen(true);
+    } catch {
+      message.error('Não foi possível abrir a inspeção para correção.');
+    }
+  }
+
+  // Chegada vinda do Registro de Entrada: a inspecao abre sozinha, ja presa
+  // aquela entrega. O parametro sai da URL assim que a tela abre, para um F5
+  // (ou o voltar do navegador) nao reabrir a mesma inspecao.
+  const entradaParam = params.get('entrada');
+  const { data: entradaAberta } = useQuery<any>({
+    queryKey: ['registro-entrada', entradaParam],
+    queryFn: async () =>
+      (await api.get(`/registros-entrada/${entradaParam}`)).data,
+    enabled: !!entradaParam,
+  });
+
+  useEffect(() => {
+    if (!entradaParam || !entradaAberta) return;
+    if (entradaAberta.numeroInspecao) {
+      message.info(
+        `O registro de entrada já gerou a inspeção ${entradaAberta.numeroInspecao}.`,
+      );
+    } else {
+      novaInspecao(entradaAberta);
+    }
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entradaParam, entradaAberta]);
 
   // Resultado automatico a partir do preenchimento
   const resultadoAuto = useMemo(() => {
@@ -345,11 +465,15 @@ export default function Inspecoes() {
       return;
     }
     setOpen(false);
+    setEntradaVinculada(null);
+    setEdicao(null);
   }
 
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['inspecoes'] });
     qc.invalidateQueries({ queryKey: ['entregas'] });
+    qc.invalidateQueries({ queryKey: ['registros-entrada'] });
+    qc.invalidateQueries({ queryKey: ['registro-entrada'] });
     qc.invalidateQueries({ queryKey: ['avaliar'] });
     qc.invalidateQueries({ queryKey: ['fornecedores'] });
     qc.invalidateQueries({ queryKey: ['rnc'] });
@@ -488,22 +612,6 @@ export default function Inspecoes() {
   ) {
     setSalvando(true);
     try {
-      // Fora do ciclo e sem inspecao extra: registra apenas o recebimento
-      if (!preencheFormulario) {
-        await api.post('/inspecoes/recebimento', {
-          fornecedorId: v.fornecedorId,
-          notaFiscal: v.notaFiscal,
-          po: v.po,
-          dataEntrega: hoje.toISOString(),
-        });
-        setOpen(false);
-        invalidar();
-        message.success(
-          'Recebimento registrado sem inspeção (fora do ciclo de periodicidade).',
-        );
-        return;
-      }
-
       const rota = tipo === 'VISUAL' ? '/inspecoes/visual' : '/inspecoes/lote';
       const payload: any = {
         fornecedorId: v.fornecedorId,
@@ -533,6 +641,36 @@ export default function Inspecoes() {
       };
       if (tipo === 'VISUAL') payload.checklist = grupos;
       else payload.cotas = cotas;
+
+      // Correcao: o relatorio ja existe, entao e PATCH no formulario. O
+      // fornecedor e a entrega nao vao no corpo - eles vem do Registro de
+      // Entrada e mexer neles mudaria o ciclo de periodicidade, que nao e o
+      // que um conserto de digitacao faz.
+      if (edicao) {
+        const res = (
+          await api.patch(
+            `/inspecoes/${edicao.tipo === 'VISUAL' ? 'visual' : 'lote'}/${edicao.id}`,
+            payload,
+          )
+        ).data;
+        if (fotosVisual.length && res.inspecao?.id)
+          await enviarFotosEvidencia(
+            fotosVisual,
+            tipo === 'VISUAL' ? EVID.sqeVisual : EVID.sqeDimensional,
+            res.inspecao.id,
+          );
+        setOpen(false);
+        setEdicao(null);
+        invalidar();
+        if (res.rncsCanceladas?.length)
+          message.success(
+            `Inspeção ${edicao.numero ?? ''} corrigida e aprovada. A RNC ${res.rncsCanceladas.join(', ')} foi cancelada.`,
+          );
+        else if (res.rnc) abrirRncObrigatoria(res.rnc);
+        else
+          message.success(`Inspeção ${edicao.numero ?? ''} corrigida.`);
+        return;
+      }
 
       const res = (await api.post(rota, payload)).data;
 
@@ -573,6 +711,7 @@ export default function Inspecoes() {
       }
 
       setOpen(false);
+      setEntradaVinculada(null);
       invalidar();
       if (rnc) {
         // Escolheu abrir a RNC: dai em diante ela e obrigatoria, a inspecao so
@@ -590,7 +729,9 @@ export default function Inspecoes() {
     } catch (e: any) {
       message.error(
         e?.response?.data?.message ??
-          'Não foi possível registrar o recebimento.',
+          (edicao
+            ? 'Não foi possível salvar a correção.'
+            : 'Não foi possível registrar o recebimento.'),
       );
     } finally {
       setSalvando(false);
@@ -664,10 +805,12 @@ export default function Inspecoes() {
     <Card
       title="Inspeções de recebimento"
       extra={
+        // Toda inspecao nasce de um registro de entrada: e a chegada da carga
+        // que diz se esta entrega cai no ciclo de periodicidade.
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => novaInspecao()}
+          onClick={() => navigate('/registros-entrada')}
         >
           Nova inspeção
         </Button>
@@ -727,18 +870,15 @@ export default function Inspecoes() {
               value,
             })),
             onFilter: (v: any, r: any) => (r.formularios ?? []).includes(v),
-            render: (fs: string[]) =>
-              fs?.length ? (
-                <Space size={4} wrap={false}>
-                  {fs.map((f) => (
-                    <Tag key={f} color={f === 'VISUAL' ? 'geekblue' : 'purple'}>
-                      {labelFormulario[f] ?? f}
-                    </Tag>
-                  ))}
-                </Space>
-              ) : (
-                <Tag>Recebimento</Tag>
-              ),
+            render: (fs: string[]) => (
+              <Space size={4} wrap={false}>
+                {(fs ?? []).map((f) => (
+                  <Tag key={f} color={f === 'VISUAL' ? 'geekblue' : 'purple'}>
+                    {labelFormulario[f] ?? f}
+                  </Tag>
+                ))}
+              </Space>
+            ),
           },
           {
             title: 'Tipo',
@@ -749,8 +889,8 @@ export default function Inspecoes() {
               { text: 'Ciclo', value: false },
             ],
             onFilter: (v: any, r: any) => !!r.inspecaoExtra === v,
-            render: (e: boolean, r: any) =>
-              !r.formularios?.length ? '-' : e ? (
+            render: (e: boolean) =>
+              e ? (
                 <Tag color="orange">Extra</Tag>
               ) : (
                 <Tag color="default">Ciclo</Tag>
@@ -802,31 +942,58 @@ export default function Inspecoes() {
                 '-'
               ),
           },
-          ...(isAdmin
-            ? [
-                {
-                  title: '',
-                  width: 50,
-                  render: (_: any, r: any) =>
-                    !r.formularios?.length ? null : (
-                      <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => confirmarExclusao(r)}
-                      />
-                    ),
-                },
-              ]
-            : []),
+          {
+            title: '',
+            width: isAdmin ? 96 : 56,
+            render: (_: any, r: any) => (
+              <Space size={0}>
+                {/* Correcao do que foi digitado errado. A inspecao com os dois
+                    formularios corrige um de cada vez: cada um e um relatorio. */}
+                {r.formularios?.length > 1 ? (
+                  <Dropdown
+                    trigger={['click']}
+                    menu={{
+                      items: r.formularios.map((f: string) => ({
+                        key: f,
+                        label: `Corrigir ${labelFormulario[f].toLowerCase()}`,
+                      })),
+                      onClick: ({ key }) =>
+                        abrirEdicao(r, key as 'VISUAL' | 'LOTE'),
+                    }}
+                  >
+                    <Button type="text" icon={<EditOutlined />} />
+                  </Dropdown>
+                ) : (
+                  <Button
+                    type="text"
+                    icon={<EditOutlined />}
+                    title="Corrigir esta inspeção"
+                    onClick={() =>
+                      abrirEdicao(r, r.formularios?.[0] ?? 'VISUAL')
+                    }
+                  />
+                )}
+                {isAdmin && (
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmarExclusao(r)}
+                  />
+                )}
+              </Space>
+            ),
+          },
         ]}
       />
 
       <Modal
         title={
-          numeroInspecao
-            ? `Inspeção ${numeroInspecao}`
-            : 'Nova inspeção de recebimento'
+          edicao
+            ? `Corrigir inspeção ${numeroInspecao ?? ''} — ${labelFormulario[edicao.tipo]}`
+            : numeroInspecao
+              ? `Inspeção ${numeroInspecao}`
+              : 'Nova inspeção de recebimento'
         }
         open={open}
         onCancel={fecharInspecao}
@@ -835,8 +1002,8 @@ export default function Inspecoes() {
         onOk={() => form.submit()}
         confirmLoading={salvando}
         okText={
-          !preencheFormulario
-            ? 'Registrar recebimento sem inspeção'
+          edicao
+            ? 'Salvar correção'
             : !ultimoPasso
               ? `Registrar ${labelFormulario[tipo]} e continuar`
               : 'Concluir inspeção'
@@ -860,30 +1027,33 @@ export default function Inspecoes() {
                 <Select
                   showSearch
                   optionFilterProp="label"
-                  disabled={passoIdx > 0}
+                  disabled={passoIdx > 0 || daEntrada || !!edicao}
                   options={opcoesFornecedor(fornecedores)}
                 />
               </Form.Item>
             </Col>
             {/* Fornecedor que nao esta na base (ex: importacao): cadastro
-                pontual aqui mesmo, sem abandonar a inspecao. */}
-            <Col span={6}>
-              <Form.Item label=" " colon={false}>
-                <Button
-                  block
-                  icon={<UserAddOutlined />}
-                  disabled={passoIdx > 0}
-                  onClick={() => {
-                    formFornecedor.resetFields();
-                    formFornecedor.setFieldsValue(valoresIniciaisFornecedor);
-                    setOpenFornecedor(true);
-                  }}
-                >
-                  Novo fornecedor
-                </Button>
-              </Form.Item>
-            </Col>
-            <Col span={7}>
+                pontual aqui mesmo, sem abandonar a inspecao. Vindo do Registro
+                de Entrada o fornecedor ja veio de la, entao nao cabe trocar. */}
+            {!daEntrada && !edicao && (
+              <Col span={6}>
+                <Form.Item label=" " colon={false}>
+                  <Button
+                    block
+                    icon={<UserAddOutlined />}
+                    disabled={passoIdx > 0}
+                    onClick={() => {
+                      formFornecedor.resetFields();
+                      formFornecedor.setFieldsValue(valoresIniciaisFornecedor);
+                      setOpenFornecedor(true);
+                    }}
+                  >
+                    Novo fornecedor
+                  </Button>
+                </Form.Item>
+              </Col>
+            )}
+            <Col span={daEntrada || edicao ? 13 : 7}>
               <Form.Item label="Nº da inspeção">
                 <Input value={numeroInspecao ?? 'Gerado ao salvar'} disabled />
               </Form.Item>
@@ -909,8 +1079,44 @@ export default function Inspecoes() {
             </Col>
           </Row>
 
-          {/* Decisao de recebimento: classificacao + periodicidade + contador */}
-          {fornecedorId && avaliacao && (
+          {/* Chegada ja registrada: a decisao do ciclo foi tomada la e esta
+              inspecao fica presa aquela entrega. */}
+          {daEntrada && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Inspeção do registro de entrada de ${dayjs(
+                entradaVinculada.dataEntrega,
+              ).format('DD/MM/YYYY')} — ${entradaVinculada.fornecedor?.nome}`}
+              description={
+                entradaVinculada.inspecaoExtra
+                  ? 'Inspeção EXTRA — fora do ciclo, por decisão da Qualidade.'
+                  : 'Esta entrega caiu no ciclo de periodicidade e deve ser inspecionada.'
+              }
+            />
+          )}
+
+          {/* Correcao: deixa claro que o relatorio e o mesmo, para ninguem
+              confundir com reinspecao. */}
+          {edicao && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Corrigindo a ${labelFormulario[edicao.tipo].toLowerCase()} da inspeção ${numeroInspecao ?? ''}`}
+              description={
+                rncDaInspecao
+                  ? `Este é o mesmo relatório, não uma reinspeção. Se a correção aprovar a inspeção, a RNC ${rncDaInspecao.numero} será cancelada.`
+                  : 'Este é o mesmo relatório, não uma reinspeção: o número e a data da inspeção não mudam.'
+              }
+            />
+          )}
+
+          {/* Decisao de recebimento: classificacao + periodicidade + contador.
+              Vindo do Registro de Entrada some: o contador que ele mostraria e
+              o da PROXIMA carga, nao o desta. */}
+          {fornecedorId && avaliacao && !daEntrada && !edicao && (
             <Descriptions
               size="small"
               bordered
@@ -965,19 +1171,23 @@ export default function Inspecoes() {
               jeito, escolhendo os formularios independente do cadastro. */}
           {fornecedorId && !precisaInspecionar && (
             <Card size="small" style={{ marginBottom: 12 }}>
-              <Form.Item
-                name="extra"
-                label="Realizar inspeção extra"
-                valuePropName="checked"
-                extra="A inspeção extra conta nos indicadores e reinicia o ciclo de periodicidade do fornecedor."
-                style={{ marginBottom: extraAtivo ? 12 : 0 }}
-              >
-                <Switch
-                  checkedChildren="Sim"
-                  unCheckedChildren="Não"
-                  disabled={passoIdx > 0}
-                />
-              </Form.Item>
+              {/* Vindo do Registro de Entrada a extra ja foi decidida la: aqui
+                  restam so os formularios. */}
+              {!daEntrada && (
+                <Form.Item
+                  name="extra"
+                  label="Realizar inspeção extra"
+                  valuePropName="checked"
+                  extra="A inspeção extra conta nos indicadores e reinicia o ciclo de periodicidade do fornecedor."
+                  style={{ marginBottom: extraAtivo ? 12 : 0 }}
+                >
+                  <Switch
+                    checkedChildren="Sim"
+                    unCheckedChildren="Não"
+                    disabled={passoIdx > 0}
+                  />
+                </Form.Item>
+              )}
               {extraAtivo && (
                 <Form.Item
                   name="formulariosExtra"
@@ -999,22 +1209,6 @@ export default function Inspecoes() {
                 </Form.Item>
               )}
             </Card>
-          )}
-
-          {/* Recebimento sem inspecao: apenas NF / PO (data/semana/ano acima) */}
-          {fornecedorId && !preencheFormulario && (
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item name="notaFiscal" label="Nota Fiscal">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="po" label="PO">
-                  <Input />
-                </Form.Item>
-              </Col>
-            </Row>
           )}
 
           {preencheFormulario && (

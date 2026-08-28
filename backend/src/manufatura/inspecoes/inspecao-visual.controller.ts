@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -38,8 +39,9 @@ const ORIGENS = ORIGENS_INSPECAO.map((o) => o.value);
 
 // Inspecao visual da manufatura: mesmo cabecalho do formulario dimensional,
 // mas sem cotas - so o campo aberto com o que foi observado.
-class InspecaoVisualDto {
-  @IsInt() maquinaId: number;
+// A maquina fica de fora: na correcao ela nao muda (trocar de maquina seria
+// outra inspecao) e por isso os campos do formulario vivem separados dela.
+class CamposVisualDto {
   @IsOptional() @IsString() dataInspecao?: string;
   // Revisao do proprio relatorio, digitada pelo inspetor. Comeca em "01".
   @IsOptional() @IsString() revisao?: string;
@@ -56,6 +58,10 @@ class InspecaoVisualDto {
   @IsOptional() @IsString() observacoes?: string;
   // "Elaborado por" e "Inspecionado por" nao vem mais do formulario: o sistema
   // assina com o usuario logado.
+}
+
+class InspecaoVisualDto extends CamposVisualDto {
+  @IsInt() maquinaId: number;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
@@ -105,6 +111,17 @@ export class InspecaoVisualManufaturaController {
   @Post('producao')
   criarProducao(@Body() dto: InspecaoVisualDto, @CurrentUser() user: AuthUser) {
     return this.service.criar('PRODUCAO', dto, user.id);
+  }
+
+  // Correcao do que foi digitado errado - o mesmo documento, com o mesmo
+  // numero. Sem @Roles de proposito: quem enxerga o modulo conserta.
+  @Patch(':id')
+  corrigir(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CamposVisualDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.corrigir(id, dto, user.id);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

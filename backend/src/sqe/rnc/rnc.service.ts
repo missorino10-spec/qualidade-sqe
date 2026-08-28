@@ -383,9 +383,12 @@ export class RncService {
   // em vez de abrir uma segunda - inclusive se os formularios forem salvos em
   // dias diferentes, porque o vinculo e a entrega, nao o momento.
   async abrirOuComplementar(data: any, usuarioId: number) {
+    // RNC cancelada e historico encerrado: o desvio que aparecer depois - por
+    // exemplo numa correcao que voltou a reprovar a inspecao - merece uma RNC
+    // nova, e nao ressuscita a que foi cancelada.
     const existente = data.entregaId
       ? await this.prisma.rnc.findFirst({
-          where: { entregaId: data.entregaId },
+          where: { entregaId: data.entregaId, status: { not: 'CANCELADA' } },
           orderBy: { id: 'asc' },
         })
       : null;

@@ -16,6 +16,7 @@ import {
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  EditOutlined,
   FilePdfOutlined,
   FileTextOutlined,
   ReloadOutlined,
@@ -51,7 +52,15 @@ function labelOrigem(v: string, outros?: string) {
   return ORIGENS_INSPECAO.find((o) => o.value === v)?.label ?? v ?? '-';
 }
 
-function Tentativa({ rel, total }: { rel: any; total: number }) {
+function Tentativa({
+  rel,
+  total,
+  onCorrigir,
+}: {
+  rel: any;
+  total: number;
+  onCorrigir: (rel: any) => void;
+}) {
   const defeitos = Array.isArray(rel.defeitos) ? rel.defeitos : [];
   const titulo =
     rel.tentativa <= 1
@@ -71,6 +80,13 @@ function Tentativa({ rel, total }: { rel: any; total: number }) {
           </Tag>
           {total > 1 && <Tag>{`${rel.tentativa} de ${total}`}</Tag>}
         </Space>
+      }
+      // Correcao do que foi digitado errado neste relatorio. Nao e reinspecao:
+      // e o mesmo documento, com o mesmo numero.
+      extra={
+        <Button icon={<EditOutlined />} onClick={() => onCorrigir(rel)}>
+          Corrigir
+        </Button>
       }
     >
       <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }} style={{ marginBottom: 12 }}>
@@ -207,6 +223,8 @@ export default function InspecaoManufaturaDetalhe() {
   const [defeitos, setDefeitos] = useState<any[]>([]);
   const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
+  // Relatorio que esta sendo corrigido. Null = o modal esta em reinspecao.
+  const [edicao, setEdicao] = useState<any>(null);
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ['manufatura-inspecao', id],
@@ -239,6 +257,7 @@ export default function InspecaoManufaturaDetalhe() {
   // medido na tentativa anterior — so as medidas mudam.
   function abrirReinspecao() {
     form.resetFields();
+    setEdicao(null);
     form.setFieldsValue({
       maquinaId: data.maquinaId,
       setupId: data.setupId ?? undefined,
@@ -276,6 +295,67 @@ export default function InspecaoManufaturaDetalhe() {
     setDefeitos([]);
     setFotosDimensional([]);
     setOpen(true);
+  }
+
+  // Correcao: o mesmo relatorio reaberto com tudo o que foi lancado, inclusive
+  // as medidas. O numero e a tentativa nao mudam - so o conteudo.
+  function abrirCorrecao(rel: any) {
+    form.resetFields();
+    setEdicao(rel);
+    form.setFieldsValue({
+      maquinaId: data.maquinaId,
+      setupId: data.setupId ?? undefined,
+      dataInspecao: dayjs(rel.dataInspecao).format('YYYY-MM-DD'),
+      revisao: rel.revisao ?? '01',
+      origem: rel.origem,
+      origemOutros: rel.origemOutros ?? undefined,
+      itemCodigo: rel.itemCodigo ?? undefined,
+      itemDescricao: rel.itemDescricao ?? undefined,
+      desenho: rel.desenho ?? rel.desenhoRev ?? undefined,
+      desenhoRevisao: rel.desenhoRevisao ?? undefined,
+      toleranciasNorm: rel.toleranciasNorm ?? 'ISO2768',
+      po: rel.po ?? undefined,
+      qtdInspecionada: rel.qtdInspecionada ?? undefined,
+      qtdTotal: rel.qtdTotal ?? undefined,
+      observacoesFinais: rel.observacoesFinais ?? undefined,
+      resultado: rel.resultado,
+      observacaoResultado: rel.observacaoResultado ?? undefined,
+      qtdAfetada: rel.qtdAfetada ?? undefined,
+      descricaoDesvio: rel.descricaoDesvio ?? undefined,
+    });
+    setCotas(Array.isArray(rel.cotas) && rel.cotas.length ? rel.cotas : [cotaVazia()]);
+    setDefeitos(Array.isArray(rel.defeitos) ? rel.defeitos : []);
+    setFotosDimensional([]);
+    setOpen(true);
+  }
+
+  async function salvarCorrecao() {
+    const v = await form.validateFields();
+    setSalvando(true);
+    try {
+      const res = await api.patch(
+        `/manufatura/inspecoes/${id}/relatorio/${edicao.id}`,
+        { ...v, cotas, defeitos: defeitos.filter((d) => d.tipoDefeitoId) },
+      );
+      if (fotosDimensional.length)
+        await enviarFotosEvidencia(
+          fotosDimensional,
+          EVID.manufaturaDimensional,
+          edicao.id,
+        );
+      message.success(`Relatório ${res.data.numero ?? edicao.numero} corrigido.`);
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
+      qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
+      qc.invalidateQueries({ queryKey: ['maquinas'] });
+      setOpen(false);
+      setEdicao(null);
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível salvar a correção.',
+      );
+    } finally {
+      setSalvando(false);
+    }
   }
 
   async function salvarReinspecao() {
@@ -462,23 +542,36 @@ export default function InspecaoManufaturaDetalhe() {
       </Card>
 
       {relatorios.map((rel) => (
-        <Tentativa key={rel.id} rel={rel} total={relatorios.length} />
+        <Tentativa
+          key={rel.id}
+          rel={rel}
+          total={relatorios.length}
+          onCorrigir={abrirCorrecao}
+        />
       ))}
 
       <Modal
         open={open}
-        title={`Reinspeção — ${data.numero} — Doc. BDBR.QUA.FMR.011.06`}
+        title={
+          edicao
+            ? `Corrigir ${edicao.numero} — Doc. BDBR.QUA.FMR.011.06`
+            : `Reinspeção — ${data.numero} — Doc. BDBR.QUA.FMR.011.06`
+        }
         width={1100}
-        okText="Salvar reinspeção"
+        okText={edicao ? 'Salvar correção' : 'Salvar reinspeção'}
         cancelText="Cancelar"
         confirmLoading={salvando}
-        onOk={salvarReinspecao}
-        onCancel={() => setOpen(false)}
+        onOk={edicao ? salvarCorrecao : salvarReinspecao}
+        onCancel={() => {
+          setOpen(false);
+          setEdicao(null);
+        }}
         destroyOnClose
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          Novo relatório completo, com número próprio, dentro da mesma inspeção.
-          Os campos vieram da tentativa anterior; preencha as medidas novamente.
+          {edicao
+            ? 'Este é o mesmo relatório, não uma reinspeção: o número e a tentativa não mudam. Tudo pode ser corrigido, inclusive o resultado.'
+            : 'Novo relatório completo, com número próprio, dentro da mesma inspeção. Os campos vieram da tentativa anterior; preencha as medidas novamente.'}
         </Typography.Paragraph>
         <Form form={form} layout="vertical">
           <CamposRelatorio
@@ -492,6 +585,7 @@ export default function InspecaoManufaturaDetalhe() {
             tipo={data.tipo}
             fotosDimensional={fotosDimensional}
             setFotosDimensional={setFotosDimensional}
+            maquinaFixa
           />
         </Form>
       </Modal>

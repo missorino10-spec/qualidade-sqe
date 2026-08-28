@@ -226,6 +226,20 @@ export class HomologacoesItensController {
     return this.service.salvarRelatorio(id, dto, user.id);
   }
 
+  // Correcao de um relatorio ja lancado: a tentativa vem na rota, entao esta
+  // rota so conserta - nunca cria uma tentativa nova. Sem @Roles de proposito:
+  // quem enxerga o modulo corrige o que digitou errado, sem depender da
+  // Qualidade.
+  @Patch(':id/relatorio/:tentativa')
+  corrigirRelatorio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tentativa', ParseIntPipe) tentativa: number,
+    @Body() dto: RelatorioInspecaoDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.salvarRelatorio(id, { ...dto, tentativa }, user.id);
+  }
+
   @Roles('QUALIDADE', 'ADMIN')
   @Delete(':id/relatorio/:tentativa')
   removerRelatorio(

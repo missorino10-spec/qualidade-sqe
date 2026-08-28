@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -159,6 +160,19 @@ export class InspecoesManufaturaController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.reinspecionar(id, dto, user.id);
+  }
+
+  // Correcao de um relatorio ja lancado - o mesmo numero, a mesma tentativa.
+  // Sem @Roles de proposito: quem enxerga o modulo conserta o que digitou
+  // errado, sem depender da Qualidade.
+  @Patch(':id/relatorio/:relatorioId')
+  corrigirRelatorio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('relatorioId', ParseIntPipe) relatorioId: number,
+    @Body() dto: RelatorioDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.corrigirRelatorio(id, relatorioId, dto, user.id);
   }
 
   @Roles('QUALIDADE', 'ADMIN')
