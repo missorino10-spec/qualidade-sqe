@@ -23,6 +23,7 @@ import {
   TeamOutlined,
   CheckSquareOutlined,
   InboxOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -40,8 +41,8 @@ type ItemMenu = {
 };
 
 // O menu e a lista completa; o que cada pessoa ve sai do filtro la embaixo.
-// SQE, MANUFATURA e SQD sao modulo inteiro; CADASTROS aparece com os submenus
-// que o admin liberou, e some se nao liberou nenhum.
+// SQE, MANUFATURA, SQD e R.O sao modulo inteiro; CADASTROS aparece com os
+// submenus que o admin liberou, e some se nao liberou nenhum.
 const itensMenu: {
   key: string;
   icon: ReactNode;
@@ -128,6 +129,19 @@ const itensMenu: {
         key: '/sqd/auditorias',
         icon: <AuditOutlined />,
         label: 'Auditoria de Fornecedores',
+      },
+    ],
+  },
+  {
+    key: 'ro',
+    icon: <SolutionOutlined />,
+    label: 'QUALIDADE - R.O',
+    modulo: 'RO',
+    children: [
+      {
+        key: '/ro',
+        icon: <SolutionOutlined />,
+        label: 'Reclamações (R.O)',
       },
     ],
   },

@@ -28,6 +28,7 @@ import { HomologacoesModule } from './sqd/homologacoes/homologacoes.module';
 import { HomologacoesItensModule } from './sqd/homologacoes-itens/homologacoes-itens.module';
 import { AuditoriasModule } from './sqd/auditorias/auditorias.module';
 import { PainelSqdModule } from './sqd/painel/painel-sqd.module';
+import { ReclamacoesModule } from './ro/reclamacoes/reclamacoes.module';
 
 // Pasta com o frontend ja compilado (usada no pacote portatil, onde o proprio
 // backend serve as telas numa unica porta). No modo Docker/dev o nginx serve o
@@ -72,6 +73,7 @@ const servirFrontend = existsSync(frontendDir);
     HomologacoesItensModule,
     AuditoriasModule,
     PainelSqdModule,
+    ReclamacoesModule,
   ],
 })
 export class AppModule {}

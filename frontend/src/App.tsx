@@ -33,6 +33,8 @@ import HomologacoesItens from './pages/sqd/HomologacoesItens';
 import HomologacaoItemDetalhe from './pages/sqd/HomologacaoItemDetalhe';
 import Auditorias from './pages/sqd/Auditorias';
 import AuditoriaDetalhe from './pages/sqd/AuditoriaDetalhe';
+import Reclamacoes from './pages/ro/Reclamacoes';
+import ReclamacaoDetalhe from './pages/ro/ReclamacaoDetalhe';
 import Instrumentos from './pages/Instrumentos';
 import Colaboradores from './pages/admin/Colaboradores';
 import TrocarSenha from './pages/TrocarSenha';
@@ -158,6 +160,11 @@ export default function App() {
         path="/sqd/auditorias/:id"
         element={<Privado modulo="SQD"><AuditoriaDetalhe /></Privado>}
       />
+
+      {/* R.O - Gestao de Reclamacoes da Qualidade */}
+      <Route path="/ro" element={<Privado modulo="RO"><Reclamacoes /></Privado>} />
+      {/* ":id" tambem aceita "novo": e a mesma tela, em branco. */}
+      <Route path="/ro/:id" element={<Privado modulo="RO"><ReclamacaoDetalhe /></Privado>} />
 
       {/* Instrumentos - BDBR.QUA.FMR.004.01 */}
       <Route

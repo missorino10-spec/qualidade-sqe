@@ -28,6 +28,7 @@ const MODULOS = [
   'SQE',
   'MANUFATURA',
   'SQD',
+  'RO',
   'CAD_FORNECEDORES',
   'CAD_ITENS',
   'CAD_MAQUINAS',

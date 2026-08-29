@@ -1,5 +1,5 @@
 /**
- * O que cada colaborador enxerga. SQE, MANUFATURA e SQD sao liberados por
+ * O que cada colaborador enxerga. SQE, MANUFATURA, SQD e R.O sao liberados por
  * modulo inteiro; CADASTROS e liberado submenu a submenu, porque mexer na base
  * de fornecedores e de itens e coisa de pouca gente.
  *
@@ -9,6 +9,7 @@ export type Modulo =
   | 'SQE'
   | 'MANUFATURA'
   | 'SQD'
+  | 'RO'
   | 'CAD_FORNECEDORES'
   | 'CAD_ITENS'
   | 'CAD_MAQUINAS'
@@ -32,6 +33,7 @@ export const ROTULO_MODULO: Record<Modulo, string> = {
   SQE: 'QUALIDADE - SQE',
   MANUFATURA: 'QUALIDADE - MANUFATURA',
   SQD: 'QUALIDADE - SQD',
+  RO: 'QUALIDADE - R.O',
   CAD_FORNECEDORES: 'Cadastros › Fornecedores',
   CAD_ITENS: 'Cadastros › Itens',
   CAD_MAQUINAS: 'Cadastros › Máquinas',
@@ -43,6 +45,7 @@ export const MODULOS: Modulo[] = [
   'SQE',
   'MANUFATURA',
   'SQD',
+  'RO',
   ...MODULOS_CADASTRO,
 ];
 
@@ -51,6 +54,7 @@ export const ROTA_INICIAL: Record<Modulo, string> = {
   SQE: '/',
   MANUFATURA: '/manufatura',
   SQD: '/sqd',
+  RO: '/ro',
   CAD_FORNECEDORES: '/fornecedores',
   CAD_ITENS: '/itens',
   CAD_MAQUINAS: '/manufatura/maquinas',

@@ -50,10 +50,10 @@ model Usuario {
 
   acessos AcessoModulo[]
 
-  entregas        EntregaPortaria[]     @relation("EntregaConfirmadoPor")
-  inspecoesVisual InspecaoVisual[]      @relation("InspVisualInspetor")
-  inspecoesLote   InspecaoLote[]        @relation("InspLoteInspetor")
-  rncs            Rnc[]                 @relation("RncCriadoPor")
+  entregas        EntregaPortaria[] @relation("EntregaConfirmadoPor")
+  inspecoesVisual InspecaoVisual[]  @relation("InspVisualInspetor")
+  inspecoesLote   InspecaoLote[]    @relation("InspLoteInspetor")
+  rncs            Rnc[]             @relation("RncCriadoPor")
   anexos          Anexo[]
   historicos      HistoricoStatus[]
 
@@ -83,6 +83,11 @@ model Usuario {
   auditoriasFornecedor   AuditoriaFornecedor[]   @relation("AuditoriaCriadoPor")
   rodadasAuditoria       RodadaAuditoria[]       @relation("RodadaAuditoriaCriadoPor")
 
+  // R.O
+  reclamacoes            Reclamacao[]      @relation("ReclamacaoCriadoPor")
+  reclamacoesResponsavel Reclamacao[]      @relation("ReclamacaoResponsavel")
+  blocosReclamacao       BlocoReclamacao[] @relation("BlocoReclamacaoConcluidoPor")
+
   // Metrologia
   instrumentos Instrumento[] @relation("InstrumentoCriadoPor")
 }
@@ -94,6 +99,7 @@ enum ModuloSistema {
   SQE
   MANUFATURA
   SQD
+  RO
   CAD_FORNECEDORES
   CAD_ITENS
   CAD_MAQUINAS
@@ -193,20 +199,20 @@ model Contato {
 }
 
 model Item {
-  id        Int    @id @default(autoincrement())
-  codigo    String @unique
-  descricao String
-  unidade   String?
+  id            Int         @id @default(autoincrement())
+  codigo        String      @unique
+  descricao     String
+  unidade       String?
   // Custo unitario em R$ vindo da "Base de Codigos e Custo". E o valor que
   // alimenta valorUnitario da RNC e do CNQ quando o codigo e digitado. Fica
   // opcional porque item digitado na mao (fora da base) nao tem custo.
   custoUnitario Float?
   // Cadastro nao se apaga por padrao: inativa. Item inativo some das buscas
   // dos formularios, mas continua nos registros antigos que apontam para ele.
-  ativo        Boolean     @default(true)
-  fornecedorId Int?
-  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
-  createdAt    DateTime    @default(now())
+  ativo         Boolean     @default(true)
+  fornecedorId  Int?
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  createdAt     DateTime    @default(now())
 
   entregas          EntregaPortaria[]
   inspecoesVisual   InspecaoVisual[]
@@ -287,12 +293,12 @@ model HistoricoClassificacao {
 // Lote do mesmo recebimento sao a MESMA inspecao, contam como uma so e
 // compartilham uma unica RNC.
 model EntregaPortaria {
-  id                     Int                  @id @default(autoincrement())
+  id                     Int        @id @default(autoincrement())
   fornecedorId           Int
-  fornecedor             Fornecedor           @relation(fields: [fornecedorId], references: [id])
+  fornecedor             Fornecedor @relation(fields: [fornecedorId], references: [id])
   itemId                 Int?
-  item                   Item?                @relation(fields: [itemId], references: [id])
-  dataEntrega            DateTime             @default(now())
+  item                   Item?      @relation(fields: [itemId], references: [id])
+  dataEntrega            DateTime   @default(now())
   semanaReferencia       String? // W do recebimento (domingo->sabado)
   semana                 String? // semana no formato W## (ex: W28)
   ano                    Int? // ano do recebimento
@@ -301,7 +307,7 @@ model EntregaPortaria {
   quantidade             Float?
   // Decisao automatica de inspecao
   numeroEntregaAcumulado Int? // valor do contador no momento
-  passivelInspecao       Boolean              @default(false) // sistema decidiu inspecionar?
+  passivelInspecao       Boolean    @default(false) // sistema decidiu inspecionar?
 
   // Identificacao da inspecao (nula enquanto o recebimento nao for inspecionado)
   numeroInspecao     String? @unique // formato INSP0001/2026
@@ -607,10 +613,10 @@ model ProducaoDiaria {
 // Lista oficial de "Descricao do Defeito" (aba Defeitos e CNQ). Cadastravel
 // para a Qualidade ajustar sem depender de deploy.
 model TipoDefeito {
-  id    Int     @id @default(autoincrement())
-  nome  String  @unique
-  ordem Int     @default(0)
-  ativo Boolean @default(true)
+  id           Int     @id @default(autoincrement())
+  nome         String  @unique
+  ordem        Int     @default(0)
+  ativo        Boolean @default(true)
   // "Outros": o lancamento tem de dizer qual foi o defeito. Marcado por flag e
   // nao pelo nome, senao renomear a linha no cadastro apagaria o campo aberto.
   exigeDetalhe Boolean @default(false)
@@ -868,29 +874,29 @@ model OitoD {
   cnq        Cnq?                @relation(fields: [cnqId], references: [id])
 
   // Cabecalho
-  empresaUnidade    String          @default("Big Dutchman Brasil")
-  dataAbertura      DateTime        @default(now())
-  status            StatusOitoD     @default(AGUARDANDO)
-  produtoItem       String?
-  codigoDesenho     String?
-  origem            OrigemOitoD     @default(PRODUCAO)
+  empresaUnidade      String          @default("Big Dutchman Brasil")
+  dataAbertura        DateTime        @default(now())
+  status              StatusOitoD     @default(AGUARDANDO)
+  produtoItem         String?
+  codigoDesenho       String?
+  origem              OrigemOitoD     @default(PRODUCAO)
   // Origem digitada quando "origem" e OUTROS
-  origemOutros      String?
+  origemOutros        String?
   // Documento que motivou a abertura (RNC, relatorio, e-mail...): o numero e
   // digitado aqui e o arquivo entra como anexo OITO_D_DOC.
   documentoReferencia String?
-  local             String?
-  processoOperacao  String?
-  equipamento       String?
-  turno             TurnoManufatura @default(COMERCIAL)
-  qtdAfetada        String?
+  local               String?
+  processoOperacao    String?
+  equipamento         String?
+  turno               TurnoManufatura @default(COMERCIAL)
+  qtdAfetada          String?
   // "responsavel" e o Coordenador e "equipe" e o Grupo de Trabalho da planilha.
-  responsavel       String?
-  equipe            String?
-  departamento      String?
-  areaAplicacao     String?
+  responsavel         String?
+  equipe              String?
+  departamento        String?
+  areaAplicacao       String?
   // Passo 1 - Problema (o enunciado)
-  descricaoProblema String?
+  descricaoProblema   String?
 
   // Passo 1.1 - Objetivos (SMART, medidos contra a perda causal)
   objetivos     String?
@@ -977,23 +983,23 @@ model CincoG {
   cnq        Cnq?                @relation(fields: [cnqId], references: [id])
 
   // Cabecalho (mesmos campos do 8D, para o documento ser reconhecivel)
-  dataAbertura     DateTime        @default(now())
-  status           StatusOitoD     @default(AGUARDANDO)
-  origem           OrigemOitoD     @default(PRODUCAO)
+  dataAbertura        DateTime        @default(now())
+  status              StatusOitoD     @default(AGUARDANDO)
+  origem              OrigemOitoD     @default(PRODUCAO)
   // Mesmo par do 8D: origem digitada quando e OUTROS e o documento que motivou
   // a abertura (numero aqui, arquivo no anexo CINCO_G_DOC).
   origemOutros        String?
   documentoReferencia String?
-  turno            TurnoManufatura @default(COMERCIAL)
-  produtoItem      String?
-  codigoDesenho    String?
-  local            String?
-  processoOperacao String?
-  equipamento      String?
-  responsavel      String?
-  equipe           String?
-  departamento     String?
-  areaAplicacao    String?
+  turno               TurnoManufatura @default(COMERCIAL)
+  produtoItem         String?
+  codigoDesenho       String?
+  local               String?
+  processoOperacao    String?
+  equipamento         String?
+  responsavel         String?
+  equipe              String?
+  departamento        String?
+  areaAplicacao       String?
 
   descricaoProblema String?
 
@@ -1603,4 +1609,227 @@ model Instrumento {
 
   @@index([ativo])
   @@index([proximaCalibracao])
+}
+
+// ---------------------------------------------------------------------------
+// R.O - Gestao de Reclamacoes da Qualidade
+//
+// Copia da planilha "especificacao_controle_reclamacoes_qualidade.xlsx". E o
+// controle INTERNO da Qualidade sobre a reclamacao que chega da Sala de
+// Controle: nao substitui o formulario do SAC, comeca a partir dele.
+//
+// A planilha tem quatro blocos e o sistema marca cada um como concluido
+// sozinho, assim que os campos daquele bloco estao preenchidos - por isso o
+// flag mora numa tabela filha (BlocoReclamacao), e nao em colunas soltas.
+// ---------------------------------------------------------------------------
+
+enum CompletudeSacRo {
+  SIM
+  NAO
+  PARCIAL
+}
+
+enum AceiteRo {
+  SIM
+  NAO
+  AGUARDANDO
+}
+
+enum SimNaoRo {
+  SIM
+  NAO
+}
+
+enum ClassificacaoRo {
+  DEFEITO_FUNCIONAL
+  FALHA_DESEMPENHO
+  PROBLEMA_DIMENSIONAL
+  MATERIAL_INCORRETO
+  QUANTIDADE_INCORRETA
+  EMBALAGEM
+  DOCUMENTACAO
+  MONTAGEM_INSTALACAO
+  SOFTWARE_COMUNICACAO
+  ENTREGA_LOGISTICA
+  SEGURANCA
+  BEM_ESTAR_ANIMAL
+  MEIO_AMBIENTE
+  OUTRO
+}
+
+enum ProcedenciaRo {
+  PROCEDENTE
+  PARCIALMENTE_PROCEDENTE
+  NAO_PROCEDENTE
+  INCONCLUSIVA
+}
+
+enum AreaResponsavelRo {
+  QUALIDADE_PRODUCAO
+  SQE
+  SQD
+  ENGENHARIA
+  LOGISTICA
+  SERVICO_ASSISTENCIA
+  EQUIPE_MULTIFUNCIONAL
+}
+
+enum PrioridadeRo {
+  CRITICA
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+enum MetodoAnaliseRo {
+  CINCO_PORQUES
+  ISHIKAWA
+  PARETO
+  FMEA
+  OITO_D
+  TESTE_REPRODUCAO
+  ANALISE_DADOS
+  AUDITORIA
+  OUTRO
+}
+
+enum StatusAcaoRo {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  CONCLUIDA
+  ATRASADA
+  CANCELADA
+}
+
+enum EficaciaRo {
+  EFICAZ
+  PARCIALMENTE_EFICAZ
+  INEFICAZ
+  NAO_APLICAVEL
+}
+
+enum MotivoEncerramentoRo {
+  PROCEDENTE_COM_ACAO
+  NAO_PROCEDENTE
+  DUPLICADA
+  CANCELADA
+  INCONCLUSIVA
+}
+
+enum StatusRo {
+  RECEBIDA_SAC
+  EM_TRIAGEM
+  AGUARDANDO_SAC
+  DIRECIONADA
+  CONTENCAO
+  INVESTIGACAO
+  ACOES_CORRETIVAS
+  AGUARDANDO_EFICACIA
+  RETORNO_SAC
+  ENCERRADA
+  REABERTA
+  NAO_ACEITA
+}
+
+// O plano de contencao e as acoes corretivas sao a mesma coisa em forma: linhas
+// de tarefa com responsavel, prazo e situacao. O tipo separa as duas listas.
+enum TipoTarefaRo {
+  CONTENCAO
+  ACAO_CORRETIVA
+}
+
+model Reclamacao {
+  id         Int    @id @default(autoincrement())
+  numero     String @unique // RO-2026-0001
+  ano        Int
+  sequencial Int
+
+  // --- 1. Dados recebidos (o que a Sala de Controle mandou) ---
+  // Sao digitados pela Qualidade conforme o formulario recebido: nao existe
+  // modulo de SAC no sistema.
+  cliente             String?
+  produtoCodigo       String?
+  produtoDescricao    String?
+  quantidadeAfetada   Float?
+  valorUnitario       Float?
+  tipoInformado       String?
+  resultadoAnaliseSac String?
+  origemIndicada      String?
+  // Carimbo automatico da chegada na Qualidade: e dele que sai o prazo.
+  recebidoEm          DateTime @default(now())
+
+  // --- 2. Triagem e direcionamento da Qualidade ---
+  dadosCompletos  CompletudeSacRo?
+  aceita          AceiteRo?
+  classificacao   ClassificacaoRo?
+  procedencia     ProcedenciaRo?
+  prioridade      PrioridadeRo?
+  areaResponsavel AreaResponsavelRo?
+  responsavelId   Int?
+  responsavel     Usuario?           @relation("ReclamacaoResponsavel", fields: [responsavelId], references: [id])
+  // Recebimento + 5 dias uteis, calculado pelo sistema.
+  prazoConclusao  DateTime?
+  pendenciasSac   String?
+  // Quantidade afetada x valor unitario, calculado pelo sistema.
+  custoTotal      Float?
+
+  // --- 3. Tratativa interna ---
+  necessidadeContencao SimNaoRo?
+  metodoAnalise        MetodoAnaliseRo?
+  causaImediata        String?
+  causaSistemica       String?
+  // Situacao geral das acoes corretivas, resumida das linhas do plano.
+  statusAcoes          StatusAcaoRo?
+  verificacaoEficacia  EficaciaRo?
+  evidencias           String?
+
+  // --- 4. Retorno ao SAC e encerramento ---
+  resumoConclusao    String?
+  dataRetornoSac     DateTime?
+  motivoEncerramento MotivoEncerramentoRo?
+  status             StatusRo              @default(RECEBIDA_SAC)
+
+  tarefas TarefaReclamacao[]
+  blocos  BlocoReclamacao[]
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("ReclamacaoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ano, sequencial])
+  @@index([recebidoEm])
+  @@index([status])
+}
+
+// Uma linha do plano de contencao ou do plano de acoes corretivas.
+model TarefaReclamacao {
+  id           Int        @id @default(autoincrement())
+  reclamacaoId Int
+  reclamacao   Reclamacao @relation(fields: [reclamacaoId], references: [id], onDelete: Cascade)
+
+  tipo        TipoTarefaRo
+  ordem       Int
+  descricao   String
+  responsavel String?
+  prazo       DateTime?
+  status      StatusAcaoRo @default(NAO_INICIADA)
+
+  @@index([reclamacaoId, tipo])
+}
+
+// Flag de bloco concluido. A propria existencia da linha e o flag: o sistema
+// cria quando o bloco fica completo e apaga se algum campo dele for esvaziado.
+model BlocoReclamacao {
+  id           Int        @id @default(autoincrement())
+  reclamacaoId Int
+  reclamacao   Reclamacao @relation(fields: [reclamacaoId], references: [id], onDelete: Cascade)
+
+  numero      Int // 1 a 4
+  concluidoEm DateTime @default(now())
+
+  concluidoPorId Int?
+  concluidoPor   Usuario? @relation("BlocoReclamacaoConcluidoPor", fields: [concluidoPorId], references: [id])
+
+  @@unique([reclamacaoId, numero])
 }

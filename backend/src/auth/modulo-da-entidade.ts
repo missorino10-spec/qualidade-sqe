@@ -4,6 +4,7 @@ import { DOC_8D, EVID_8D } from '../comum/oitod';
 import { DOC_5G, EVID_5G } from '../comum/cincog';
 import { FOTO_ICAQ } from '../comum/icaq';
 import { DESVIO } from '../comum/desvio-qualidade';
+import { DOC_RO, FOTO_RO } from '../comum/ro';
 import {
   TIPO_ANEXO_RELATORIO,
   TIPO_ANEXO_PLANO_ACAO,
@@ -61,6 +62,10 @@ export const MODULO_DA_ENTIDADE: Record<string, ModuloSistema> = {
   [DESVIO.homologacaoItem]: ModuloSistema.SQD,
   [TIPO_ANEXO_RELATORIO_AUDITORIA]: ModuloSistema.SQD,
   [TIPO_ANEXO_PLANO_ACAO_AUDITORIA]: ModuloSistema.SQD,
+
+  // R.O - o formulario recebido da Sala de Controle e as fotos de evidencia
+  [DOC_RO]: ModuloSistema.RO,
+  [FOTO_RO]: ModuloSistema.RO,
 };
 
 /**
