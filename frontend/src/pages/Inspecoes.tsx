@@ -42,7 +42,7 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
-import { OPCOES_NORMA, TabelaCotasMaxMin } from '../components/TabelaCotas';
+import { SelectNorma, TabelaCotasMaxMin } from '../components/TabelaCotas';
 import {
   UploadFotosEvidencia,
   enviarFotosEvidencia,
@@ -1281,7 +1281,7 @@ export default function Inspecoes() {
                   {/* A norma escolhida aqui puxa as tolerancias da tabela em
                       todas as cotas do dimensional. */}
                   <Form.Item name="toleranciasNorm" label="Tolerâncias / Norma">
-                    <Select options={OPCOES_NORMA} />
+                    <SelectNorma />
                   </Form.Item>
                 </Col>
                 <Col span={6}>

@@ -13,7 +13,7 @@ import {
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
-  OPCOES_NORMA,
+  SelectNorma,
   TabelaCotasMaxMin,
   cotaVaziaMaxMin,
 } from '../../components/TabelaCotas';
@@ -265,7 +265,7 @@ export function CamposRelatorio({
         name="toleranciasNorm"
         label="Tolerâncias / Norma (padrão do relatório)"
       >
-        <Select options={OPCOES_NORMA} />
+        <SelectNorma />
       </Form.Item>
 
       <Form.Item name="origem" label="Origem da inspeção">

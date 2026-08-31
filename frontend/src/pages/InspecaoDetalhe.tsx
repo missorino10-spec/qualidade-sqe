@@ -25,6 +25,7 @@ import NomeAssinatura from '../components/NomeAssinatura';
 import {
   EVID,
   checklistDoRelatorio,
+  labelNorma,
   labelOrigemInspecao,
   textoDesenho,
   textoRevisao,
@@ -122,7 +123,7 @@ function Formulario({
           {textoRevisao(dados.revisao)}
         </Descriptions.Item>
         <Descriptions.Item label="Tolerâncias / Norma">
-          {dados.toleranciasNorm ?? '-'}
+          {labelNorma(dados.toleranciasNorm) || '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Origem da inspeção" span={3}>
           {/* Em "Outros" sai junto o texto digitado, como na Manufatura. */}

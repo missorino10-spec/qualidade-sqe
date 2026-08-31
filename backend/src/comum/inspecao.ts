@@ -17,41 +17,83 @@
 // manual.
 export type UnidadeCota = 'mm' | 'graus';
 
-// Norma de referencia. ISO 2768 e DIN 7168 usam a MESMA tabela; em "NA" o
-// inspetor digita a tolerancia a mao (o resto do calculo continua automatico).
-export type NormaTolerancia = 'ISO2768' | 'DIN7168' | 'NA';
+// Norma de referencia da cota.
+//
+// ISO 2768 e DIN 7168 usam a MESMA tabela (classe m para dimensao, K para
+// forma e posicao) e sao as unicas em que o sistema sabe a tolerancia. Nas
+// outras duas quem informa e o inspetor:
+//   - "OUTROS": ele digita o nome da norma e a tolerancia; upper e lower saem
+//     calculados igual as duas de cima.
+//   - "NA": ele digita os proprios limites; a tolerancia vira opcional.
+//
+// Na opcao "Outros" o texto digitado E o valor gravado - nao ha coluna
+// separada. Por isso os registros antigos, que guardavam a norma como texto
+// livre, continuam legiveis sem conversao nenhuma.
+export type NormaPadrao = 'ISO2768' | 'DIN7168' | 'NA' | 'OUTROS';
+export type NormaTolerancia = NormaPadrao | (string & {});
 
-export const NORMAS_TOLERANCIA: Record<NormaTolerancia, string> = {
-  ISO2768: 'ISO 2768 - m (média)',
-  DIN7168: 'DIN 7168 - m (média)',
+// Escolhido "Outros" e ainda sem o nome digitado. Fica gravado assim mesmo:
+// no papel sai "Outros (norma informada)", que e honesto, em vez de um campo
+// vazio ou de uma norma que o inspetor nao escolheu.
+export const NORMA_OUTROS = 'OUTROS';
+
+export const NORMAS_TOLERANCIA: Record<NormaPadrao, string> = {
+  ISO2768: 'ISO 2768 - mK',
+  DIN7168: 'DIN 7168 - mK',
   NA: 'N/A (tolerância informada)',
+  OUTROS: 'Outros (norma informada)',
 };
 
 // Rotulo curto: a norma tambem e mostrada por cota, numa coluna estreita da
 // tabela, onde o texto cheio nao cabe.
-export const NORMAS_CURTAS: Record<NormaTolerancia, string> = {
-  ISO2768: 'ISO 2768-m',
-  DIN7168: 'DIN 7168-m',
+export const NORMAS_CURTAS: Record<NormaPadrao, string> = {
+  ISO2768: 'ISO 2768-mK',
+  DIN7168: 'DIN 7168-mK',
   NA: 'N/A',
+  OUTROS: 'Outros',
 };
 
 // Opcoes do campo "Tolerâncias / Norma" (cabecalho do relatorio e coluna da
-// tabela de cotas). ISO 2768 e DIN 7168 usam a MESMA tabela (classe m); em
-// N/A o inspetor digita a tolerancia.
-export const OPCOES_NORMA: { value: NormaTolerancia; label: string }[] = (
-  Object.keys(NORMAS_TOLERANCIA) as NormaTolerancia[]
+// tabela de cotas).
+export const OPCOES_NORMA: { value: NormaPadrao; label: string }[] = (
+  Object.keys(NORMAS_TOLERANCIA) as NormaPadrao[]
 ).map((value) => ({ value, label: NORMAS_TOLERANCIA[value] }));
 
-// Registros antigos guardavam a norma como texto livre; nesse caso sai o que
-// esta gravado, sem inventar um codigo que o inspetor nao escolheu.
+export function ehNormaPadrao(valor: unknown): valor is NormaPadrao {
+  return (
+    valor === 'ISO2768' ||
+    valor === 'DIN7168' ||
+    valor === 'NA' ||
+    valor === NORMA_OUTROS
+  );
+}
+
+// So nessas duas o sistema tem a tabela de tolerancia.
+export function normaTemTabela(valor: unknown): boolean {
+  return valor === 'ISO2768' || valor === 'DIN7168';
+}
+
+// Nome digitado pelo inspetor na opcao "Outros" - vazio quando ele escolheu
+// "Outros" mas ainda nao escreveu, e vazio nas tres opcoes fixas.
+export function normaDigitada(valor: unknown): string {
+  if (valor == null || valor === '' || ehNormaPadrao(valor)) return '';
+  return String(valor);
+}
+
+// Valor que o <Select> deve mostrar: norma digitada aparece como "Outros".
+export function normaSelecionada(valor: unknown): NormaPadrao {
+  if (valor == null || valor === '') return 'ISO2768';
+  return ehNormaPadrao(valor) ? valor : NORMA_OUTROS;
+}
+
 export function labelNorma(valor: unknown): string {
   if (valor == null || valor === '') return '';
-  return NORMAS_TOLERANCIA[valor as NormaTolerancia] ?? String(valor);
+  return ehNormaPadrao(valor) ? NORMAS_TOLERANCIA[valor] : String(valor);
 }
 
 export function normaCurta(valor: unknown): string {
   if (valor == null || valor === '') return '';
-  return NORMAS_CURTAS[valor as NormaTolerancia] ?? String(valor);
+  return ehNormaPadrao(valor) ? NORMAS_CURTAS[valor] : String(valor);
 }
 
 // A empresa trabalha sempre na classe "m" (media), por decisao do processo.
@@ -162,7 +204,7 @@ function limites(cota: CotaBase): {
   especificado: number;
   unidade: UnidadeCota;
   casas: number;
-  tolerancia: number;
+  tolerancia: number | null;
   upper: number;
   lower: number;
 } | null {
@@ -172,12 +214,36 @@ function limites(cota: CotaBase): {
   const unidade: UnidadeCota = cota.unidade === 'graus' ? 'graus' : 'mm';
   const casas = casasDaUnidade(unidade);
   const norma: NormaTolerancia = cota.norma ?? 'ISO2768';
-
-  // Em N/A a tolerancia e sempre a digitada. Nas normas, a tabela manda; a
-  // digitada so entra quando a medida esta fora do alcance da tabela.
   const digitada = numero(cota.tolerancia);
-  const daTabela = norma === 'NA' ? null : toleranciaPadrao(especificado, unidade);
-  const tolerancia = norma === 'NA' ? digitada : (daTabela ?? digitada);
+
+  // Em N/A quem manda sao os limites digitados: o desenho pode trazer campo
+  // assimetrico (ex: +0,5 / -0,1), que uma tolerancia so nao representa. A
+  // tolerancia continua valendo como atalho de quem tem o campo simetrico, e
+  // por isso os registros antigos, que so guardavam ela, seguem batendo.
+  if (norma === 'NA') {
+    const upperDigitado = numero(cota.upper);
+    const lowerDigitado = numero(cota.lower);
+    if (upperDigitado !== null && lowerDigitado !== null) {
+      return {
+        especificado,
+        unidade,
+        casas,
+        tolerancia:
+          digitada === null ? null : arredondar(Math.abs(digitada), casas),
+        upper: arredondar(Math.max(upperDigitado, lowerDigitado), casas),
+        lower: arredondar(Math.min(upperDigitado, lowerDigitado), casas),
+      };
+    }
+  }
+
+  // Nas duas normas com tabela ela manda, e a digitada so entra quando a
+  // medida esta fora do alcance. Em norma informada pelo inspetor ("Outros")
+  // o sistema nao tem tabela: vale a digitada, com upper e lower calculados
+  // do mesmo jeito.
+  const daTabela = normaTemTabela(norma)
+    ? toleranciaPadrao(especificado, unidade)
+    : null;
+  const tolerancia = daTabela ?? digitada;
   if (tolerancia === null) return null;
 
   return {
@@ -244,7 +310,7 @@ export function calcularCotaMaxMin(cota: CotaMaxMin): CotaMaxMin {
     ...cota,
     unidade: cota.unidade === 'graus' ? 'graus' : 'mm',
     norma: cota.norma ?? 'ISO2768',
-    tolerancia,
+    tolerancia: tolerancia ?? '',
     upper,
     lower,
     desvioMin: d.desvioMin ?? '',
@@ -275,7 +341,7 @@ export function calcularCotaPecas(cota: CotaPecas): CotaPecas {
     ...cota,
     unidade: cota.unidade === 'graus' ? 'graus' : 'mm',
     norma: cota.norma ?? 'ISO2768',
-    tolerancia,
+    tolerancia: tolerancia ?? '',
     upper,
     lower,
     desvioMin: d.desvioMin ?? '',

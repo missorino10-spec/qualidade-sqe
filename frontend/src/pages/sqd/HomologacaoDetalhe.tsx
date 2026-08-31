@@ -431,7 +431,7 @@ export default function HomologacaoDetalhe() {
           type="warning"
           showIcon
           message="Aprovado na condicional"
-          description="O relatório precisa apontar as ações e os prazos para os pontos reprovados abaixo, e o plano de ação do fornecedor deve ser anexado."
+          description="O relatório precisa apontar as ações e os prazos para os pontos reprovados abaixo."
         />
       )}
       {h.resultado === 'REPROVADO' && (

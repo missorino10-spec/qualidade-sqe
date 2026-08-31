@@ -16,6 +16,7 @@ import type { FormInstance } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { formatarMoedaInput, lerMoedaInput, moeda } from '../moeda';
+import { UNIDADES_ITEM } from '../unidades';
 
 /**
  * Par CODIGO + DESCRICAO do item, com consulta na base de codigos e custo.
@@ -286,8 +287,18 @@ export function CamposItem({
               </Form.Item>
             </Col>
             <Col xs={24} sm={10}>
-              <Form.Item name="unidade" label="Unidade">
-                <Input placeholder="PC, KG, M..." />
+              {/* Mesma lista fechada do cadastro de itens. */}
+              <Form.Item
+                name="unidade"
+                label="Unidade"
+                rules={[{ required: true, message: 'Escolha a unidade.' }]}
+              >
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Selecione"
+                  options={UNIDADES_ITEM}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={14}>

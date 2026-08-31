@@ -22,6 +22,7 @@ import { api } from '../api';
 import { useAuth } from '../auth';
 import Tabela from '../components/Tabela';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
+import { opcoesUnidadeItem } from '../unidades';
 
 /**
  * Base de codigos e custo (planilha "Base de Codigos e Custo.xlsx").
@@ -121,7 +122,7 @@ export default function Itens() {
       i ?? {
         codigo: '',
         descricao: '',
-        unidade: '',
+        unidade: undefined,
         custoUnitario: undefined,
         fornecedorId: undefined,
       },
@@ -280,8 +281,19 @@ export default function Itens() {
           </Row>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="unidade" label="Unidade">
-                <Input placeholder="PC, UN, KG..." />
+              {/* Lista fechada: com o campo aberto a mesma unidade entrava de
+                  varios jeitos ("PC", "PÇ", "Peça"). */}
+              <Form.Item
+                name="unidade"
+                label="Unidade"
+                rules={[{ required: true, message: 'Escolha a unidade.' }]}
+              >
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Selecione"
+                  options={opcoesUnidadeItem(editando?.unidade)}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>

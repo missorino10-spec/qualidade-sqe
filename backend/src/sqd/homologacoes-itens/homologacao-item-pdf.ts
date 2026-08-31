@@ -362,6 +362,32 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
 // O relatorio nao tem numero proprio: carrega o numero do registro mais a
 // revisao, que e o numero da tentativa.
 // ---------------------------------------------------------------------------
+
+// Cota que o inspetor mexeu. "norma" e "unidade" ficam de fora: nascem
+// preenchidas na linha em branco e diriam que toda cota tem conteudo.
+function cotaPreenchida(c: any): boolean {
+  if (!c) return false;
+  return [
+    c.localizacao,
+    c.especificado,
+    c.tolerancia,
+    c.upper,
+    c.lower,
+    c.encontradoMax,
+    c.encontradoMin,
+    c.instrumento,
+    ...(Array.isArray(c.pecas) ? c.pecas : []),
+  ].some((v) => String(v ?? '').trim() !== '');
+}
+
+// Houve inspecao dimensional nesta tentativa? Cota preenchida, foto de
+// evidencia ou observacao escrita - qualquer um basta.
+function houveAmostras(r: any, fotosDimensional: Buffer[]): boolean {
+  if (fotosDimensional.length) return true;
+  if (txt(r.observacoesAmostras)) return true;
+  return Array.isArray(r.cotas) && r.cotas.some(cotaPreenchida);
+}
+
 // As fotos do bloco EVIDENCIAS chegam como bytes (e nao como caminho) porque
 // ficam no Supabase Storage, nao no disco do servidor.
 export function gerarPdfRelatorioInspecaoItem(
@@ -483,47 +509,54 @@ export function gerarPdfRelatorioInspecaoItem(
   ]);
 
   // ------------------------------------------------ aba AMOSTRAS
-  t.estado.y += 6;
-  t.faixa('AMOSTRAS / SAMPLES — BDBR.QUA.FMR.011.06 (Rev. 06)');
-  t.estado.y = desenharTabelaCotas(doc, r.cotas, {
-    x0: X0,
-    largura: W,
-    y: t.estado.y,
-    margem: M,
-    rodape: RODAPE,
-  });
-
-  // Evidencia da aba AMOSTRAS: opcional, so entra no papel quando tem foto.
-  if (fotosDimensional.length) {
+  // A aba e opcional: ha item em que so se faz o visual. O formulario abre com
+  // uma cota em branco, entao a lista existir nao quer dizer que houve
+  // dimensional - o que conta e ter algo preenchido. Sem essa conferencia o
+  // papel saia com a faixa AMOSTRAS, uma tabela vazia e um resultado
+  // "Aprovado" que ninguem avaliou.
+  if (houveAmostras(r, fotosDimensional)) {
     t.estado.y += 6;
-    t.faixa('EVIDÊNCIAS DO DIMENSIONAL / DIMENSIONAL EVIDENCE');
-    t.estado.y = desenharFotosEvidencia(doc, fotosDimensional, {
+    t.faixa('AMOSTRAS / SAMPLES — BDBR.QUA.FMR.011.06 (Rev. 06)');
+    t.estado.y = desenharTabelaCotas(doc, r.cotas, {
       x0: X0,
       largura: W,
       y: t.estado.y,
       margem: M,
       rodape: RODAPE,
     });
-  }
 
-  t.estado.y += 4;
-  t.bloco(
-    'Observações finais / Final observations',
-    txt(r.observacoesAmostras) || 'Medidas em milímetro.',
-    30,
-  );
-  t.linha(
-    [
-      {
-        w: W,
-        label: 'RESULTADO / RESULT — AMOSTRAS',
-        valor: LABEL_RESULTADO[r.resultadoAmostras] ?? '',
-        cor: corResultado(r.resultadoAmostras),
-        negrito: true,
-      },
-    ],
-    30,
-  );
+    // Evidencia da aba AMOSTRAS: opcional, so entra no papel quando tem foto.
+    if (fotosDimensional.length) {
+      t.estado.y += 6;
+      t.faixa('EVIDÊNCIAS DO DIMENSIONAL / DIMENSIONAL EVIDENCE');
+      t.estado.y = desenharFotosEvidencia(doc, fotosDimensional, {
+        x0: X0,
+        largura: W,
+        y: t.estado.y,
+        margem: M,
+        rodape: RODAPE,
+      });
+    }
+
+    t.estado.y += 4;
+    t.bloco(
+      'Observações finais / Final observations',
+      txt(r.observacoesAmostras),
+      30,
+    );
+    t.linha(
+      [
+        {
+          w: W,
+          label: 'RESULTADO / RESULT — AMOSTRAS',
+          valor: LABEL_RESULTADO[r.resultadoAmostras] ?? '',
+          cor: corResultado(r.resultadoAmostras),
+          negrito: true,
+        },
+      ],
+      30,
+    );
+  }
 
   // ------------------------------------------------ aba VISUAL
   t.estado.y += 6;
@@ -580,15 +613,18 @@ export function gerarPdfRelatorioInspecaoItem(
   }
 
   // Bloco EVIDENCIAS do formulario visual: as fotos que comprovam a inspecao.
-  t.estado.y += 6;
-  t.faixa('EVIDÊNCIAS DO VISUAL / VISUAL EVIDENCE');
-  t.estado.y = desenharFotosEvidencia(doc, fotosVisual, {
-    x0: X0,
-    largura: W,
-    y: t.estado.y,
-    margem: M,
-    rodape: RODAPE,
-  });
+  // Igual ao do dimensional, so entra no papel quando tem foto.
+  if (fotosVisual.length) {
+    t.estado.y += 6;
+    t.faixa('EVIDÊNCIAS DO VISUAL / VISUAL EVIDENCE');
+    t.estado.y = desenharFotosEvidencia(doc, fotosVisual, {
+      x0: X0,
+      largura: W,
+      y: t.estado.y,
+      margem: M,
+      rodape: RODAPE,
+    });
+  }
   t.bloco('Descrição das evidências', txt(r.evidenciasVisual), 30);
   t.bloco('Observações finais', txt(r.observacoesVisual), 30);
   t.linha(

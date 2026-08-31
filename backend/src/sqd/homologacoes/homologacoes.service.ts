@@ -81,47 +81,27 @@ export class HomologacoesService {
   // O ciclo so fecha quando a homologacao esta completa: fornecedor avaliado,
   // relatorio final anexado e acao registrada.
   //
-  // O plano de acao so e cobrado no aprovado condicionalmente, que e o unico
-  // caso em que a homologacao depende do fornecedor corrigir alguma coisa. No
-  // aprovado ele e opcional (entra se o fornecedor mandar alguma melhoria) e no
-  // reprovado a conclusao e a recomendacao de troca, entao o registro precisa
-  // poder ser encerrado sem plano nenhum.
+  // O plano de acao do fornecedor NAO entra nessa conta. Ele continua no
+  // registro, com status e anexo proprios, mas quem decide se ele e necessario
+  // e a Qualidade - e no campo Acao que essa decisao fica escrita. Cobra-lo
+  // travava o encerramento de registro que ja estava resolvido por outro
+  // caminho (troca de fornecedor, acao interna, item descontinuado).
   private async pendenciasFinalizacao(h: {
     id: number;
     resultado: string | null;
     acao: string | null;
-    statusPlanoAcao: string | null;
   }): Promise<string[]> {
     const faltas: string[] = [];
     if (!h.resultado) faltas.push('a autoavaliação do fornecedor');
 
     const anexos = await this.prisma.anexo.findMany({
-      where: {
-        entidadeId: h.id,
-        entidadeTipo: { in: [TIPO_ANEXO_RELATORIO, TIPO_ANEXO_PLANO_ACAO] },
-      },
-      select: { entidadeTipo: true },
+      where: { entidadeId: h.id, entidadeTipo: TIPO_ANEXO_RELATORIO },
+      select: { id: true },
     });
-    const tem = (tipo: string) => anexos.some((a) => a.entidadeTipo === tipo);
 
-    if (!tem(TIPO_ANEXO_RELATORIO)) faltas.push('o relatório final anexado');
+    if (!anexos.length) faltas.push('o relatório final anexado');
     if (!h.acao?.trim()) faltas.push('o campo Ação preenchido');
 
-    if (h.resultado === 'APROVADO_CONDICIONALMENTE') {
-      if (
-        h.statusPlanoAcao !== 'FINALIZADO' &&
-        h.statusPlanoAcao !== 'NAO_APLICAVEL'
-      ) {
-        faltas.push(
-          'o plano de ação em "Finalizado" ou marcado como "Não aplicável"',
-        );
-      } else if (
-        h.statusPlanoAcao === 'FINALIZADO' &&
-        !tem(TIPO_ANEXO_PLANO_ACAO)
-      ) {
-        faltas.push('o plano de ação do fornecedor anexado');
-      }
-    }
     return faltas;
   }
 

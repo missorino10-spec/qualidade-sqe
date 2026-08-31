@@ -11,7 +11,7 @@ import {
   Space,
   Typography,
 } from 'antd';
-import { OPCOES_NORMA, cotaVaziaPecas } from '../../components/TabelaCotas';
+import { SelectNorma, cotaVaziaPecas } from '../../components/TabelaCotas';
 import {
   ORIGENS_RECEBIMENTO,
   CotaPecas,
@@ -47,11 +47,11 @@ export function cotasComDesvio(cotas: CotaPecas[]): boolean {
 }
 
 // Registros antigos guardavam a norma como texto livre ("ISO 2768 - média").
-// Na tela ela virou uma lista fechada, entao o que nao for codigo cai no padrao.
+// Hoje esse texto e exatamente o que a opcao "Outros" grava, entao ele volta
+// como esta: quem nunca preencheu e que cai no padrao.
 export function normaDoRelatorio(valor: unknown): NormaTolerancia {
-  return OPCOES_NORMA.some((o) => o.value === valor)
-    ? (valor as NormaTolerancia)
-    : 'ISO2768';
+  const texto = String(valor ?? '').trim();
+  return texto ? (texto as NormaTolerancia) : 'ISO2768';
 }
 
 // Checklist em branco a partir do catalogo que o backend devolve em
@@ -197,7 +197,7 @@ export function CamposCabecalhoInspecao() {
         {/* A norma escolhida aqui puxa as tolerancias da tabela em todas as
             cotas da aba AMOSTRAS. */}
         <Form.Item name="tolerancias" label="Tolerâncias / Norma">
-          <Select options={OPCOES_NORMA} />
+          <SelectNorma />
         </Form.Item>
       </Col>
       <Col xs={12} md={6}>

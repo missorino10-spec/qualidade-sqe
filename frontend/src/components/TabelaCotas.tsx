@@ -1,16 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Radio, Select, Table, Tag, Tooltip } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   CotaMaxMin,
   CotaPecas,
-  NORMAS_TOLERANCIA,
+  NORMA_OUTROS,
   NormaTolerancia,
   OPCOES_NORMA,
   UnidadeCota,
   calcularCotaMaxMin,
   calcularCotaPecas,
+  labelNorma,
   normaCurta,
+  normaDigitada,
+  normaSelecionada,
+  normaTemTabela,
   toleranciaPadrao,
 } from '../inspecao';
 import { useInstrumentos, opcoesInstrumento } from '../hooks';
@@ -31,6 +35,43 @@ const OPCOES_UNIDADE = [
 // A lista de normas vem do arquivo compartilhado (espelho do backend), para
 // nao existir uma segunda lista aqui.
 export { OPCOES_NORMA };
+
+/**
+ * Campo "Tolerâncias / Norma" do CABECALHO do relatorio, igual nos tres
+ * modulos. Em "Outros" abre o campo de texto: o que o inspetor escreve E o
+ * valor gravado, sem coluna separada no banco. Enquanto ele nao escreve nada
+ * fica gravado o proprio "OUTROS", que no papel sai como
+ * "Outros (norma informada)".
+ *
+ * Feito para entrar dentro de um <Form.Item>, que injeta value e onChange.
+ */
+export function SelectNorma({
+  value,
+  onChange,
+}: {
+  value?: NormaTolerancia;
+  onChange?: (v: NormaTolerancia) => void;
+}) {
+  const escolhida = normaSelecionada(value);
+  return (
+    <>
+      <Select
+        style={{ width: '100%' }}
+        value={escolhida}
+        options={OPCOES_NORMA}
+        onChange={(v) => onChange?.(v)}
+      />
+      {escolhida === NORMA_OUTROS && (
+        <Input
+          style={{ marginTop: 8 }}
+          placeholder="Qual norma?"
+          value={normaDigitada(value)}
+          onChange={(e) => onChange?.(e.target.value || NORMA_OUTROS)}
+        />
+      )}
+    </>
+  );
+}
 
 export function cotaVaziaMaxMin(norma: NormaTolerancia = 'ISO2768'): CotaMaxMin {
   return {
@@ -127,18 +168,51 @@ function sufixo(unidade?: UnidadeCota) {
   return unidade === 'graus' ? '°' : '';
 }
 
-// A tolerancia so e digitavel em N/A ou quando a medida esta fora do alcance
-// da tabela da norma. Nos demais casos ela vem pronta e fica travada.
+// Campo numerico que o motor de calculo devolve arredondado (tolerancia, upper
+// e lower). Enquanto o inspetor digita o que vale e o texto dele: sem isso a
+// virgula sumia no meio da digitacao, porque "0," ja e o numero 0 e voltava
+// para a tela como "0".
+function CampoNumero({
+  valor,
+  onChange,
+}: {
+  valor: unknown;
+  onChange: (v: string) => void;
+}) {
+  const [digitando, setDigitando] = useState<string | null>(null);
+  return (
+    <Input
+      size="small"
+      value={digitando ?? br(valor)}
+      onChange={(e) => {
+        setDigitando(e.target.value);
+        onChange(e.target.value);
+      }}
+      onBlur={() => setDigitando(null)}
+    />
+  );
+}
+
+// A tolerancia so vem pronta nas duas normas com tabela, e mesmo nelas some
+// quando a medida esta fora do alcance. Em N/A e na norma informada pelo
+// inspetor ("Outros") o sistema nao tem tabela: quem digita e ele.
 function toleranciaEditavel(cota: CotaMaxMin | CotaPecas): boolean {
   const norma: NormaTolerancia = cota.norma ?? 'ISO2768';
-  if (norma === 'NA') return true;
+  if (!normaTemTabela(norma)) return true;
   const especificado = Number(String(cota.especificado ?? '').replace(',', '.'));
   if (!Number.isFinite(especificado) || !especificado) return true;
   return toleranciaPadrao(especificado, cota.unidade ?? 'mm') === null;
 }
 
-// Trocar a norma refaz a tolerancia: nas normas ela volta da tabela, em N/A
-// ela e digitada e por isso o que ja estava escrito e preservado.
+// Em N/A os limites vem do desenho e podem ser assimetricos (ex: +0,5 / -0,1),
+// coisa que uma tolerancia so nao representa: por isso ali quem digita upper e
+// lower e o inspetor. Nas demais normas eles saem da conta.
+function limitesEditaveis(cota: CotaMaxMin | CotaPecas): boolean {
+  return (cota.norma ?? 'ISO2768') === 'NA';
+}
+
+// Trocar a norma refaz a tolerancia: onde ha tabela ela volta da tabela, nas
+// outras ela e digitada e por isso o que ja estava escrito e preservado.
 function trocarNorma<T extends CotaMaxMin | CotaPecas>(
   cota: T,
   norma: NormaTolerancia,
@@ -147,7 +221,7 @@ function trocarNorma<T extends CotaMaxMin | CotaPecas>(
   return calcular({
     ...cota,
     norma,
-    tolerancia: norma === 'NA' ? cota.tolerancia : '',
+    tolerancia: normaTemTabela(norma) ? '' : cota.tolerancia,
   });
 }
 
@@ -180,6 +254,21 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
     ),
   });
 
+  // UPPER e LOWER: calculados nas normas com tolerancia, digitados em N/A.
+  const limite = (titulo: string, campo: 'upper' | 'lower') => ({
+    title: titulo,
+    width: 90,
+    render: (_: any, r: any, i: number) =>
+      limitesEditaveis(r) ? (
+        <CampoNumero
+          valor={r[campo]}
+          onChange={(v) => edit(i, campo, v)}
+        />
+      ) : (
+        <Input size="small" disabled value={br(r[campo])} />
+      ),
+  });
+
   return {
     localizacao: txt('LOCALIZAÇÃO', 'localizacao', 150),
     especificado: txt('ESPECIFICADO', 'especificado', 110),
@@ -199,23 +288,43 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
     // Cada cota tem a sua norma: a mesma peca pode ter uma cota pela ISO 2768
     // e outra com tolerancia de desenho (N/A). O campo do cabecalho continua
     // valendo como padrao do relatorio.
+    //
+    // Em "Outros" o proprio nome digitado e o valor gravado no campo: nao ha
+    // coluna separada, e por isso os relatorios antigos, que guardavam a norma
+    // como texto livre, continuam aparecendo certos aqui.
     norma: {
       title: 'NORMA',
-      width: 120,
-      render: (_: any, r: any, i: number) => (
-        <Tooltip title={NORMAS_TOLERANCIA[(r.norma ?? 'ISO2768') as NormaTolerancia]}>
-          <Select
-            size="small"
-            style={{ width: '100%' }}
-            value={r.norma ?? 'ISO2768'}
-            options={OPCOES_NORMA.map((o) => ({
-              value: o.value,
-              label: normaCurta(o.value),
-            }))}
-            onChange={(v) => edit(i, 'norma', v)}
-          />
-        </Tooltip>
-      ),
+      width: 150,
+      render: (_: any, r: any, i: number) => {
+        const escolhida = normaSelecionada(r.norma);
+        return (
+          <>
+            <Tooltip title={labelNorma(r.norma ?? 'ISO2768')}>
+              <Select
+                size="small"
+                style={{ width: '100%' }}
+                value={escolhida}
+                options={OPCOES_NORMA.map((o) => ({
+                  value: o.value,
+                  label: normaCurta(o.value),
+                }))}
+                onChange={(v) => edit(i, 'norma', v)}
+              />
+            </Tooltip>
+            {escolhida === NORMA_OUTROS && (
+              <Input
+                size="small"
+                style={{ marginTop: 4 }}
+                placeholder="Qual norma?"
+                value={normaDigitada(r.norma)}
+                onChange={(e) =>
+                  edit(i, 'norma', e.target.value || NORMA_OUTROS)
+                }
+              />
+            )}
+          </>
+        );
+      },
     },
     tolerancia: {
       title: 'TOLERÂNCIA',
@@ -225,27 +334,33 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
         return (
           <Tooltip
             title={
-              editavel
-                ? 'Medida fora da tabela da norma: informe a tolerância.'
-                : 'Tolerância da norma (ISO 2768 / DIN 7168, classe m).'
+              !editavel
+                ? 'Tolerância da norma (ISO 2768 / DIN 7168, classe m).'
+                : limitesEditaveis(r)
+                  ? 'Opcional: em N/A quem manda são o upper e o lower digitados.'
+                  : 'O sistema não tem a tabela desta norma: informe a tolerância.'
             }
           >
-            <Input
-              size="small"
-              disabled={!editavel}
-              value={
-                editavel
-                  ? (r.tolerancia ?? '')
-                  : `±${br(r.tolerancia)}${sufixo(r.unidade)}`
-              }
-              onChange={(e) => edit(i, 'tolerancia', e.target.value)}
-            />
+            {editavel ? (
+              <span>
+                <CampoNumero
+                  valor={r.tolerancia}
+                  onChange={(v) => edit(i, 'tolerancia', v)}
+                />
+              </span>
+            ) : (
+              <Input
+                size="small"
+                disabled
+                value={`±${br(r.tolerancia)}${sufixo(r.unidade)}`}
+              />
+            )}
           </Tooltip>
         );
       },
     },
-    upper: somenteLeitura('UPPER', 90, (r) => br(r.upper)),
-    lower: somenteLeitura('LOWER', 90, (r) => br(r.lower)),
+    upper: limite('UPPER', 'upper'),
+    lower: limite('LOWER', 'lower'),
     instrumento: {
       title: 'INSTRUMENTO UTILIZADO',
       width: 200,

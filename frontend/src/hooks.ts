@@ -40,26 +40,40 @@ export function useInstrumentos() {
  * O que fica gravado na cota e o texto, nao o id: assim o relatorio antigo
  * continua legivel e o PDF nao precisa consultar o cadastro.
  *
- * 36 dos 52 instrumentos nao tem codigo - nesses o rotulo e so o equipamento.
+ * No relatorio vale a TAG do instrumento, so ela: e por ela que se chega ao
+ * certificado de calibracao. O nome do equipamento so aparece em quem ainda
+ * nao tem TAG cadastrada (36 dos 53) - sem isso esses instrumentos ficariam
+ * com o rotulo em branco e ninguem conseguiria escolher.
  */
 export function rotuloInstrumento(i: any): string {
   const codigo = String(i?.codigo ?? '').trim();
   const equipamento = String(i?.equipamento ?? '').trim();
   if (!codigo || codigo === '-') return equipamento;
-  return `${codigo} — ${equipamento}`;
+  return codigo;
 }
 
 export function opcoesInstrumento(lista?: any[]) {
   const hoje = new Date();
-  return (lista ?? []).map((i) => {
+  const vistos = new Set<string>();
+  const opcoes: { value: string; label: string }[] = [];
+
+  for (const i of lista ?? []) {
     const rotulo = rotuloInstrumento(i);
+    // Duas TAGs iguais no cadastro viram uma opcao so: com o mesmo valor nas
+    // duas o inspetor nao teria como diferenciar, e o que fica gravado na cota
+    // seria identico de qualquer jeito. Na tela de Cadastros os dois continuam
+    // aparecendo, para poderem ser corrigidos.
+    if (!rotulo || vistos.has(rotulo)) continue;
+    vistos.add(rotulo);
+
     // Instrumento com calibracao vencida continua na lista, mas avisado: some-lo
     // faria o inspetor achar que o instrumento sumiu do cadastro.
     const vencido =
       !!i.proximaCalibracao && new Date(i.proximaCalibracao) < hoje;
-    return {
+    opcoes.push({
       value: rotulo,
       label: vencido ? `${rotulo} (calibração vencida)` : rotulo,
-    };
-  });
+    });
+  }
+  return opcoes;
 }

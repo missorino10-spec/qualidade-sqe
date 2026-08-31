@@ -60,6 +60,7 @@ import {
 import {
   EVID,
   checklistDoRelatorio,
+  labelNorma,
   textoDesenho,
   textoRevisao,
 } from '../../inspecao';
@@ -732,7 +733,7 @@ export default function HomologacaoItemDetalhe() {
                       {textoRevisao(recente.desenhoRevisao)}
                     </Descriptions.Item>
                     <Descriptions.Item label="Tolerâncias">
-                      {recente.tolerancias ?? '-'}
+                      {labelNorma(recente.tolerancias) || '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="NF">
                       {recente.nf ?? '-'}
