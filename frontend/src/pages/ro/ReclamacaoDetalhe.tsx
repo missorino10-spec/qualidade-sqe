@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -28,6 +28,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { dataBR, dataInput } from '../../formatos';
 import DocumentoReferenciado from '../../components/DocumentoReferenciado';
+import { CamposItem } from '../../components/CamposItem';
 import {
   UploadFotosEvidencia,
   FotosEvidenciaSalvas,
@@ -99,6 +100,10 @@ export default function ReclamacaoDetalhe() {
   // Fotos escolhidas antes de gravar: o anexo precisa do id do R.O, que so
   // existe depois do POST.
   const [fotos, setFotos] = useState<any[]>([]);
+  // Codigo do produto como veio gravado. Serve para nao deixar a base
+  // sobrescrever o valor unitario que ja esta no registro quando a tela e
+  // reaberta; trocando o codigo, o valor da base entra normalmente.
+  const codigoGravado = useRef<string | null>(null);
 
   const { data: listas } = useQuery<ListasRo>({
     queryKey: ['ro-listas'],
@@ -123,6 +128,7 @@ export default function ReclamacaoDetalhe() {
       return;
     }
     if (!reg) return;
+    codigoGravado.current = reg.produtoCodigo ?? null;
     form.setFieldsValue({
       cliente: reg.cliente ?? '',
       produtoCodigo: reg.produtoCodigo ?? '',
@@ -408,15 +414,33 @@ export default function ReclamacaoDetalhe() {
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col xs={24} sm={8} lg={6}>
-              <Form.Item name="produtoCodigo" label="Código do produto">
-                <Input maxLength={60} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={16} lg={10}>
-              <Form.Item name="produtoDescricao" label="Descrição do item">
-                <Input maxLength={200} />
-              </Form.Item>
+            {/* Digitando o codigo, a descricao e o valor unitario vem da base
+                de itens, como na RNC e no CNQ. Os spans internos 9/15 dentro
+                do lg={16} dao os mesmos 6 e 10 de 24 de antes. */}
+            <Col xs={24} lg={16}>
+              <CamposItem
+                form={form}
+                nomeCodigo="produtoCodigo"
+                nomeDescricao="produtoDescricao"
+                rotuloCodigo="Código do produto"
+                rotuloDescricao="Descrição do item"
+                spanCodigo={9}
+                spanDescricao={15}
+                aoResolver={(item) => {
+                  if (item?.custoUnitario == null) return;
+                  // Reabrindo a reclamacao com o mesmo codigo que ja esta
+                  // gravado, o valor do registro manda: pode ter sido ajustado
+                  // na mao. Codigo novo ou trocado puxa o custo da base.
+                  if (
+                    item.codigo === codigoGravado.current &&
+                    form.getFieldValue('valorUnitario') != null
+                  )
+                    return;
+                  // O Custo Total R.O usa Form.useWatch, que enxerga o
+                  // setFieldValue: nao precisa recalcular na mao.
+                  form.setFieldValue('valorUnitario', item.custoUnitario);
+                }}
+              />
             </Col>
             <Col xs={12} sm={12} lg={4}>
               <Form.Item name="quantidadeAfetada" label="Quantidade afetada">
