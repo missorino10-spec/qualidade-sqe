@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
@@ -105,6 +106,8 @@ class RelatorioInspecaoDto {
   // assina com o usuario logado.
 
   @IsOptional() @IsArray() cotas?: any[];
+  // Peca de conjunto: desenhos do 2o em diante. Ver comum/inspecao.ts.
+  @IsOptional() @IsArray() desenhos?: any[];
   @IsOptional() @IsString() observacoesAmostras?: string;
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultadoAmostras?: string;
 
@@ -112,6 +115,10 @@ class RelatorioInspecaoDto {
   @IsOptional() @IsString() evidenciasVisual?: string;
   @IsOptional() @IsString() observacoesVisual?: string;
   @IsOptional() @IsIn(['APROVADO', 'REPROVADO']) resultadoVisual?: string;
+
+  // Salvar sem terminar. A tentativa ja e consumida, mas a homologacao segue
+  // sem resultado e sem fechar o ciclo. PATCH sem esta marca LANCA o rascunho.
+  @IsOptional() @IsBoolean() rascunho?: boolean;
 }
 
 // Desvio de qualidade (concessao): quantidade, prazo, ou os dois. A validacao
@@ -179,7 +186,7 @@ export class HomologacoesItensController {
       ? relatorios.find((x) => x.tentativa === alvo)
       : relatorios.at(-1);
     // Dois blocos independentes de evidencia, um por aba do relatorio.
-    const [fotosDimensional, fotosVisual] = await Promise.all([
+    const [fotosDimensional, fotosVisual, fotosDesvio] = await Promise.all([
       carregarFotosEvidencia(
         this.prisma,
         this.storage,
@@ -192,12 +199,22 @@ export class HomologacoesItensController {
         EVID.homologacaoItemVisual,
         rel?.id,
       ),
+      // Sem teto: e uma foto por item reprovado, e cortar em 4 esconderia
+      // justamente o desvio que o relatorio precisa mostrar.
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.homologacaoItemVisualDesvio,
+        rel?.id,
+        Infinity,
+      ),
     ]);
     const doc = gerarPdfRelatorioInspecaoItem(
       h,
       alvo,
       fotosVisual,
       fotosDimensional,
+      fotosDesvio,
     );
     this.enviarPdf(res, `${h.numero.replace('/', '-')}-relatorio.pdf`);
     doc.pipe(res);
@@ -238,6 +255,16 @@ export class HomologacoesItensController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.salvarRelatorio(id, { ...dto, tentativa }, user.id);
+  }
+
+  // Descartar rascunho. Sem @Roles: o rascunho e visivel para todo mundo do
+  // modulo e nunca definiu resultado, entao jogar fora nao desfaz nada.
+  @Delete(':id/relatorio/:tentativa/rascunho')
+  descartarRascunhoRelatorio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tentativa', ParseIntPipe) tentativa: number,
+  ) {
+    return this.service.descartarRascunhoRelatorio(id, tentativa);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

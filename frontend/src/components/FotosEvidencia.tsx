@@ -49,16 +49,79 @@ export async function enviarFotosEvidencia(
   fotos: any[],
   entidadeTipo: string,
   entidadeId: number,
+  // Legenda opcional, usada pela foto do desvio visual: e o texto do item do
+  // checklist que reprovou, e sai embaixo da imagem no PDF.
+  legenda?: string,
 ) {
   for (const f of fotos.slice(0, MAX_FOTOS_EVIDENCIA)) {
     const arquivo = f.originFileObj ?? f;
     const fd = new FormData();
     fd.append('file', arquivo as Blob);
     try {
-      await api.post('/anexos', fd, { params: { entidadeTipo, entidadeId } });
+      await api.post('/anexos', fd, {
+        params: { entidadeTipo, entidadeId, legenda },
+      });
     } catch {
       message.warning(`A evidência "${f.name}" não pôde ser enviada.`);
     }
+  }
+}
+
+// Fotos do desvio visual: o inspetor marca um item do checklist como REPROVADO
+// e a foto entra ali mesmo, na linha do item. O estado e um mapa
+// "chave do item" -> lista de arquivos, porque a legenda de cada foto e o
+// proprio texto do item.
+export type FotosDesvio = Record<string, any[]>;
+
+export function chaveDesvio(gi: number, ii: number): string {
+  return `${gi}-${ii}`;
+}
+
+export function UploadFotoDesvio({
+  fotos,
+  setFotos,
+}: {
+  fotos: any[];
+  setFotos: (f: any[]) => void;
+}) {
+  return (
+    <Upload
+      multiple
+      accept="image/png,image/jpeg,image/heic,image/heif"
+      listType="picture"
+      fileList={fotos}
+      beforeUpload={(arquivo) => {
+        if (!/^image\//.test(arquivo.type)) {
+          message.error('A evidência precisa ser uma foto (JPG, PNG ou HEIC).');
+          return Upload.LIST_IGNORE;
+        }
+        return false;
+      }}
+      onChange={({ fileList }) =>
+        setFotos(fileList.slice(0, MAX_FOTOS_EVIDENCIA))
+      }
+    >
+      <Button size="small" icon={<UploadOutlined />} disabled={fotos.length >= MAX_FOTOS_EVIDENCIA}>
+        Foto do desvio
+      </Button>
+    </Upload>
+  );
+}
+
+// Sobe as fotos de todos os itens reprovados de uma vez, cada uma com a
+// legenda do seu item. Fotos de item que deixou de estar reprovado ficam de
+// fora: o inspetor pode ter marcado, tirado a foto e voltado atras.
+export async function enviarFotosDesvio(
+  fotosPorItem: FotosDesvio,
+  legendaDe: (chave: string) => string | null,
+  entidadeTipo: string,
+  entidadeId: number,
+) {
+  for (const [chave, fotos] of Object.entries(fotosPorItem)) {
+    if (!fotos?.length) continue;
+    const legenda = legendaDe(chave);
+    if (!legenda) continue;
+    await enviarFotosEvidencia(fotos, entidadeTipo, entidadeId, legenda);
   }
 }
 

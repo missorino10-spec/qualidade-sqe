@@ -155,7 +155,9 @@ export class PainelSqdService {
         leadTimeDiasUteis: true,
         tempoRespostaDiasUteis: true,
         tempoTotalDiasUteis: true,
-        _count: { select: { relatorios: true } },
+        // Rascunho nao conta como tentativa no indicador: o relatorio pela
+        // metade nao e uma rodada de amostras que o fornecedor perdeu.
+        _count: { select: { relatorios: { where: { rascunho: false } } } },
       },
     });
 

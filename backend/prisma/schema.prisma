@@ -246,6 +246,10 @@ model Anexo {
   caminho      String
   mimeType     String?
   tamanho      Int?
+  // Legenda da foto no PDF. Na foto de desvio da inspecao visual e o texto do
+  // item do checklist que reprovou, para o relatorio dizer QUAL desvio a imagem
+  // mostra. Nos demais anexos fica nulo e o bloco sai como sempre saiu.
+  legenda      String?
   uploadedById Int?
   uploadedBy   Usuario? @relation(fields: [uploadedById], references: [id])
   createdAt    DateTime @default(now())
@@ -378,6 +382,13 @@ model InspecaoVisual {
   observacoes String?
   resultado   ResultadoInspecao @default(APROVADO)
 
+  // Inspecao salva pela metade, para terminar depois. Enquanto e rascunho ela
+  // NAO conta em lugar nenhum: nao soma nos contadores do fornecedor, nao zera
+  // o ciclo de periodicidade, nao abre RNC e fica de fora dos indicadores. O
+  // numero do recebimento ja e consumido na hora de salvar, para o documento
+  // nascer com a identificacao que vai levar ate o fim.
+  rascunho Boolean @default(false)
+
   // Abrir RNC e decisao do inspetor. Quando ele diz NAO, a inspecao encerra
   // APROVADA e os itens reprovados continuam marcados no checklist - o que
   // muda e o veredito do recebimento, nao o que foi observado. A justificativa
@@ -412,6 +423,10 @@ model InspecaoLote {
   desenhoRev      String?
   desenho         String?
   revisao         String?
+  // Peca de conjunto: desenhos EXTRAS, do 2o em diante ([{ desenho, revisao }]).
+  // O 1o continua nos campos acima e cada cota diz a qual desenho pertence pelo
+  // "desenhoIdx". Ver comum/inspecao.ts (gruposDeDesenho).
+  desenhos        Json?
   toleranciasNorm String?
   notaFiscal      String?
   po              String?
@@ -429,6 +444,10 @@ model InspecaoLote {
 
   observacoes String?
   resultado   ResultadoInspecao @default(APROVADO)
+
+  // Ver InspecaoVisual: rascunho e a inspecao salva pela metade, fora de todos
+  // os contadores e indicadores ate ser lancada.
+  rascunho Boolean @default(false)
 
   // Abrir RNC e decisao do inspetor. Quando ele diz NAO, a inspecao encerra
   // APROVADA e as cotas reprovadas continuam marcadas na tabela - o que muda e
@@ -714,6 +733,10 @@ model RelatorioDimensional {
   desenhoRev      String?
   desenho         String?
   desenhoRevisao  String?
+  // Peca de conjunto: desenhos EXTRAS, do 2o em diante ([{ desenho, revisao }]).
+  // O 1o continua nos campos acima e cada cota diz a qual desenho pertence pelo
+  // "desenhoIdx". Ver comum/inspecao.ts (gruposDeDesenho).
+  desenhos        Json?
   // Norma de tolerancia do relatorio: ISO2768 | DIN7168 | NA
   toleranciasNorm String?
   po              String?
@@ -747,6 +770,10 @@ model RelatorioDimensional {
   inspetorId      Int?
   inspetor        Usuario? @relation("RelatorioInspetor", fields: [inspetorId], references: [id])
   createdAt       DateTime @default(now())
+
+  // Ver InspecaoVisual: relatorio salvo pela metade. Fora do PPM, da taxa de
+  // aprovacao e dos contadores da maquina ate ser lancado.
+  rascunho Boolean @default(false)
 
   @@unique([tipo, ano, sequencial])
   @@index([inspecaoId])
@@ -793,6 +820,10 @@ model InspecaoVisualManufatura {
   inspetorId      Int?
   inspetor        Usuario? @relation("InspVisualManufaturaInspetor", fields: [inspetorId], references: [id])
   createdAt       DateTime @default(now())
+
+  // Ver InspecaoVisual: inspecao salva pela metade, fora dos indicadores ate
+  // ser lancada.
+  rascunho Boolean @default(false)
 
   @@unique([tipo, ano, sequencial])
   @@index([tipo, dataInspecao])
@@ -1429,6 +1460,10 @@ model RelatorioInspecaoItem {
   desenhoRev      String?
   desenho         String?
   desenhoRevisao  String?
+  // Peca de conjunto: desenhos EXTRAS, do 2o em diante ([{ desenho, revisao }]).
+  // O 1o continua nos campos acima e cada cota diz a qual desenho pertence pelo
+  // "desenhoIdx". Ver comum/inspecao.ts (gruposDeDesenho).
+  desenhos        Json?
   tolerancias     String?
   nf              String?
   po              String?
@@ -1450,6 +1485,10 @@ model RelatorioInspecaoItem {
   evidenciasVisual  String?
   observacoesVisual String?
   resultadoVisual   ResultadoInspecao?
+
+  // Ver InspecaoVisual: relatorio salvo pela metade. Nao apura o resultado do
+  // item nem entra nos indicadores do SQD ate ser lancado.
+  rascunho Boolean @default(false)
 
   criadoPorId Int?
   criadoPor   Usuario? @relation("RelatorioItemCriadoPor", fields: [criadoPorId], references: [id])

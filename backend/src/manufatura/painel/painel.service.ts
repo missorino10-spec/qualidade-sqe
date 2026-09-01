@@ -27,7 +27,11 @@ export class PainelManufaturaService {
       this.prisma.inspecaoManufatura.findMany({
         where: temPeriodo ? { dataInspecao: periodo } : {},
         include: {
+          // Rascunho fica de fora do indicador: enquanto o relatorio nao for
+          // lancado, a inspecao ainda nao tem resultado nenhum. Uma inspecao
+          // que so tem rascunho nem sequer conta como inspecao feita.
           relatorios: {
+            where: { rascunho: false },
             orderBy: { tentativa: 'desc' },
             select: { resultado: true },
           },

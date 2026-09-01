@@ -14,6 +14,7 @@ import {
   GrupoVisual,
   calcularCotaPecas,
   checklistVisualInicial,
+  desenhosExtras,
   resultadoDimensional,
   resultadoVisual,
 } from '../../comum/inspecao';
@@ -231,6 +232,13 @@ export class HomologacoesItensService {
     if (dto.tentativa && !existente) {
       throw new NotFoundException('Tentativa não encontrada');
     }
+    // Rascunho aberto segura a tentativa nova: seriam duas rodadas de amostras
+    // em aberto no mesmo registro, nenhuma delas com resultado apurado.
+    if (!existente && atual.relatorios.some((r) => r.rascunho)) {
+      throw new ConflictException(
+        'Existe um relatório em rascunho nesta homologação. Lance ou descarte esse rascunho antes de abrir uma tentativa nova.',
+      );
+    }
 
     const tentativa = existente
       ? existente.tentativa
@@ -238,7 +246,18 @@ export class HomologacoesItensService {
 
     const dataInspecao = dataPura(dto.dataInspecao) ?? new Date();
 
+    // Relatorio salvo pela metade. A tentativa ja e consumida aqui - o
+    // documento nasce com o numero que vai levar ate o fim -, mas o registro
+    // continua sem resultado: para a homologacao o item ainda nao foi
+    // inspecionado, e por isso ele nao fecha o ciclo nem entra nos
+    // indicadores. Corrigir um relatorio ja lancado nunca o devolve a
+    // rascunho: so quem esta em rascunho e que pode continuar em rascunho.
+    const rascunho = existente
+      ? existente.rascunho && dto.rascunho === true
+      : dto.rascunho === true;
+
     const dados = {
+      rascunho,
       revisao: String(tentativa).padStart(2, '0'),
       dataInspecao,
       origem: dto.origem ?? 'HOMOLOGACAO',
@@ -253,6 +272,9 @@ export class HomologacoesItensService {
       // "Elaborado / Inspecionado por" saiu do formulario: quem assina e o
       // usuario logado, gravado em criadoPorId.
       cotas: cotas as any,
+      // Peca de conjunto: desenhos do 2o em diante. Sempre array (nunca null),
+      // porque o campo e Json? e o Prisma cobraria JsonNull no lugar de null.
+      desenhos: desenhosExtras(dto.desenhos ?? existente?.desenhos) as any,
       observacoesAmostras: dto.observacoesAmostras ?? null,
       resultadoAmostras: resAmostras,
       checklistVisual: checklist as any,
@@ -277,10 +299,14 @@ export class HomologacoesItensService {
       });
     }
 
-    // O resultado da homologacao sai sempre do relatorio mais recente: o item
-    // so e aprovado quando AMOSTRAS e VISUAL sao aprovadas.
+    // Rascunho nao mexe no registro: sem resultado, a homologacao segue
+    // devendo o relatorio de inspecao e o ciclo nao fecha.
+    if (rascunho) return this.detalhe(id);
+
+    // O resultado da homologacao sai sempre do relatorio mais recente JA
+    // LANCADO: um rascunho de tentativa mais alta nao decide nada.
     const relatorios = await this.prisma.relatorioInspecaoItem.findMany({
-      where: { homologacaoId: id },
+      where: { homologacaoId: id, rascunho: false },
       orderBy: { tentativa: 'desc' },
       take: 1,
     });
@@ -325,7 +351,7 @@ export class HomologacoesItensService {
     });
 
     const restantes = await this.prisma.relatorioInspecaoItem.findMany({
-      where: { homologacaoId: id },
+      where: { homologacaoId: id, rascunho: false },
       orderBy: { tentativa: 'desc' },
       take: 1,
     });
@@ -340,6 +366,23 @@ export class HomologacoesItensService {
             ? 'APROVADO'
             : 'REPROVADO',
       },
+    });
+    return this.detalhe(id);
+  }
+
+  // Descartar rascunho: joga fora a tentativa que ficou pela metade. Nao ha o
+  // que recalcular no registro, porque o rascunho nunca definiu resultado.
+  async descartarRascunhoRelatorio(id: number, tentativa: number) {
+    const relatorio = await this.prisma.relatorioInspecaoItem.findFirst({
+      where: { homologacaoId: id, tentativa },
+    });
+    if (!relatorio) throw new NotFoundException('Tentativa não encontrada');
+    if (!relatorio.rascunho)
+      throw new ConflictException(
+        'Este relatório já foi lançado e não pode mais ser descartado.',
+      );
+    await this.prisma.relatorioInspecaoItem.delete({
+      where: { id: relatorio.id },
     });
     return this.detalhe(id);
   }

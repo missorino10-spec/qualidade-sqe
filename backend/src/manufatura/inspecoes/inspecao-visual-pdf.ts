@@ -1,7 +1,10 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+import {
+  FotoEvidencia,
+  desenharFotosEvidencia,
+} from '../../comum/fotos-evidencia';
 import { ORIGENS_INSPECAO } from '../../comum/inspecao';
 import { nomeCurto } from '../../comum/nome';
 import { valorDeCelula } from '../../comum/pdf-texto';
@@ -47,7 +50,7 @@ function txt(v: any): string {
 
 export function gerarPdfInspecaoVisual(
   insp: any,
-  fotos: Buffer[] = [],
+  fotos: FotoEvidencia[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   let y = 0;

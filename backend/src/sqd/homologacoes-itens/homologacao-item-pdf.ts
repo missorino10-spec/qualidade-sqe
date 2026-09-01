@@ -1,13 +1,9 @@
-import { fraseFaltas } from '../../comum/pendencias';
 import { nomeCurto } from '../../comum/nome';
 import PDFDocument from 'pdfkit';
 // Mesmo desenho dos PDFs da homologacao de fornecedores: cabecalho, faixas
 // laranja, celulas rotuladas e rodape com paginacao. Aqui so mudam os campos.
 import {
   CINZA,
-  LABEL_EFETIVIDADE,
-  LABEL_PLANO,
-  LABEL_STATUS,
   LARANJA,
   M,
   PRETO,
@@ -19,16 +15,13 @@ import {
   X1,
   ferramentas,
   fmtData,
-  fmtPrazo,
   txt,
 } from '../homologacoes/homologacao-pdf';
+import { desenharCotasPorDesenho } from '../../comum/cotas-pdf';
 import {
-  ACOES_HOMOLOGACAO_ITEM,
-  SLA_HOMOLOGACAO_ITEM_DIAS,
-  SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
-} from './itens-utils';
-import { desenharTabelaCotas } from '../../comum/cotas-pdf';
-import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+  FotoEvidencia,
+  desenharFotosEvidencia,
+} from '../../comum/fotos-evidencia';
 import {
   checklistDoRelatorio,
   labelNorma,
@@ -75,15 +68,6 @@ function num(v: any): string {
   const n = Number(String(v).replace(',', '.'));
   if (!Number.isFinite(n)) return String(v);
   return n.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-}
-
-function moeda(v?: number | null): string {
-  return v == null
-    ? ''
-    : v.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      });
 }
 
 // ---------------------------------------------------------------------------
@@ -138,66 +122,22 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
       valor: LABEL_SOLICITANTE[h.solicitante] ?? txt(h.solicitante),
     },
     {
-      w: 190,
+      w: W - 145,
       label: 'MOTIVO DA SOLICITAÇÃO',
       valor: LABEL_MOTIVO[h.motivo] ?? txt(h.motivo),
     },
-    {
-      w: W - 145 - 190,
-      label: 'CUSTO POTENCIAL EVITADO',
-      valor: moeda(h.custoEvitado),
-    },
   ]);
 
-  // ------------------------------------------------ 2. prazos
+  // ------------------------------------------------ 2. resultado
+  // O papel entregue ao fornecedor traz o resultado e a observacao, so. Prazos,
+  // SLA, custo evitado, tentativas e controle do plano de acao sao gestao
+  // interna: continuam na tela e nos indicadores, fora do PDF.
   t.estado.y += 6;
-  t.faixa('2. PRAZOS DO PROCESSO (DIAS ÚTEIS)');
-  t.linha([
-    { w: 128, label: 'DATA DA SOLICITAÇÃO', valor: fmtData(h.dataSolicitacao) },
-    {
-      w: 128,
-      label: 'RETORNO DO FORNECEDOR',
-      valor: fmtData(h.dataRetornoFornecedor),
-    },
-    {
-      w: 130,
-      label: 'ENVIO DO RELATÓRIO',
-      valor: fmtData(h.dataEnvioRelatorio),
-    },
-    {
-      w: W - 128 - 128 - 130,
-      label: 'FINALIZAÇÃO',
-      valor: fmtData(h.dataFinalizacao),
-    },
-  ]);
-  t.linha([
-    {
-      w: 190,
-      label: `RESPOSTA DO FORNECEDOR (SLA ${SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS})`,
-      valor: fmtPrazo(
-        h.tempoRespostaDiasUteis,
-        SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
-      ),
-    },
-    {
-      w: 190,
-      label: `LEAD TIME DO RELATÓRIO (SLA ${SLA_HOMOLOGACAO_ITEM_DIAS})`,
-      valor: fmtPrazo(h.leadTimeDiasUteis, SLA_HOMOLOGACAO_ITEM_DIAS),
-    },
-    {
-      w: W - 190 - 190,
-      label: 'TEMPO TOTAL DO CICLO',
-      valor: h.tempoTotalDiasUteis == null ? '' : String(h.tempoTotalDiasUteis),
-    },
-  ]);
-
-  // ------------------------------------------------ 3. resultado
-  t.estado.y += 6;
-  t.faixa('3. RESULTADO E CONTROLE');
+  t.faixa('2. RESULTADO');
   t.linha(
     [
       {
-        w: 175,
+        w: W,
         label: 'RESULTADO DA HOMOLOGAÇÃO',
         valor: h.resultado
           ? LABEL_RESULTADO[h.resultado]
@@ -205,46 +145,14 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
         cor: corResultado(h.resultado),
         negrito: true,
       },
-      {
-        w: 90,
-        label: 'Nº DE TENTATIVAS',
-        valor: String(h.tentativas ?? relatorios.length),
-        negrito: true,
-      },
-      {
-        w: 110,
-        label: 'STATUS DA HOMOLOGAÇÃO',
-        valor: LABEL_STATUS[h.statusHomologacao] ?? txt(h.statusHomologacao),
-        negrito: true,
-      },
-      {
-        w: W - 175 - 90 - 110,
-        label: 'STATUS DO PLANO DE AÇÃO',
-        valor: h.statusPlanoAcao ? LABEL_PLANO[h.statusPlanoAcao] : '',
-      },
     ],
-    30,
-  );
-  t.linha([
-    { w: 190, label: 'DATA DE REAVALIAÇÃO', valor: fmtData(h.dataReavaliacao) },
-    {
-      w: W - 190,
-      label: 'EFETIVIDADE DO PLANO DE AÇÃO',
-      valor: h.efetividadePlanoAcao
-        ? LABEL_EFETIVIDADE[h.efetividadePlanoAcao]
-        : '',
-    },
-  ]);
-  t.bloco(
-    'Ação',
-    h.acao ? (ACOES_HOMOLOGACAO_ITEM[h.acao] ?? txt(h.acao)) : '',
     30,
   );
   t.bloco('Observações', txt(h.observacoes), 40);
 
-  // ------------------------------------------------ 4. tentativas
+  // ------------------------------------------------ 3. tentativas
   t.estado.y += 6;
-  t.faixa(`4. RELATÓRIOS DE INSPEÇÃO (${relatorios.length})`);
+  t.faixa(`3. RELATÓRIOS DE INSPEÇÃO (${relatorios.length})`);
   if (!relatorios.length) {
     t.espaco(18);
     doc
@@ -328,28 +236,31 @@ export function gerarPdfRegistroHomologacaoItem(h: any): PDFKit.PDFDocument {
     }
   }
 
-  // ------------------------------------------------ 5. encerramento
-  t.estado.y += 6;
-  t.faixa('5. ENCERRAMENTO');
-  const pendencias: string[] = h.pendenciasFinalizacao ?? [];
-  t.bloco(
-    h.statusHomologacao === 'FINALIZADO'
-      ? 'Ciclo encerrado'
-      : 'Pendências para encerrar o ciclo',
-    h.statusHomologacao === 'FINALIZADO'
-      ? `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`
-      : pendencias.length
-        ? `${fraseFaltas(pendencias)}.`
-        : 'Nenhuma pendência: o ciclo pode ser encerrado.',
-    30,
-  );
-  t.linha(
-    [
-      { w: W / 2, label: 'REGISTRADO POR', valor: nomeCurto(h.criadoPor?.nome) },
-      { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
-    ],
-    40,
-  );
+  // ------------------------------------------------ 4. encerramento
+  // So sai no papel quando o ciclo esta encerrado. Enquanto ele esta aberto o
+  // bloco inteiro nao aparece - e junto some a linha de assinatura, porque
+  // "REGISTRADO POR / QUALIDADE (VISTO)" e o visto do encerramento: assinar um
+  // registro ainda em andamento daria a entender que ele ja foi aprovado.
+  if (h.statusHomologacao === 'FINALIZADO') {
+    t.estado.y += 6;
+    t.faixa('4. ENCERRAMENTO');
+    t.bloco(
+      'Ciclo encerrado',
+      `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`,
+      30,
+    );
+    t.linha(
+      [
+        {
+          w: W / 2,
+          label: 'REGISTRADO POR',
+          valor: nomeCurto(h.criadoPor?.nome),
+        },
+        { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
+      ],
+      40,
+    );
+  }
 
   t.rodape(`Homologação ${txt(h.numero)}`);
   return doc;
@@ -382,7 +293,7 @@ function cotaPreenchida(c: any): boolean {
 
 // Houve inspecao dimensional nesta tentativa? Cota preenchida, foto de
 // evidencia ou observacao escrita - qualquer um basta.
-function houveAmostras(r: any, fotosDimensional: Buffer[]): boolean {
+function houveAmostras(r: any, fotosDimensional: FotoEvidencia[]): boolean {
   if (fotosDimensional.length) return true;
   if (txt(r.observacoesAmostras)) return true;
   return Array.isArray(r.cotas) && r.cotas.some(cotaPreenchida);
@@ -393,8 +304,11 @@ function houveAmostras(r: any, fotosDimensional: Buffer[]): boolean {
 export function gerarPdfRelatorioInspecaoItem(
   h: any,
   tentativa?: number,
-  fotosVisual: Buffer[] = [],
-  fotosDimensional: Buffer[] = [],
+  fotosVisual: FotoEvidencia[] = [],
+  fotosDimensional: FotoEvidencia[] = [],
+  // Fotos presas a um item REPROVADO do checklist. Cada uma sai com a legenda
+  // do seu item, entao o bloco diz QUAL desvio a imagem esta mostrando.
+  fotosDesvio: FotoEvidencia[] = [],
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: M, bufferPages: true });
   const t = ferramentas(doc);
@@ -517,7 +431,12 @@ export function gerarPdfRelatorioInspecaoItem(
   if (houveAmostras(r, fotosDimensional)) {
     t.estado.y += 6;
     t.faixa('AMOSTRAS / SAMPLES — BDBR.QUA.FMR.011.06 (Rev. 06)');
-    t.estado.y = desenharTabelaCotas(doc, r.cotas, {
+    t.estado.y = desenharCotasPorDesenho(doc, {
+      cotas: r.cotas,
+      desenhos: r.desenhos,
+      desenho: r.desenho,
+      revisao: r.desenhoRevisao,
+    }, {
       x0: X0,
       largura: W,
       y: t.estado.y,
@@ -618,6 +537,20 @@ export function gerarPdfRelatorioInspecaoItem(
     t.estado.y += 6;
     t.faixa('EVIDÊNCIAS DO VISUAL / VISUAL EVIDENCE');
     t.estado.y = desenharFotosEvidencia(doc, fotosVisual, {
+      x0: X0,
+      largura: W,
+      y: t.estado.y,
+      margem: M,
+      rodape: RODAPE,
+    });
+  }
+
+  // As fotos dos desvios vem depois das evidencias gerais: primeiro o que a
+  // inspecao viu, depois o que ela reprovou.
+  if (fotosDesvio.length) {
+    t.estado.y += 6;
+    t.faixa('FOTOS DOS DESVIOS / DEVIATION PHOTOS');
+    t.estado.y = desenharFotosEvidencia(doc, fotosDesvio, {
       x0: X0,
       largura: W,
       y: t.estado.y,

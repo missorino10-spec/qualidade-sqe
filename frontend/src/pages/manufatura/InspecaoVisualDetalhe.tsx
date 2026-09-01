@@ -91,18 +91,31 @@ export default function InspecaoVisualDetalhe() {
     setOpen(true);
   }
 
-  async function salvarCorrecao() {
-    const v = await form.validateFields();
+  // Rascunho so precisa da maquina; sem a marca "rascunho" o PATCH LANCA o
+  // documento, e dai em diante ele so pode ser corrigido.
+  async function salvarCorrecao(rascunho = false) {
+    const v = rascunho
+      ? (await form.validateFields(['maquinaId']), form.getFieldsValue(true))
+      : await form.validateFields();
     setSalvando(true);
     try {
-      await api.patch(`/manufatura/inspecoes-visuais/${id}`, v);
+      await api.patch(`/manufatura/inspecoes-visuais/${id}`, {
+        ...v,
+        rascunho: rascunho || undefined,
+      });
       if (fotos.length)
         await enviarFotosEvidencia(
           fotos,
           EVID.manufaturaVisualInspecao,
           Number(id),
         );
-      message.success(`Inspeção visual ${data.numero} corrigida.`);
+      message.success(
+        rascunho
+          ? `Rascunho da inspeção visual ${data.numero} salvo. Ele não conta nos indicadores até ser lançado.`
+          : data.rascunho
+            ? `Inspeção visual ${data.numero} lançada.`
+            : `Inspeção visual ${data.numero} corrigida.`,
+      );
       qc.invalidateQueries({ queryKey: ['manufatura-inspecao-visual', id] });
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes-visuais'] });
       setOpen(false);
@@ -113,6 +126,37 @@ export default function InspecaoVisualDetalhe() {
     } finally {
       setSalvando(false);
     }
+  }
+
+  // Descartar rascunho: joga fora o que ficou pela metade. Nao ha nada a
+  // desfazer, porque o visual em rascunho nunca valeu como documento.
+  function descartarRascunho() {
+    Modal.confirm({
+      title: `Descartar o rascunho ${data.numero}?`,
+      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      content:
+        'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda em lugar nenhum.',
+      okText: 'Descartar',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          await api.delete(`/manufatura/inspecoes-visuais/${id}/rascunho`);
+          message.success('Rascunho descartado.');
+          qc.invalidateQueries({ queryKey: ['manufatura-inspecoes-visuais'] });
+          navigate(
+            data.tipo === 'SETUP'
+              ? '/manufatura/inspecoes/setup'
+              : '/manufatura/inspecoes/producao',
+          );
+        } catch (e: any) {
+          message.error(
+            e?.response?.data?.message ??
+              'Não foi possível descartar o rascunho.',
+          );
+        }
+      },
+    });
   }
 
   async function remover() {
@@ -152,13 +196,21 @@ export default function InspecaoVisualDetalhe() {
             <Tag color="orange">
               {data.tipo === 'SETUP' ? 'Setup' : 'Produção'}
             </Tag>
+            {data.rascunho && <Tag color="orange">Rascunho</Tag>}
           </Space>
         }
         extra={
           <Space>
             <Button icon={<EditOutlined />} onClick={abrirCorrecao}>
-              Corrigir
+              {data.rascunho ? 'Continuar rascunho' : 'Corrigir'}
             </Button>
+            {/* Descartar rascunho e de qualquer um do modulo; excluir
+                documento ja lancado continua no botao ao lado. */}
+            {data.rascunho && (
+              <Button danger icon={<DeleteOutlined />} onClick={descartarRascunho}>
+                Descartar rascunho
+              </Button>
+            )}
             <Popconfirm
               title="Excluir esta inspeção visual?"
               okText="Excluir"
@@ -255,18 +307,44 @@ export default function InspecaoVisualDetalhe() {
 
       <Modal
         open={open}
-        title={`Corrigir inspeção visual ${data.numero}`}
+        title={
+          data.rascunho
+            ? `Rascunho da inspeção visual ${data.numero}`
+            : `Corrigir inspeção visual ${data.numero}`
+        }
         width={1000}
-        okText="Salvar correção"
-        cancelText="Cancelar"
         confirmLoading={salvando}
-        onOk={salvarCorrecao}
         onCancel={() => setOpen(false)}
         destroyOnClose
+        /* Documento ja lancado nao volta a rascunho: o "Salvar rascunho" so
+           existe enquanto ele ainda nao valeu. */
+        footer={[
+          <Button key="cancelar" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>,
+          data.rascunho ? (
+            <Button
+              key="rascunho"
+              loading={salvando}
+              onClick={() => salvarCorrecao(true)}
+            >
+              Salvar rascunho
+            </Button>
+          ) : null,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvando}
+            onClick={() => salvarCorrecao()}
+          >
+            {data.rascunho ? 'Lançar inspeção visual' : 'Salvar correção'}
+          </Button>,
+        ]}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          Este é o mesmo documento: o número não muda. As fotos já enviadas
-          continuam salvas; o que for anexado aqui é acrescentado a elas.
+          {data.rascunho
+            ? 'Rascunho: enquanto não for lançado, este documento fica marcado como incompleto. As fotos já enviadas continuam salvas.'
+            : 'Este é o mesmo documento: o número não muda. As fotos já enviadas continuam salvas; o que for anexado aqui é acrescentado a elas.'}
         </Typography.Paragraph>
         <Form form={form} layout="vertical">
           <CamposVisual

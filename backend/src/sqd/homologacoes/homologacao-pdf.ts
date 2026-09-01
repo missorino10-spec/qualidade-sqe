@@ -1,14 +1,8 @@
-import { fraseFaltas } from '../../comum/pendencias';
 import { nomeCurto } from '../../comum/nome';
 import { valorDeCelula } from '../../comum/pdf-texto';
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import {
-  ACOES_HOMOLOGACAO,
-  SLA_HOMOLOGACAO_DIAS,
-  SLA_RESPOSTA_FORNECEDOR_DIAS,
-} from '../sqd-utils';
 
 // Mesma identidade visual dos PDFs da RNC, da inspecao e do 8D. Exportados
 // porque a homologacao de itens usa exatamente o mesmo desenho.
@@ -35,21 +29,6 @@ export const LABEL_STATUS: Record<string, string> = {
   EM_ANDAMENTO: 'Em andamento',
   FINALIZADO: 'Finalizado',
   CANCELADO: 'Cancelado',
-};
-
-export const LABEL_PLANO: Record<string, string> = {
-  EM_ANDAMENTO: 'Em andamento',
-  FINALIZADO: 'Finalizado',
-  CANCELADO: 'Cancelado',
-  NAO_APLICAVEL: 'Não aplicável',
-};
-
-export const LABEL_EFETIVIDADE: Record<string, string> = {
-  NAO_APLICAVEL_CANCELADO: 'Não aplicável / Cancelado',
-  NAO_IMPLEMENTADO_ATRASADO: 'Não implementado / Atrasado',
-  EFETIVO: 'Efetivo',
-  PARCIALMENTE_EFETIVO: 'Parcialmente efetivo',
-  INEFICAZ: 'Ineficaz',
 };
 
 const LABEL_SOLICITANTE: Record<string, string> = {
@@ -90,13 +69,6 @@ function fmtNota(v?: number | null): string {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1,
       });
-}
-
-// Relogio do PDF: "3 (dentro do SLA)" — a mesma leitura da tela.
-export function fmtPrazo(dias?: number | null, sla?: number): string {
-  if (dias == null) return '';
-  if (sla == null) return String(dias);
-  return `${dias} (${dias <= sla ? 'dentro do SLA' : 'fora do SLA'})`;
 }
 
 function corResultado(resultado?: string | null): string {
@@ -356,59 +328,24 @@ export function gerarPdfRegistroHomologacao(h: any): PDFKit.PDFDocument {
   t.bloco('Escopo do fornecedor', txt(h.escopoFornecedor), 34);
   t.bloco('Processos terceirizados', txt(h.processosTerceirizados), 34);
 
-  // ------------------------------------------------ 2. prazos
+  // ------------------------------------------------ 2. resultado
+  // Igual ao registro de itens: o papel traz o resultado e a observacao. Prazos,
+  // SLA, status, plano de acao e reavaliacao sao gestao interna - continuam na
+  // tela e nos indicadores, fora do PDF. A nota fica porque e o proprio
+  // resultado: e dela que sai o aprovado / aprovado condicionalmente.
   t.estado.y += 6;
-  t.faixa('2. PRAZOS DO PROCESSO (DIAS ÚTEIS)');
-  t.linha([
-    { w: 128, label: 'DATA DA SOLICITAÇÃO', valor: fmtData(h.dataSolicitacao) },
-    {
-      w: 128,
-      label: 'RETORNO DO FORNECEDOR',
-      valor: fmtData(h.dataRetornoFornecedor),
-    },
-    {
-      w: 130,
-      label: 'ENVIO DO RELATÓRIO',
-      valor: fmtData(h.dataEnvioRelatorio),
-    },
-    {
-      w: W - 128 - 128 - 130,
-      label: 'FINALIZAÇÃO',
-      valor: fmtData(h.dataFinalizacao),
-    },
-  ]);
-  t.linha([
-    {
-      w: 190,
-      label: `RESPOSTA DO FORNECEDOR (SLA ${SLA_RESPOSTA_FORNECEDOR_DIAS})`,
-      valor: fmtPrazo(h.tempoRespostaDiasUteis, SLA_RESPOSTA_FORNECEDOR_DIAS),
-    },
-    {
-      w: 190,
-      label: `LEAD TIME DO RELATÓRIO (SLA ${SLA_HOMOLOGACAO_DIAS})`,
-      valor: fmtPrazo(h.leadTimeDiasUteis, SLA_HOMOLOGACAO_DIAS),
-    },
-    {
-      w: W - 190 - 190,
-      label: 'TEMPO TOTAL DO CICLO',
-      valor: h.tempoTotalDiasUteis == null ? '' : String(h.tempoTotalDiasUteis),
-    },
-  ]);
-
-  // ------------------------------------------------ 3. resultado
-  t.estado.y += 6;
-  t.faixa('3. RESULTADO E CONTROLE');
+  t.faixa('2. RESULTADO');
   t.linha(
     [
       {
-        w: 90,
+        w: 110,
         label: 'NOTA FINAL',
         valor: h.nota == null ? '' : `${fmtNota(h.nota)}%`,
         cor: corResultado(h.resultado),
         negrito: true,
       },
       {
-        w: 175,
+        w: W - 110,
         label: 'RESULTADO DA AUTOAVALIAÇÃO',
         valor: h.resultado
           ? LABEL_RESULTADO[h.resultado]
@@ -416,59 +353,35 @@ export function gerarPdfRegistroHomologacao(h: any): PDFKit.PDFDocument {
         cor: corResultado(h.resultado),
         negrito: true,
       },
-      {
-        w: 110,
-        label: 'STATUS DA HOMOLOGAÇÃO',
-        valor: LABEL_STATUS[h.statusHomologacao] ?? txt(h.statusHomologacao),
-        negrito: true,
-      },
-      {
-        w: W - 90 - 175 - 110,
-        label: 'STATUS DO PLANO DE AÇÃO',
-        valor: h.statusPlanoAcao ? LABEL_PLANO[h.statusPlanoAcao] : '',
-      },
     ],
     30,
   );
-  t.linha([
-    {
-      w: 190,
-      label: 'DATA DE REAVALIAÇÃO',
-      valor: fmtData(h.dataReavaliacao),
-    },
-    {
-      w: W - 190,
-      label: 'EFETIVIDADE DO PLANO DE AÇÃO',
-      valor: h.efetividadePlanoAcao
-        ? LABEL_EFETIVIDADE[h.efetividadePlanoAcao]
-        : '',
-    },
-  ]);
-  t.bloco('Ação', h.acao ? (ACOES_HOMOLOGACAO[h.acao] ?? txt(h.acao)) : '', 30);
   t.bloco('Observações', txt(h.observacoes), 40);
 
-  // ------------------------------------------------ 4. encerramento
-  t.estado.y += 6;
-  t.faixa('4. ENCERRAMENTO');
-  const pendencias: string[] = h.pendenciasFinalizacao ?? [];
-  t.bloco(
-    h.statusHomologacao === 'FINALIZADO'
-      ? 'Ciclo encerrado'
-      : 'Pendências para encerrar o ciclo',
-    h.statusHomologacao === 'FINALIZADO'
-      ? `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`
-      : pendencias.length
-        ? `${fraseFaltas(pendencias)}.`
-        : 'Nenhuma pendência: o ciclo pode ser encerrado.',
-    30,
-  );
-  t.linha(
-    [
-      { w: W / 2, label: 'REGISTRADO POR', valor: nomeCurto(h.criadoPor?.nome) },
-      { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
-    ],
-    40,
-  );
+  // ------------------------------------------------ 3. encerramento
+  // So sai no papel quando o ciclo esta encerrado. Enquanto ele esta aberto o
+  // bloco inteiro nao aparece - e junto some a linha de assinatura, porque
+  // "REGISTRADO POR / QUALIDADE (VISTO)" e o visto do encerramento.
+  if (h.statusHomologacao === 'FINALIZADO') {
+    t.estado.y += 6;
+    t.faixa('3. ENCERRAMENTO');
+    t.bloco(
+      'Ciclo encerrado',
+      `Homologação finalizada em ${fmtData(h.dataFinalizacao)}.`,
+      30,
+    );
+    t.linha(
+      [
+        {
+          w: W / 2,
+          label: 'REGISTRADO POR',
+          valor: nomeCurto(h.criadoPor?.nome),
+        },
+        { w: W / 2, label: 'QUALIDADE (VISTO)', valor: '' },
+      ],
+      40,
+    );
+  }
 
   t.rodape(`Homologação ${txt(h.numero)}`);
   return doc;

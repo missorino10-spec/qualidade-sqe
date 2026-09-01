@@ -33,8 +33,11 @@ export class DashboardService {
       this.prisma.entregaPortaria.findMany({
         where: entregaWhere,
         include: {
-          inspecoesVisual: { select: { resultado: true } },
-          inspecoesLote: { select: { resultado: true } },
+          // Rascunho fica de fora dos KPIs: enquanto o formulario nao e
+          // lancado, o recebimento ainda conta como NAO inspecionado - e e
+          // exatamente isso que a Qualidade precisa enxergar no painel.
+          inspecoesVisual: { where: { rascunho: false }, select: { resultado: true } },
+          inspecoesLote: { where: { rascunho: false }, select: { resultado: true } },
         },
       }),
       this.prisma.rnc.findMany({ where: rncWhere }),

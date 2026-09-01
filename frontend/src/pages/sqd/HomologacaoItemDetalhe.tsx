@@ -47,19 +47,23 @@ import {
   normaDoRelatorio,
   resultadoVisual,
 } from './FormularioInspecaoItem';
-import { CotasSomenteLeitura, TabelaCotasPecas } from '../../components/TabelaCotas';
+import { BlocoDesenhos, CotasPorDesenho } from '../../components/TabelaCotas';
 import {
   CardDesvioQualidade,
   TIPO_DESVIO,
 } from '../../components/DesvioQualidade';
 import {
+  FotosDesvio,
   FotosEvidenciaSalvas,
   UploadFotosEvidencia,
+  enviarFotosDesvio,
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
 import {
+  DesenhoExtra,
   EVID,
   checklistDoRelatorio,
+  desenhosExtras,
   labelNorma,
   textoDesenho,
   textoRevisao,
@@ -198,9 +202,14 @@ export default function HomologacaoItemDetalhe() {
   const [formRegistro] = Form.useForm();
   const [formInspecao] = Form.useForm();
   const [cotas, setCotas] = useState<Cota[]>([]);
+  // Peca de conjunto: desenhos do 2o em diante. O 1o e o do cabecalho.
+  const [desenhos, setDesenhos] = useState<DesenhoExtra[]>([]);
   const [checklist, setChecklist] = useState<GrupoVisual[]>([]);
   const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
   const [fotosVisual, setFotosVisual] = useState<any[]>([]);
+  // Foto presa a um item REPROVADO do checklist: a chave e a posicao do item e
+  // a legenda no PDF e o proprio texto dele.
+  const [fotosDesvio, setFotosDesvio] = useState<FotosDesvio>({});
   // Tentativa que está aberta no modal; null = uma rodada nova.
   const [tentativaEdicao, setTentativaEdicao] = useState<number | null>(null);
 
@@ -209,6 +218,8 @@ export default function HomologacaoItemDetalhe() {
   const norma = normaDoRelatorio(Form.useWatch('tolerancias', formInspecao));
   const qtdPecas =
     Number(Form.useWatch('qtdInspecionada', formInspecao)) || PECAS_PADRAO;
+  const desenhoSel = Form.useWatch('desenho', formInspecao);
+  const revisaoSel = Form.useWatch('desenhoRevisao', formInspecao);
 
   const { data: h, isLoading } = useQuery<any>({
     queryKey: ['sqd-homologacao-item', id],
@@ -259,6 +270,15 @@ export default function HomologacaoItemDetalhe() {
       ),
   });
 
+  // A legenda da foto e o texto do item que reprovou. Se o inspetor marcou,
+  // anexou a foto e depois voltou atras, o item deixa de estar REPROVADO e a
+  // foto nao sobe.
+  function legendaDoDesvio(chave: string): string | null {
+    const [gi, ii] = chave.split('-').map(Number);
+    const item = checklist[gi]?.itens?.[ii];
+    return item?.status === 'REPROVADO' ? item.texto : null;
+  }
+
   // O relatorio de inspecao tem rota propria: e ele que apura o resultado do
   // item e o tempo de resposta do fornecedor.
   const salvarInspecao = useMutation({
@@ -266,6 +286,7 @@ export default function HomologacaoItemDetalhe() {
       const corpo = {
         ...v,
         cotas,
+        desenhos,
         checklistVisual: checklist,
         resultadoAmostras: cotasComDesvio(cotas) ? 'REPROVADO' : 'APROVADO',
         resultadoVisual: resultadoVisual(checklist),
@@ -281,7 +302,11 @@ export default function HomologacaoItemDetalhe() {
         : await api.post(`/sqd/homologacoes-itens/${id}/relatorio`, corpo);
       // As fotos dos blocos EVIDENCIAS so podem subir depois: elas precisam do
       // id do relatorio da tentativa que acabou de ser gravada.
-      if (fotosDimensional.length || fotosVisual.length) {
+      if (
+        fotosDimensional.length ||
+        fotosVisual.length ||
+        Object.keys(fotosDesvio).length
+      ) {
         const lista: any[] = res.data?.relatorios ?? [];
         const alvo = tentativaEdicao
           ? lista.find((r) => r.tentativa === tentativaEdicao)
@@ -299,15 +324,23 @@ export default function HomologacaoItemDetalhe() {
               EVID.homologacaoItemVisual,
               alvo.id,
             );
+          await enviarFotosDesvio(
+            fotosDesvio,
+            legendaDoDesvio,
+            EVID.homologacaoItemVisualDesvio,
+            alvo.id,
+          );
         }
       }
       return res;
     },
-    onSuccess: (res: any) => {
+    onSuccess: (res: any, v: any) => {
       message.success(
-        `Relatório de inspeção lançado — item ${
-          labelResultadoItem[res.data.resultado] ?? res.data.resultado
-        }.`,
+        v?.rascunho
+          ? 'Rascunho do relatório salvo. Ele não apura resultado nem conta nos indicadores até ser lançado.'
+          : `Relatório de inspeção lançado — item ${
+              labelResultadoItem[res.data.resultado] ?? res.data.resultado
+            }.`,
       );
       setInspecaoOpen(false);
       invalidar();
@@ -330,6 +363,24 @@ export default function HomologacaoItemDetalhe() {
       message.error('Não foi possível excluir o relatório de inspeção.'),
   });
 
+  // Descartar rascunho e diferente de excluir: o rascunho nunca apurou
+  // resultado, entao nao ha o que recalcular no registro. Por isso vale para
+  // qualquer um do modulo, e nao so para quem pode excluir tentativa lancada.
+  const descartarRascunho = useMutation({
+    mutationFn: async (tentativa: number) =>
+      api.delete(
+        `/sqd/homologacoes-itens/${id}/relatorio/${tentativa}/rascunho`,
+      ),
+    onSuccess: () => {
+      message.success('Rascunho descartado.');
+      invalidar();
+    },
+    onError: (e: any) =>
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível descartar o rascunho.',
+      ),
+  });
+
   const remover = useMutation({
     mutationFn: async () => api.delete(`/sqd/homologacoes-itens/${id}`),
     onSuccess: () => {
@@ -345,6 +396,13 @@ export default function HomologacaoItemDetalhe() {
   const relatorios: any[] = h.relatorios ?? [];
   const catalogo: { grupo: string; itens: string[] }[] = h.checklistVisual ?? [];
   const recente = relatorios.length ? relatorios[relatorios.length - 1] : null;
+  const temRascunho = relatorios.some((r) => r.rascunho);
+  // Tentativa reaberta que ainda e rascunho: em vez de "salvar e recalcular",
+  // o botao lanca o relatorio, e aparece o "Descartar".
+  const editandoRascunho = !!(
+    tentativaEdicao &&
+    relatorios.find((r) => r.tentativa === tentativaEdicao)?.rascunho
+  );
 
   // Sem relatorio de inspecao nao existe resultado: o registro esta esperando
   // as amostras do fornecedor.
@@ -414,6 +472,9 @@ export default function HomologacaoItemDetalhe() {
             conforme: null,
           })),
     );
+    // Os desenhos vem do mesmo lugar que as cotas: a rodada nova mede a mesma
+    // peca, entao herda os mesmos desenhos do conjunto.
+    setDesenhos(desenhosExtras(base?.desenhos));
     setChecklist(
       r?.checklistVisual?.length
         ? (r.checklistVisual as GrupoVisual[])
@@ -421,6 +482,7 @@ export default function HomologacaoItemDetalhe() {
     );
     setFotosDimensional([]);
     setFotosVisual([]);
+    setFotosDesvio({});
     setInspecaoOpen(true);
   }
 
@@ -470,10 +532,17 @@ export default function HomologacaoItemDetalhe() {
           )}
           {podeEditar && (
             <>
+              {/* Rascunho aberto segura a tentativa nova: seriam duas rodadas
+                  em aberto na mesma homologacao, nenhuma com resultado. */}
               <Button
                 type={inspecionado ? 'default' : 'primary'}
                 icon={<FormOutlined />}
-                disabled={cancelado}
+                disabled={cancelado || temRascunho}
+                title={
+                  temRascunho
+                    ? 'Existe um rascunho em aberto. Lance ou descarte esse rascunho antes de abrir uma tentativa nova.'
+                    : undefined
+                }
                 onClick={() => abrirInspecao()}
               >
                 {relatorios.length
@@ -621,32 +690,50 @@ export default function HomologacaoItemDetalhe() {
                   scroll={{ x: 'max-content' }}
                   dataSource={relatorios}
                   columns={[
-                    { title: 'Rev.', dataIndex: 'revisao', width: 70 },
+                    {
+                      title: 'Rev.',
+                      width: 130,
+                      render: (_: any, r: any) => (
+                        <Space size={4}>
+                          <span>{r.revisao}</span>
+                          {r.rascunho && <Tag color="orange">Rascunho</Tag>}
+                        </Space>
+                      ),
+                    },
                     {
                       title: 'Data',
                       dataIndex: 'dataInspecao',
                       width: 110,
                       render: (d: string) => dataBR(d),
                     },
+                    // Rascunho nao apura nada: o resultado gravado e so o que
+                    // estava na tela quando o inspetor parou, e mostra-lo como
+                    // veredito faria parecer que a tentativa ja foi decidida.
                     {
                       title: 'Amostras',
                       dataIndex: 'resultadoAmostras',
                       width: 110,
-                      render: (r: string) => (
-                        <Tag color={corStatusVisual[r]}>
-                          {labelStatusVisual[r]}
-                        </Tag>
-                      ),
+                      render: (v: string, r: any) =>
+                        r.rascunho ? (
+                          '-'
+                        ) : (
+                          <Tag color={corStatusVisual[v]}>
+                            {labelStatusVisual[v]}
+                          </Tag>
+                        ),
                     },
                     {
                       title: 'Visual',
                       dataIndex: 'resultadoVisual',
                       width: 110,
-                      render: (r: string) => (
-                        <Tag color={corStatusVisual[r]}>
-                          {labelStatusVisual[r]}
-                        </Tag>
-                      ),
+                      render: (v: string, r: any) =>
+                        r.rascunho ? (
+                          '-'
+                        ) : (
+                          <Tag color={corStatusVisual[v]}>
+                            {labelStatusVisual[v]}
+                          </Tag>
+                        ),
                     },
                     {
                       title: 'Inspecionado por',
@@ -672,12 +759,38 @@ export default function HomologacaoItemDetalhe() {
                               Qualidade: quem enxerga o modulo conserta. */}
                           <Button
                             size="small"
-                            title="Corrigir esta tentativa"
+                            title={
+                              r.rascunho
+                                ? 'Continuar este rascunho'
+                                : 'Corrigir esta tentativa'
+                            }
                             icon={<EditOutlined />}
                             onClick={() => abrirInspecao(r.tentativa)}
                           />
-                          {podeEditar && (
-                            <>
+                          {/* Descartar rascunho nao desfaz nada: a tentativa
+                              nunca apurou resultado. Por isso vale para todo
+                              mundo do modulo, sem depender do podeEditar. */}
+                          {r.rascunho ? (
+                            <Button
+                              size="small"
+                              danger
+                              title="Descartar rascunho"
+                              icon={<DeleteOutlined />}
+                              onClick={() =>
+                                Modal.confirm({
+                                  title: `Descartar o rascunho da ${r.revisao}?`,
+                                  content:
+                                    'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, o resultado do item não muda.',
+                                  okText: 'Descartar',
+                                  okButtonProps: { danger: true },
+                                  cancelText: 'Cancelar',
+                                  onOk: () =>
+                                    descartarRascunho.mutateAsync(r.tentativa),
+                                })
+                              }
+                            />
+                          ) : (
+                            podeEditar && (
                               <Button
                                 size="small"
                                 danger
@@ -695,7 +808,7 @@ export default function HomologacaoItemDetalhe() {
                                   })
                                 }
                               />
-                            </>
+                            )
                           )}
                         </Space>
                       ),
@@ -766,7 +879,13 @@ export default function HomologacaoItemDetalhe() {
                   <Divider orientation="left" plain>
                     AMOSTRAS — Doc. BDBR.QUA.FMR.011.06
                   </Divider>
-                  <CotasSomenteLeitura cotas={recente.cotas} />
+                  <CotasPorDesenho
+                    cotas={recente.cotas}
+                    desenhos={recente.desenhos}
+                    desenho={recente.desenho}
+                    revisao={recente.desenhoRevisao}
+                    legado={recente.desenhoRev}
+                  />
                   <Divider orientation="left" plain>
                     Evidências do dimensional
                   </Divider>
@@ -1090,14 +1209,70 @@ export default function HomologacaoItemDetalhe() {
           tentativaEdicao ?? relatorios.length + 1,
         ).padStart(2, '0')}`}
         width={1180}
-        okText={tentativaEdicao ? 'Salvar e recalcular' : 'Lançar e apurar resultado'}
-        cancelText="Cancelar"
         confirmLoading={salvarInspecao.isPending}
-        onOk={async () =>
-          salvarInspecao.mutate(await formInspecao.validateFields())
-        }
         onCancel={() => setInspecaoOpen(false)}
         destroyOnClose
+        /* Rodape na mao por causa do "Salvar rascunho". O rascunho nao valida
+           nada: e para isso que ele serve. Relatorio ja lancado nao volta a
+           rascunho - o resultado do item ja saiu dele. */
+        footer={[
+          editandoRascunho ? (
+            <Button
+              key="descartar"
+              danger
+              loading={descartarRascunho.isPending}
+              onClick={() =>
+                Modal.confirm({
+                  title: `Descartar o rascunho da Rev. ${String(
+                    tentativaEdicao,
+                  ).padStart(2, '0')}?`,
+                  content:
+                    'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, o resultado do item não muda.',
+                  okText: 'Descartar',
+                  okButtonProps: { danger: true },
+                  cancelText: 'Cancelar',
+                  onOk: async () => {
+                    await descartarRascunho.mutateAsync(tentativaEdicao!);
+                    setInspecaoOpen(false);
+                  },
+                })
+              }
+            >
+              Descartar rascunho
+            </Button>
+          ) : null,
+          <Button key="cancelar" onClick={() => setInspecaoOpen(false)}>
+            Cancelar
+          </Button>,
+          !tentativaEdicao || editandoRascunho ? (
+            <Button
+              key="rascunho"
+              loading={salvarInspecao.isPending}
+              onClick={() =>
+                salvarInspecao.mutate({
+                  ...formInspecao.getFieldsValue(true),
+                  rascunho: true,
+                })
+              }
+            >
+              Salvar rascunho
+            </Button>
+          ) : null,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvarInspecao.isPending}
+            onClick={async () =>
+              salvarInspecao.mutate(await formInspecao.validateFields())
+            }
+          >
+            {editandoRascunho
+              ? 'Lançar e apurar resultado'
+              : tentativaEdicao
+                ? 'Salvar e recalcular'
+                : 'Lançar e apurar resultado'}
+          </Button>,
+        ]}
       >
         <Form form={formInspecao} layout="vertical">
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
@@ -1110,11 +1285,15 @@ export default function HomologacaoItemDetalhe() {
           <Divider orientation="left" plain>
             AMOSTRAS — Doc. BDBR.QUA.FMR.011.06 (Rev. 06)
           </Divider>
-          <TabelaCotasPecas
+          <BlocoDesenhos
             cotas={cotas}
             setCotas={setCotas}
+            desenhos={desenhos}
+            setDesenhos={setDesenhos}
             qtdPecas={qtdPecas}
             norma={norma}
+            desenhoCabecalho={desenhoSel}
+            revisaoCabecalho={revisaoSel}
           />
           <Divider orientation="left" plain>
             Evidências do dimensional (opcional)
@@ -1141,7 +1320,12 @@ export default function HomologacaoItemDetalhe() {
           <Divider orientation="left" plain>
             VISUAL — Doc. BDBR.QUA.FMR.06.07 (Rev. 07)
           </Divider>
-          <ChecklistVisual checklist={checklist} setChecklist={setChecklist} />
+          <ChecklistVisual
+            checklist={checklist}
+            setChecklist={setChecklist}
+            fotosDesvio={fotosDesvio}
+            setFotosDesvio={setFotosDesvio}
+          />
           <Divider orientation="left" plain>
             Evidências do visual (opcional)
           </Divider>

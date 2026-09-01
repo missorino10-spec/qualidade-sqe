@@ -2,20 +2,28 @@
 // no PDF. E a MESMA tabela nos tres modulos; so muda a coluna do que foi
 // encontrado: Max/Min no lote e uma coluna por peca nas amostras.
 
-import { normaCurta } from './inspecao';
+import {
+  UNIDADES_COTA,
+  gruposDeDesenho,
+  normaCurta,
+  textoCota,
+  unidadeDaCota,
+} from './inspecao';
 
 const PRETO = '#000000';
 const CINZA = '#555555';
 const VERDE = '#237804';
 const VERMELHO = '#CF1322';
 
-function br(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '';
-  return String(v).replace('.', ',');
+// Valor de um campo da cota no formato da unidade dela: mm e raio com virgula
+// decimal, angulo em graus e minutos ("0°30'"). O simbolo ja vem no texto.
+function val(cota: any, campo: string): string {
+  return textoCota(cota?.[campo], unidadeDaCota(cota?.unidade));
 }
 
-function un(cota: any): string {
-  return cota?.unidade === 'graus' ? '°' : '';
+function rotuloUnidade(cota: any): string {
+  const unidade = unidadeDaCota(cota?.unidade);
+  return UNIDADES_COTA.find((u) => u.value === unidade)?.label ?? unidade;
 }
 
 type Coluna = { titulo: string; peso: number; valor: (c: any) => string };
@@ -28,41 +36,41 @@ function qtdPecas(cotas: any[]): number {
   );
 }
 
-function colunas(cotas: any[]): Coluna[] {
-  const pecas = qtdPecas(cotas);
+// "pecasForcado" existe por causa da peca de conjunto: sao varias tabelas no
+// mesmo relatorio e todas precisam ter as MESMAS colunas, contadas no relatorio
+// inteiro. Sem isso um desenho ainda vazio sairia com Max/Min no lugar das
+// colunas de peca.
+function colunas(cotas: any[], pecasForcado?: number): Coluna[] {
+  const pecas = pecasForcado ?? qtdPecas(cotas);
   const encontrado: Coluna[] = pecas
     ? Array.from({ length: pecas }, (_, p) => ({
         titulo: `PEÇA ${String(p + 1).padStart(2, '0')}`,
         peso: 34,
-        valor: (c: any) => br(c.pecas?.[p]),
+        valor: (c: any) => textoCota(c.pecas?.[p], unidadeDaCota(c.unidade)),
       }))
     : [
-        { titulo: 'ENC. Máx.', peso: 38, valor: (c) => br(c.encontradoMax) },
-        { titulo: 'ENC. Mín.', peso: 38, valor: (c) => br(c.encontradoMin) },
+        { titulo: 'ENC. Máx.', peso: 38, valor: (c) => val(c, 'encontradoMax') },
+        { titulo: 'ENC. Mín.', peso: 38, valor: (c) => val(c, 'encontradoMin') },
       ];
 
   return [
     { titulo: 'LOCALIZAÇÃO', peso: 90, valor: (c) => String(c.localizacao ?? '') },
-    {
-      titulo: 'ESPECIF.',
-      peso: 44,
-      valor: (c) => (br(c.especificado) ? `${br(c.especificado)}${un(c)}` : ''),
-    },
-    { titulo: 'UN.', peso: 26, valor: (c) => (c.unidade === 'graus' ? 'graus' : 'mm') },
+    { titulo: 'ESPECIF.', peso: 44, valor: (c) => val(c, 'especificado') },
+    { titulo: 'UN.', peso: 30, valor: rotuloUnidade },
     // A norma e por cota: a mesma peca pode ter cota pela ISO 2768 e cota com
     // tolerancia de desenho.
     { titulo: 'NORMA', peso: 48, valor: (c) => normaCurta(c.norma) },
     {
       titulo: 'TOLER.',
       peso: 42,
-      valor: (c) => (br(c.tolerancia) ? `±${br(c.tolerancia)}${un(c)}` : ''),
+      valor: (c) => (val(c, 'tolerancia') ? `±${val(c, 'tolerancia')}` : ''),
     },
-    { titulo: 'UPPER', peso: 38, valor: (c) => br(c.upper) },
-    { titulo: 'LOWER', peso: 38, valor: (c) => br(c.lower) },
+    { titulo: 'UPPER', peso: 38, valor: (c) => val(c, 'upper') },
+    { titulo: 'LOWER', peso: 38, valor: (c) => val(c, 'lower') },
     ...encontrado,
     { titulo: 'INSTRUMENTO', peso: 58, valor: (c) => String(c.instrumento ?? '') },
-    { titulo: 'DESV. Mín.', peso: 42, valor: (c) => br(c.desvioMin) },
-    { titulo: 'DESV. Máx.', peso: 42, valor: (c) => br(c.desvioMax) },
+    { titulo: 'DESV. Mín.', peso: 42, valor: (c) => val(c, 'desvioMin') },
+    { titulo: 'DESV. Máx.', peso: 42, valor: (c) => val(c, 'desvioMax') },
     {
       titulo: 'CONFORME',
       peso: 52,
@@ -134,13 +142,15 @@ export function desenharTabelaCotas(
     y: number;
     margem: number;
     rodape: number;
+    // Numero de colunas de peca imposto de fora (peca de conjunto).
+    pecas?: number;
   },
 ): number {
   const cotas: any[] = Array.isArray(cotasBrutas) ? cotasBrutas : [];
   const { x0, largura, margem, rodape } = opts;
   let y = opts.y;
 
-  const cols = colunas(cotas);
+  const cols = colunas(cotas, opts.pecas);
   // Os pesos viram larguras reais: assim a tabela fecha na borda direita com
   // qualquer numero de colunas de peca.
   const total = cols.reduce((t, c) => t + c.peso, 0);
@@ -206,6 +216,72 @@ export function desenharTabelaCotas(
     });
     y += ALTURA_LINHA;
   }
+
+  return y;
+}
+
+const ALTURA_TARJA = 14;
+
+// Peca de conjunto: uma tabela por desenho, cada uma com a sua tarja de titulo.
+// Relatorio de um desenho so cai direto no desenharTabelaCotas, sem tarja, para
+// o PDF sair exatamente como sempre saiu.
+export function desenharCotasPorDesenho(
+  doc: PDFKit.PDFDocument,
+  dados: {
+    cotas: unknown;
+    desenhos?: unknown;
+    desenho?: string | null;
+    revisao?: string | null;
+    // Campo unico dos registros antigos (desenho e revisao juntos).
+    legado?: string | null;
+  },
+  opts: {
+    x0: number;
+    largura: number;
+    y: number;
+    margem: number;
+    rodape: number;
+  },
+): number {
+  const grupos = gruposDeDesenho(dados.cotas, dados.desenhos, {
+    desenho: dados.desenho,
+    revisao: dados.revisao,
+    legado: dados.legado,
+  });
+  if (grupos.length === 1) return desenharTabelaCotas(doc, dados.cotas, opts);
+
+  // Contado no relatorio inteiro para as tabelas ficarem todas iguais.
+  const pecas = qtdPecas(Array.isArray(dados.cotas) ? dados.cotas : []);
+  const { x0, largura, margem, rodape } = opts;
+  let y = opts.y;
+
+  grupos.forEach((g, i) => {
+    if (i) y += 10;
+    if (y + ALTURA_TARJA + ALTURA_CABECALHO > doc.page.height - rodape) {
+      doc.addPage();
+      y = margem;
+    }
+    doc.rect(x0, y, largura, ALTURA_TARJA).fill('#E8E8E8');
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7.5)
+      .fillColor(PRETO)
+      .text(
+        `DESENHO ${g.indice + 1} DE ${grupos.length} — Nº ${g.desenho}   Rev. ${g.revisao}`,
+        x0 + 4,
+        y + 4,
+        { width: largura - 8, lineBreak: false, ellipsis: true },
+      );
+    y += ALTURA_TARJA;
+    y = desenharTabelaCotas(doc, g.cotas, {
+      x0,
+      largura,
+      y,
+      margem,
+      rodape,
+      pecas,
+    });
+  });
 
   return y;
 }

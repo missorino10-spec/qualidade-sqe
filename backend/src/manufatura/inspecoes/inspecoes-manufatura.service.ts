@@ -9,6 +9,7 @@ import { numeroManufatura, statusPorResultado } from '../manufatura-utils';
 import {
   CotaMaxMin,
   calcularCotaMaxMin,
+  desenhosExtras,
   resultadoDimensional,
 } from '../../comum/inspecao';
 
@@ -114,6 +115,9 @@ export class InspecoesManufaturaService {
             qtdTotal: dto.qtdTotal ?? null,
             toleranciasNorm: dto.toleranciasNorm ?? null,
             cotas,
+            // Sempre array (nunca null): o campo e Json? e o Prisma cobraria
+            // JsonNull no lugar de null.
+            desenhos: desenhosExtras(dto.desenhos) as any,
             inspecaoVisual: dto.inspecaoVisual ?? null,
             observacoesFinais: dto.observacoesFinais ?? null,
             resultado: dto.resultado ?? resultadoDimensional(cotas),
@@ -121,6 +125,10 @@ export class InspecoesManufaturaService {
             defeitos: dto.defeitos ?? undefined,
             qtdAfetada: dto.qtdAfetada ?? null,
             descricaoDesvio: dto.descricaoDesvio ?? null,
+            // Relatorio salvo pela metade. O numero ja e consumido aqui, para
+            // o documento nascer com a identificacao que vai levar ate o fim,
+            // mas ele nao conta na maquina nem nos indicadores ate ser lancado.
+            rascunho: dto.rascunho === true,
             // Elaborado/inspecionado por saiu do formulario: quem assina e o
             // usuario logado, gravado em inspetorId. As colunas de texto ficam
             // vazias e sobrevivem so pelos relatorios antigos.
@@ -173,15 +181,20 @@ export class InspecoesManufaturaService {
 
     // O numero da inspecao e o do primeiro relatorio: as reinspecoes ganham
     // numeros novos na mesma serie, mas ficam dentro desta mesma inspecao.
+    // Rascunho fica PENDENTE: o veredito dele ainda nao vale, entao a maquina
+    // nao soma setup/producao nem reprova enquanto ele nao for lancado.
     await this.prisma.inspecaoManufatura.update({
       where: { id: inspecao.id },
       data: {
         numero: relatorio.numero,
-        status: statusPorResultado(relatorio.resultado),
+        status: relatorio.rascunho
+          ? 'PENDENTE'
+          : statusPorResultado(relatorio.resultado),
       },
     });
 
-    await this.contabilizar(maquina.id, tipo, relatorio.resultado);
+    if (!relatorio.rascunho)
+      await this.contabilizar(maquina.id, tipo, relatorio.resultado);
     return this.detalhe(inspecao.id);
   }
 
@@ -191,9 +204,16 @@ export class InspecoesManufaturaService {
   async reinspecionar(inspecaoId: number, dto: any, usuarioId: number) {
     const insp = await this.prisma.inspecaoManufatura.findUnique({
       where: { id: inspecaoId },
-      include: { relatorios: { orderBy: { tentativa: 'desc' }, take: 1 } },
+      include: { relatorios: { orderBy: { tentativa: 'desc' } } },
     });
     if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    // Rascunho aberto trava a reinspecao: primeiro se termina (ou se descarta)
+    // a medicao que ficou pela metade, senao a inspecao ficaria com duas
+    // tentativas em aberto e nenhuma com veredito.
+    if (insp.relatorios.some((r) => r.rascunho))
+      throw new ConflictException(
+        'Existe um relatório em rascunho nesta inspeção. Lance ou descarte esse rascunho antes de reinspecionar.',
+      );
     const ultima = insp.relatorios[0];
     if (ultima && ultima.resultado !== 'REPROVADO')
       throw new ConflictException(
@@ -207,6 +227,10 @@ export class InspecoesManufaturaService {
       dto,
       usuarioId,
     );
+
+    // Ver criar(): enquanto o relatorio e rascunho a inspecao continua como
+    // estava e a maquina nao contabiliza nada.
+    if (relatorio.rascunho) return this.detalhe(insp.id);
 
     await this.prisma.inspecaoManufatura.update({
       where: { id: insp.id },
@@ -261,6 +285,7 @@ export class InspecoesManufaturaService {
         qtdTotal: dto.qtdTotal ?? null,
         toleranciasNorm: dto.toleranciasNorm ?? null,
         cotas,
+        desenhos: desenhosExtras(dto.desenhos ?? atual.desenhos) as any,
         inspecaoVisual: dto.inspecaoVisual ?? null,
         observacoesFinais: dto.observacoesFinais ?? null,
         resultado: dto.resultado ?? resultadoDimensional(cotas),
@@ -268,16 +293,42 @@ export class InspecoesManufaturaService {
         defeitos: dto.defeitos ?? undefined,
         qtdAfetada: dto.qtdAfetada ?? null,
         descricaoDesvio: dto.descricaoDesvio ?? null,
+        // Rascunho que continua rascunho segue fora de tudo. Rascunho salvo
+        // sem a marca e um LANCAMENTO: o relatorio passa a valer agora e daqui
+        // para a frente e corrigido como qualquer outro.
+        rascunho: atual.rascunho && dto.rascunho === true,
         // Quem corrigiu passa a assinar o relatorio: e ele que responde pelo
         // que esta escrito la agora.
         inspetorId: usuarioId,
       },
     });
 
+    // Rascunho pela metade nao mexe no cabecalho nem na maquina.
+    if (relatorio.rascunho) return this.detalhe(inspecaoId);
+
     const insp = await this.prisma.inspecaoManufatura.findUniqueOrThrow({
       where: { id: inspecaoId },
-      include: { relatorios: { orderBy: { tentativa: 'desc' }, take: 1 } },
+      include: {
+        relatorios: {
+          where: { rascunho: false },
+          orderBy: { tentativa: 'desc' },
+          take: 1,
+        },
+      },
     });
+
+    // Lancamento de rascunho: e aqui que a maquina finalmente contabiliza. Na
+    // primeira tentativa entra o setup/producao inteiro; na reinspecao so a
+    // reprova, igual ao que reinspecionar() faria.
+    if (atual.rascunho) {
+      if (relatorio.tentativa === 1)
+        await this.contabilizar(insp.maquinaId, insp.tipo, relatorio.resultado);
+      else if (relatorio.resultado === 'REPROVADO')
+        await this.prisma.maquina.update({
+          where: { id: insp.maquinaId },
+          data: { inspecoesReprovadas: { increment: 1 } },
+        });
+    }
 
     // O status da inspecao sai sempre da ULTIMA tentativa - corrigir a
     // primeira nao reabre uma inspecao que a reinspecao ja aprovou.
@@ -298,9 +349,11 @@ export class InspecoesManufaturaService {
     });
 
     // O indicador de reprovas da maquina conta um por relatorio reprovado.
-    // Se a correcao mudou o veredito, a conta acompanha.
-    const eraReprovado = atual.resultado === 'REPROVADO';
-    const agoraReprovado = relatorio.resultado === 'REPROVADO';
+    // Se a correcao mudou o veredito, a conta acompanha. No lancamento de
+    // rascunho nao ha o que acompanhar: a contabilizacao acabou de ser feita
+    // acima, sobre o resultado final.
+    const eraReprovado = !atual.rascunho && atual.resultado === 'REPROVADO';
+    const agoraReprovado = !atual.rascunho && relatorio.resultado === 'REPROVADO';
     if (eraReprovado !== agoraReprovado) {
       const maquina = await this.prisma.maquina.findUniqueOrThrow({
         where: { id: insp.maquinaId },
@@ -350,7 +403,9 @@ export class InspecoesManufaturaService {
         'Esta inspeção tem um 5G vinculado. Exclua o 5G antes.',
       );
 
-    const reprovados = insp.relatorios.filter(
+    // Rascunho nunca somou nada na maquina, entao tambem nao desconta.
+    const lancados = insp.relatorios.filter((r) => !r.rascunho);
+    const reprovados = lancados.filter(
       (r) => r.resultado === 'REPROVADO',
     ).length;
     const maquina = await this.prisma.maquina.findUniqueOrThrow({
@@ -358,15 +413,17 @@ export class InspecoesManufaturaService {
     });
 
     await this.prisma.inspecaoManufatura.delete({ where: { id } });
+    // Uma inspecao que so tinha rascunho nunca abriu setup nem producao.
+    const abriu = lancados.length > 0;
     await this.prisma.maquina.update({
       where: { id: maquina.id },
       data: {
         setupsRealizados:
-          insp.tipo === 'SETUP'
+          abriu && insp.tipo === 'SETUP'
             ? Math.max(0, maquina.setupsRealizados - 1)
             : undefined,
         producoesRealizadas:
-          insp.tipo === 'PRODUCAO'
+          abriu && insp.tipo === 'PRODUCAO'
             ? Math.max(0, maquina.producoesRealizadas - 1)
             : undefined,
         inspecoesReprovadas: Math.max(
@@ -376,5 +433,30 @@ export class InspecoesManufaturaService {
       },
     });
     return { ok: true };
+  }
+
+  // Descartar rascunho: joga fora a medicao que ficou pela metade. Nao ha nada
+  // a desfazer na maquina, porque o rascunho nunca somou. Se era o unico
+  // relatorio, a inspecao inteira vai junto - sem relatorio ela nao existe.
+  async descartarRascunho(inspecaoId: number, relatorioId: number) {
+    const rel = await this.prisma.relatorioDimensional.findUnique({
+      where: { id: relatorioId },
+    });
+    if (!rel || rel.inspecaoId !== inspecaoId)
+      throw new NotFoundException('Relatório não encontrado nesta inspeção.');
+    if (!rel.rascunho)
+      throw new ConflictException(
+        'Este relatório já foi lançado e não pode mais ser descartado.',
+      );
+
+    const total = await this.prisma.relatorioDimensional.count({
+      where: { inspecaoId },
+    });
+    if (total <= 1) {
+      await this.prisma.inspecaoManufatura.delete({ where: { id: inspecaoId } });
+      return { ok: true, inspecaoRemovida: true };
+    }
+    await this.prisma.relatorioDimensional.delete({ where: { id: relatorioId } });
+    return { ok: true, inspecaoRemovida: false };
   }
 }

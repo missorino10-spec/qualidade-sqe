@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -42,12 +42,21 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
-import { SelectNorma, TabelaCotasMaxMin } from '../components/TabelaCotas';
+import { BlocoDesenhos, SelectNorma } from '../components/TabelaCotas';
 import {
+  FotosDesvio,
+  UploadFotoDesvio,
   UploadFotosEvidencia,
+  chaveDesvio,
+  enviarFotosDesvio,
   enviarFotosEvidencia,
 } from '../components/FotosEvidencia';
-import { EVID, ORIGENS_RECEBIMENTO } from '../inspecao';
+import {
+  DesenhoExtra,
+  EVID,
+  ORIGENS_RECEBIMENTO,
+  desenhosExtras,
+} from '../inspecao';
 import Tabela from '../components/Tabela';
 import { CamposItem } from '../components/CamposItem';
 import { TIPOS_DESVIO } from '../tipo-desvio';
@@ -59,11 +68,14 @@ type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 const corResultado: Record<string, string> = {
   APROVADO: 'green',
   REPROVADO: 'red',
+  // Rascunho nao e veredito: e trabalho pela metade esperando alguem terminar.
+  RASCUNHO: 'orange',
 };
 
 const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
   REPROVADO: 'Reprovado',
+  RASCUNHO: 'Rascunho',
 };
 
 const labelFormulario: Record<string, string> = {
@@ -74,9 +86,13 @@ const labelFormulario: Record<string, string> = {
 function ChecklistVisual({
   grupos,
   setGrupos,
+  fotosDesvio,
+  setFotosDesvio,
 }: {
   grupos: any[];
   setGrupos: (g: any[]) => void;
+  fotosDesvio: FotosDesvio;
+  setFotosDesvio: (f: FotosDesvio) => void;
 }) {
   function marcar(gi: number, ii: number, status: StatusItem) {
     const copia = grupos.map((g) => ({ ...g, itens: g.itens.map((x: any) => ({ ...x })) }));
@@ -111,31 +127,44 @@ function ChecklistVisual({
             </Space>
           }
         >
-          {g.itens.map((item: any, ii: number) => (
-            <Row
-              key={ii}
-              align="middle"
-              justify="space-between"
-              style={{ padding: '4px 0' }}
-            >
-              <Col flex="auto">
-                <Typography.Text>{item.texto}</Typography.Text>
-              </Col>
-              <Col>
-                <Radio.Group
-                  size="small"
-                  value={item.status}
-                  onChange={(e) => marcar(gi, ii, e.target.value)}
-                  optionType="button"
-                  buttonStyle="solid"
-                >
-                  <Radio.Button value="APROVADO">Aprovado</Radio.Button>
-                  <Radio.Button value="REPROVADO">Reprovado</Radio.Button>
-                  <Radio.Button value="NAO_APLICAVEL">N/A</Radio.Button>
-                </Radio.Group>
-              </Col>
-            </Row>
-          ))}
+          {g.itens.map((item: any, ii: number) => {
+            const chave = chaveDesvio(gi, ii);
+            return (
+              <div key={ii} style={{ padding: '4px 0' }}>
+                <Row align="middle" justify="space-between">
+                  <Col flex="auto">
+                    <Typography.Text>{item.texto}</Typography.Text>
+                  </Col>
+                  <Col>
+                    <Radio.Group
+                      size="small"
+                      value={item.status}
+                      onChange={(e) => marcar(gi, ii, e.target.value)}
+                      optionType="button"
+                      buttonStyle="solid"
+                    >
+                      <Radio.Button value="APROVADO">Aprovado</Radio.Button>
+                      <Radio.Button value="REPROVADO">Reprovado</Radio.Button>
+                      <Radio.Button value="NAO_APLICAVEL">N/A</Radio.Button>
+                    </Radio.Group>
+                  </Col>
+                </Row>
+                {/* A foto abre na propria linha do desvio: no relatorio ela
+                    sai com este texto como legenda, entao quem le sabe de
+                    qual item a imagem esta falando. */}
+                {item.status === 'REPROVADO' && (
+                  <div style={{ marginTop: 4 }}>
+                    <UploadFotoDesvio
+                      fotos={fotosDesvio[chave] ?? []}
+                      setFotos={(f) =>
+                        setFotosDesvio({ ...fotosDesvio, [chave]: f })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </Card>
       ))}
     </div>
@@ -152,8 +181,12 @@ export default function Inspecoes() {
   const [form] = Form.useForm();
   const [grupos, setGrupos] = useState<any[]>([]);
   const [cotas, setCotas] = useState<any[]>([]);
+  // Peca de conjunto: desenhos do 2o em diante. O 1o e o do cabecalho.
+  const [desenhos, setDesenhos] = useState<DesenhoExtra[]>([]);
   // Bloco EVIDENCIAS do formulario visual: ate 4 fotos, sempre opcional.
   const [fotosVisual, setFotosVisual] = useState<any[]>([]);
+  // Foto presa a um item reprovado do checklist, por linha do checklist.
+  const [fotosDesvio, setFotosDesvio] = useState<FotosDesvio>({});
   const [passoIdx, setPassoIdx] = useState(0);
   // Uma inspecao = um recebimento. A entrega criada no primeiro formulario e
   // reaproveitada no seguinte, para Visual e Lote serem a MESMA inspecao,
@@ -174,7 +207,15 @@ export default function Inspecoes() {
     tipo: 'VISUAL' | 'LOTE';
     id: number;
     numero?: string;
+    // Formulario reaberto que ainda e rascunho. Muda o que a tela oferece:
+    // em vez de "Salvar correcao" o botao e "Lançar inspeção", e aparece o
+    // "Descartar" - que so vale enquanto nada foi lancado.
+    rascunho?: boolean;
   } | null>(null);
+
+  // Qual botao foi clicado. Fica em ref porque o onFinish do Form roda no
+  // mesmo ciclo do submit e leria um useState ainda desatualizado.
+  const modoSalvar = useRef<'RASCUNHO' | 'LANCAR'>('LANCAR');
 
   // Cadastro pontual de fornecedor, sem sair da inspecao
   const [openFornecedor, setOpenFornecedor] = useState(false);
@@ -207,6 +248,8 @@ export default function Inspecoes() {
   const normaSel = Form.useWatch('toleranciasNorm', form) ?? 'ISO2768';
   const extra = Form.useWatch('extra', form);
   const origemSel = Form.useWatch('origem', form);
+  const desenhoSel = Form.useWatch('desenho', form);
+  const revisaoSel = Form.useWatch('revisao', form);
   const formulariosExtra: string[] | undefined = Form.useWatch(
     'formulariosExtra',
     form,
@@ -284,6 +327,15 @@ export default function Inspecoes() {
   const preencheFormulario = passos.length > 0;
   const ultimoPasso = passoIdx >= passos.length - 1;
 
+  // Legenda da foto do desvio: o texto do item do checklist. So vale enquanto
+  // o item continuar REPROVADO - o inspetor pode ter marcado, anexado a foto e
+  // voltado atras, e nesse caso a foto nao sobe.
+  function legendaDoDesvio(chave: string): string | null {
+    const [gi, ii] = chave.split('-').map(Number);
+    const item = grupos[gi]?.itens?.[ii];
+    return item?.status === 'REPROVADO' ? item.texto : null;
+  }
+
   // Limpa SO o preenchimento do formulario (checklist, cotas, fotos e
   // observacoes). O cabecalho fica: Visual e Lote sao a mesma peca, o mesmo
   // item e a mesma nota, entao o inspetor nao redigita nada.
@@ -297,7 +349,9 @@ export default function Inspecoes() {
         : [],
     );
     setCotas([]);
+    setDesenhos([]);
     setFotosVisual([]);
+    setFotosDesvio({});
     form.setFieldsValue({ observacoes: undefined });
   }
 
@@ -354,14 +408,21 @@ export default function Inspecoes() {
       setDesvioAnterior(false);
       setDesviosPendentes([]);
       setFotosVisual([]);
+      setFotosDesvio({});
       // RNC cancelada nao conta: se a inspecao voltar a reprovar, o desvio
       // precisa de uma RNC nova, e a pergunta tem que ser feita de novo.
       setRncDaInspecao(
         (insp.rncs ?? []).find((r: any) => r.status !== 'CANCELADA') ?? null,
       );
-      setEdicao({ tipo: tipoForm, id: f.id, numero: insp.numeroInspecao });
+      setEdicao({
+        tipo: tipoForm,
+        id: f.id,
+        numero: insp.numeroInspecao,
+        rascunho: !!f.rascunho,
+      });
       setGrupos(tipoForm === 'VISUAL' ? (f.checklist ?? []) : []);
       setCotas(tipoForm === 'LOTE' ? (f.cotas ?? []) : []);
+      setDesenhos(tipoForm === 'LOTE' ? desenhosExtras(f.desenhos) : []);
       form.setFieldsValue({
         fornecedorId: f.fornecedorId ?? insp.fornecedor?.id,
         itemCodigo: f.item?.codigo ?? insp.item?.codigo,
@@ -594,7 +655,11 @@ export default function Inspecoes() {
   // Nao se pergunta quando o recebimento ja tem RNC aberta: ali o desvio novo
   // complementa a RNC que existe, como sempre foi.
   async function onFinish(v: any) {
+    // Rascunho nao decide nada: guarda o que esta na tela e pronto. A pergunta
+    // da RNC e feita quando a inspecao for lancada, com o desvio ja definitivo.
+    const rascunho = modoSalvar.current === 'RASCUNHO';
     if (
+      !rascunho &&
       preencheFormulario &&
       ultimoPasso &&
       blocosDesvio.length > 0 &&
@@ -603,12 +668,13 @@ export default function Inspecoes() {
       setDecisaoRnc(v);
       return;
     }
-    return salvarFormulario(v);
+    return salvarFormulario(v, undefined, rascunho);
   }
 
   async function salvarFormulario(
     v: any,
     decisao?: { abrirRnc: boolean; observacaoDesvio?: string },
+    rascunho = false,
   ) {
     setSalvando(true);
     try {
@@ -638,9 +704,14 @@ export default function Inspecoes() {
         observacaoDesvio: decisao?.observacaoDesvio,
         // Ainda vem outro formulario: o desvio grava e espera o fim do ciclo.
         decidirNoFim: !ultimoPasso,
+        // Sem a marca, o PATCH de um rascunho e o LANCAMENTO dele.
+        rascunho: rascunho || undefined,
       };
       if (tipo === 'VISUAL') payload.checklist = grupos;
-      else payload.cotas = cotas;
+      else {
+        payload.cotas = cotas;
+        payload.desenhos = desenhos;
+      }
 
       // Correcao: o relatorio ja existe, entao e PATCH no formulario. O
       // fornecedor e a entrega nao vao no corpo - eles vem do Registro de
@@ -659,10 +730,26 @@ export default function Inspecoes() {
             tipo === 'VISUAL' ? EVID.sqeVisual : EVID.sqeDimensional,
             res.inspecao.id,
           );
+        if (tipo === 'VISUAL' && res.inspecao?.id)
+          await enviarFotosDesvio(
+            fotosDesvio,
+            legendaDoDesvio,
+            EVID.sqeVisualDesvio,
+            res.inspecao.id,
+          );
         setOpen(false);
         setEdicao(null);
         invalidar();
-        if (res.rncsCanceladas?.length)
+        if (rascunho)
+          message.success(
+            `Rascunho da inspeção ${edicao.numero ?? ''} salvo. Ele não conta nos indicadores até ser lançado.`,
+          );
+        else if (edicao.rascunho && res.rnc) abrirRncObrigatoria(res.rnc);
+        else if (edicao.rascunho)
+          message.success(
+            `Inspeção ${edicao.numero ?? ''} lançada.`,
+          );
+        else if (res.rncsCanceladas?.length)
           message.success(
             `Inspeção ${edicao.numero ?? ''} corrigida e aprovada. A RNC ${res.rncsCanceladas.join(', ')} foi cancelada.`,
           );
@@ -682,6 +769,28 @@ export default function Inspecoes() {
           tipo === 'VISUAL' ? EVID.sqeVisual : EVID.sqeDimensional,
           res.inspecao.id,
         );
+      }
+      if (tipo === 'VISUAL' && res.inspecao?.id) {
+        await enviarFotosDesvio(
+          fotosDesvio,
+          legendaDoDesvio,
+          EVID.sqeVisualDesvio,
+          res.inspecao.id,
+        );
+      }
+
+      // Rascunho encerra aqui: a tela fecha e o formulario fica esperando na
+      // listagem, marcado como RASCUNHO, para qualquer um do modulo terminar.
+      // O proximo formulario do ciclo (Visual -> Dimensional) e retomado no
+      // lancamento, nao agora - nada foi decidido ainda.
+      if (rascunho) {
+        setOpen(false);
+        setEntradaVinculada(null);
+        invalidar();
+        message.success(
+          `Rascunho da inspeção ${res.numeroInspecao ?? ''} salvo. Ele não conta nos indicadores até ser lançado.`,
+        );
+        return;
       }
 
       const rnc = res.rnc ?? rncDaInspecao;
@@ -729,13 +838,50 @@ export default function Inspecoes() {
     } catch (e: any) {
       message.error(
         e?.response?.data?.message ??
-          (edicao
-            ? 'Não foi possível salvar a correção.'
-            : 'Não foi possível registrar o recebimento.'),
+          (rascunho
+            ? 'Não foi possível salvar o rascunho.'
+            : edicao
+              ? 'Não foi possível salvar a correção.'
+              : 'Não foi possível registrar o recebimento.'),
       );
     } finally {
       setSalvando(false);
     }
+  }
+
+  // Descartar rascunho: joga fora o formulario pela metade. So aparece
+  // enquanto nada foi lancado - inspecao lancada continua so podendo ser
+  // excluida pelo ADMIN.
+  function descartarRascunho(
+    formularios: { tipo: 'VISUAL' | 'LOTE'; id: number }[],
+    numero?: string,
+    aoTerminar?: () => void,
+  ) {
+    Modal.confirm({
+      title: `Descartar o rascunho ${numero ?? ''}?`,
+      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      content:
+        'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda nos indicadores nem no ciclo do fornecedor.',
+      okText: 'Descartar',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          for (const f of formularios)
+            await api.delete(
+              `/inspecoes/${f.tipo === 'VISUAL' ? 'visual' : 'lote'}/${f.id}/rascunho`,
+            );
+          message.success('Rascunho descartado.');
+          invalidar();
+          aoTerminar?.();
+        } catch (e: any) {
+          message.error(
+            e?.response?.data?.message ??
+              'Não foi possível descartar o rascunho.',
+          );
+        }
+      },
+    });
   }
 
   // Exclui a inspecao inteira (os formularios do recebimento).
@@ -805,12 +951,14 @@ export default function Inspecoes() {
     <Card
       title="Inspeções de recebimento"
       extra={
-        // Toda inspecao nasce de um registro de entrada: e a chegada da carga
-        // que diz se esta entrega cai no ciclo de periodicidade.
+        // Abre o formulario padrao em branco. O caminho contrario continua
+        // valendo: o registro de entrada leva direto para a inspecao, porque
+        // ali a carga ja chegou. Mas a inspecao pode ser aberta a qualquer
+        // hora, sem passar pelo registro.
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => navigate('/registros-entrada')}
+          onClick={() => novaInspecao()}
         >
           Nova inspeção
         </Button>
@@ -944,18 +1092,22 @@ export default function Inspecoes() {
           },
           {
             title: '',
-            width: isAdmin ? 96 : 56,
+            // 96 mesmo sem ser ADMIN: o "descartar rascunho" aparece para todos.
+            width: 96,
             render: (_: any, r: any) => (
               <Space size={0}>
                 {/* Correcao do que foi digitado errado. A inspecao com os dois
-                    formularios corrige um de cada vez: cada um e um relatorio. */}
+                    formularios corrige um de cada vez: cada um e um relatorio.
+                    Formulario ainda em rascunho e "continuar", nao "corrigir". */}
                 {r.formularios?.length > 1 ? (
                   <Dropdown
                     trigger={['click']}
                     menu={{
                       items: r.formularios.map((f: string) => ({
                         key: f,
-                        label: `Corrigir ${labelFormulario[f].toLowerCase()}`,
+                        label: r.rascunhos?.includes(f)
+                          ? `Continuar rascunho ${labelFormulario[f].toLowerCase()}`
+                          : `Corrigir ${labelFormulario[f].toLowerCase()}`,
                       })),
                       onClick: ({ key }) =>
                         abrirEdicao(r, key as 'VISUAL' | 'LOTE'),
@@ -967,19 +1119,45 @@ export default function Inspecoes() {
                   <Button
                     type="text"
                     icon={<EditOutlined />}
-                    title="Corrigir esta inspeção"
+                    title={
+                      r.rascunhos?.length
+                        ? 'Continuar este rascunho'
+                        : 'Corrigir esta inspeção'
+                    }
                     onClick={() =>
                       abrirEdicao(r, r.formularios?.[0] ?? 'VISUAL')
                     }
                   />
                 )}
-                {isAdmin && (
+                {/* Descartar rascunho nao e exclusao: o rascunho nunca somou
+                    nada, entao qualquer um do modulo pode jogar fora. Se ainda
+                    houver formulario lancado no recebimento, so o ADMIN pode
+                    apagar - e o botao abaixo continua sendo o dele. */}
+                {r.rascunhos?.length > 0 && r.rascunho ? (
                   <Button
                     type="text"
                     danger
                     icon={<DeleteOutlined />}
-                    onClick={() => confirmarExclusao(r)}
+                    title="Descartar rascunho"
+                    onClick={() =>
+                      descartarRascunho(
+                        r.rascunhos.map((t: string) => ({
+                          tipo: t as 'VISUAL' | 'LOTE',
+                          id: t === 'VISUAL' ? r.visualId : r.loteId,
+                        })),
+                        r.numeroInspecao,
+                      )
+                    }
                   />
+                ) : (
+                  isAdmin && (
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => confirmarExclusao(r)}
+                    />
+                  )
                 )}
               </Space>
             ),
@@ -989,27 +1167,76 @@ export default function Inspecoes() {
 
       <Modal
         title={
-          edicao
-            ? `Corrigir inspeção ${numeroInspecao ?? ''} — ${labelFormulario[edicao.tipo]}`
-            : numeroInspecao
-              ? `Inspeção ${numeroInspecao}`
-              : 'Nova inspeção de recebimento'
+          edicao?.rascunho
+            ? `Rascunho ${numeroInspecao ?? ''} — ${labelFormulario[edicao.tipo]}`
+            : edicao
+              ? `Corrigir inspeção ${numeroInspecao ?? ''} — ${labelFormulario[edicao.tipo]}`
+              : numeroInspecao
+                ? `Inspeção ${numeroInspecao}`
+                : 'Nova inspeção de recebimento'
         }
         open={open}
         onCancel={fecharInspecao}
         maskClosable={!desvioPendente}
         keyboard={!desvioPendente}
-        onOk={() => form.submit()}
         confirmLoading={salvando}
-        okText={
-          edicao
-            ? 'Salvar correção'
-            : !ultimoPasso
-              ? `Registrar ${labelFormulario[tipo]} e continuar`
-              : 'Concluir inspeção'
-        }
-        cancelText="Cancelar"
         width={900}
+        // Rodape na mao por causa do "Salvar rascunho": o mesmo formulario sai
+        // pela metade ou completo, e quem decide e o botao clicado.
+        footer={[
+          edicao?.rascunho ? (
+            <Button
+              key="descartar"
+              danger
+              onClick={() =>
+                descartarRascunho(
+                  [{ tipo: edicao.tipo, id: edicao.id }],
+                  edicao.numero,
+                  () => {
+                    setOpen(false);
+                    setEdicao(null);
+                  },
+                )
+              }
+            >
+              Descartar rascunho
+            </Button>
+          ) : null,
+          <Button key="cancelar" onClick={fecharInspecao}>
+            Cancelar
+          </Button>,
+          // Correcao de inspecao JA LANCADA nao volta a rascunho: o documento
+          // ja vale, e desfazer isso mexeria nos indicadores para tras.
+          !edicao || edicao.rascunho ? (
+            <Button
+              key="rascunho"
+              loading={salvando}
+              onClick={() => {
+                modoSalvar.current = 'RASCUNHO';
+                form.submit();
+              }}
+            >
+              Salvar rascunho
+            </Button>
+          ) : null,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvando}
+            onClick={() => {
+              modoSalvar.current = 'LANCAR';
+              form.submit();
+            }}
+          >
+            {edicao?.rascunho
+              ? 'Lançar inspeção'
+              : edicao
+                ? 'Salvar correção'
+                : !ultimoPasso
+                  ? `Registrar ${labelFormulario[tipo]} e continuar`
+                  : 'Concluir inspeção'}
+          </Button>,
+        ]}
       >
         <Form
           form={form}
@@ -1309,12 +1536,21 @@ export default function Inspecoes() {
               </Divider>
 
               {tipo === 'VISUAL' ? (
-                <ChecklistVisual grupos={grupos} setGrupos={setGrupos} />
+                <ChecklistVisual
+                  grupos={grupos}
+                  setGrupos={setGrupos}
+                  fotosDesvio={fotosDesvio}
+                  setFotosDesvio={setFotosDesvio}
+                />
               ) : (
-                <TabelaCotasMaxMin
+                <BlocoDesenhos
                   cotas={cotas}
                   setCotas={setCotas}
+                  desenhos={desenhos}
+                  setDesenhos={setDesenhos}
                   norma={normaSel}
+                  desenhoCabecalho={desenhoSel}
+                  revisaoCabecalho={revisaoSel}
                 />
               )}
 

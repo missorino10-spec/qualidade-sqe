@@ -21,7 +21,10 @@ import { AlertasService } from './alertas.service';
 import { gerarPdfAlerta } from './alerta-pdf';
 import { StorageService } from '../../anexos/storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
+import {
+  bytesDasFotos,
+  carregarFotosEvidencia,
+} from '../../comum/fotos-evidencia';
 import { EVID } from '../../comum/inspecao';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
@@ -92,7 +95,10 @@ export class AlertasController {
     const nomeArquivo = `${(alerta.numero ?? `alerta-${id}`).replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfAlerta(alerta, { errado, certo });
+    const doc = gerarPdfAlerta(alerta, {
+      errado: bytesDasFotos(errado),
+      certo: bytesDasFotos(certo),
+    });
     doc.pipe(res);
     doc.end();
   }

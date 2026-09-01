@@ -13,6 +13,11 @@ import {
 } from 'antd';
 import { SelectNorma, cotaVaziaPecas } from '../../components/TabelaCotas';
 import {
+  FotosDesvio,
+  UploadFotoDesvio,
+  chaveDesvio,
+} from '../../components/FotosEvidencia';
+import {
   ORIGENS_RECEBIMENTO,
   CotaPecas,
   GrupoVisual,
@@ -74,9 +79,13 @@ export function checklistInicial(
 export function ChecklistVisual({
   checklist,
   setChecklist,
+  fotosDesvio,
+  setFotosDesvio,
 }: {
   checklist: GrupoVisual[];
   setChecklist: (c: GrupoVisual[]) => void;
+  fotosDesvio: FotosDesvio;
+  setFotosDesvio: (f: FotosDesvio) => void;
 }) {
   function marcar(g: number, i: number, status: StatusVisual) {
     setChecklist(
@@ -127,7 +136,30 @@ export function ChecklistVisual({
             scroll={{ x: 'max-content' }}
             dataSource={grupo.itens}
             columns={[
-              { title: 'Item', dataIndex: 'texto' },
+              {
+                title: 'Item',
+                render: (_: any, item: any, ii: number) => (
+                  <>
+                    <Typography.Text>{item.texto}</Typography.Text>
+                    {/* A foto abre na propria linha do desvio: no relatorio
+                        ela sai com este texto como legenda, entao quem le
+                        sabe de qual item a imagem esta falando. */}
+                    {item.status === 'REPROVADO' && (
+                      <div style={{ marginTop: 4 }}>
+                        <UploadFotoDesvio
+                          fotos={fotosDesvio[chaveDesvio(gi, ii)] ?? []}
+                          setFotos={(f) =>
+                            setFotosDesvio({
+                              ...fotosDesvio,
+                              [chaveDesvio(gi, ii)]: f,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
+                ),
+              },
               {
                 title: 'Status',
                 width: 260,

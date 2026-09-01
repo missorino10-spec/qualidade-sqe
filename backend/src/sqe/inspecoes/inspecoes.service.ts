@@ -16,6 +16,7 @@ import {
   CotaMaxMin,
   calcularCotaMaxMin,
   checklistVisualInicial,
+  desenhosExtras,
   resultadoDimensional,
   resultadoVisual,
 } from '../../comum/inspecao';
@@ -44,6 +45,13 @@ const includeInspecao = {
   rncs: { select: { id: true, numero: true, status: true } },
 };
 
+// So o necessario para saber se o recebimento fica sem formulario nenhum
+// depois que o rascunho for descartado.
+const includeEntregaDoRascunho = {
+  inspecoesVisual: { select: { id: true } },
+  inspecoesLote: { select: { id: true } },
+};
+
 @Injectable()
 export class InspecoesService {
   constructor(
@@ -67,10 +75,15 @@ export class InspecoesService {
       lote ? 'LOTE' : null,
     ].filter(Boolean) as string[];
     const principal = visual ?? lote;
+    // Rascunho e trabalho pela metade: o veredito dele ainda nao vale. A
+    // listagem mostra RASCUNHO no lugar de aprovado/reprovado, e so o que ja
+    // foi lancado e que forma o resultado do recebimento.
+    const lancados = [visual, lote].filter((f) => f && !f.rascunho);
+    const rascunho = !lancados.length && formularios.length > 0;
     // Encerrada com desvio apontado e sem RNC continua sendo um APROVADO comum
     // na listagem: o desvio esta registrado dentro do relatorio (cotas e itens
     // reprovados marcados, mais a justificativa), nao no veredito.
-    const reprovado = [visual, lote].some((f) => f?.resultado === 'REPROVADO');
+    const reprovado = lancados.some((f) => f?.resultado === 'REPROVADO');
 
     return {
       id: e.id,
@@ -79,11 +92,22 @@ export class InspecoesService {
       fornecedor: e.fornecedor,
       item: principal?.item ?? e.item ?? null,
       formularios,
+      rascunho,
+      // Quais formularios ainda estao pela metade. Um recebimento pode ter o
+      // Visual ja lancado e o Dimensional em rascunho, entao a tela precisa
+      // saber disso formulario a formulario para oferecer "continuar" e
+      // "descartar" so em quem cabe.
+      rascunhos: [
+        visual?.rascunho ? 'VISUAL' : null,
+        lote?.rascunho ? 'LOTE' : null,
+      ].filter(Boolean) as string[],
       resultado: !formularios.length
         ? 'SEM_INSPECAO'
-        : reprovado
-          ? 'REPROVADO'
-          : 'APROVADO',
+        : rascunho
+          ? 'RASCUNHO'
+          : reprovado
+            ? 'REPROVADO'
+            : 'APROVADO',
       dataInspecao: principal?.dataInspecao ?? e.dataEntrega,
       semana: principal?.semana ?? e.semana,
       ano: principal?.ano ?? e.ano,
@@ -458,15 +482,22 @@ export class InspecoesService {
     const antes = await this.prisma.entregaPortaria.findUniqueOrThrow({
       where: { id: entregaId },
       include: {
-        inspecoesVisual: { select: { id: true, resultado: true } },
-        inspecoesLote: { select: { id: true, resultado: true } },
+        inspecoesVisual: {
+          select: { id: true, resultado: true, rascunho: true },
+        },
+        inspecoesLote: {
+          select: { id: true, resultado: true, rascunho: true },
+        },
         rncs: { select: { id: true } },
       },
     });
+    // Rascunho nao conta como formulario ja feito: ele nao somou no fornecedor
+    // nem reprovou nada. Enquanto o recebimento so tem rascunho, o proximo
+    // formulario lancado ainda e o primeiro para efeito de contagem.
     const formulariosAntes = [
       ...antes.inspecoesVisual,
       ...antes.inspecoesLote,
-    ];
+    ].filter((f) => !f.rascunho);
     const entrega = await this.numerarInspecao(entregaId, dataInsp);
 
     return {
@@ -514,6 +545,46 @@ export class InspecoesService {
     });
   }
 
+  // Lancamento de um rascunho: e aqui que o recebimento finalmente conta no
+  // fornecedor. Os numeros sao recalculados do estado atual, e nao guardados
+  // desde a criacao, porque entre salvar o rascunho e lanca-lo pode ter entrado
+  // o outro formulario da mesma inspecao.
+  //
+  // `numeroEntregaAcumulado` so e preenchido pelo Registro de Entrada: e ele
+  // que separa a chegada que ja foi somada em totalEntregas la da entrega que
+  // nasceu junto com a inspecao e ainda nao foi somada em lugar nenhum.
+  private async contabilizarLancamento(
+    entregaId: number,
+    fornecedorId: number,
+    esteId: number,
+    tipo: 'VISUAL' | 'LOTE',
+    reprovouAgora: boolean,
+  ) {
+    const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
+      where: { id: entregaId },
+      include: {
+        inspecoesVisual: {
+          select: { id: true, resultado: true, rascunho: true },
+        },
+        inspecoesLote: {
+          select: { id: true, resultado: true, rascunho: true },
+        },
+      },
+    });
+    const outros = [
+      ...entrega.inspecoesVisual.map((f) => ({ ...f, t: 'VISUAL' })),
+      ...entrega.inspecoesLote.map((f) => ({ ...f, t: 'LOTE' })),
+    ].filter((f) => !(f.t === tipo && f.id === esteId) && !f.rascunho);
+
+    await this.contabilizar({
+      fornecedorId,
+      primeiroFormulario: outros.length === 0,
+      entregaJaExistia: entrega.numeroEntregaAcumulado != null,
+      reprovouAgora,
+      jaEstavaReprovado: outros.some((f) => f.resultado === 'REPROVADO'),
+    });
+  }
+
   // Formulario ja gravado deste recebimento que reprovou e ainda espera a
   // decisao da RNC. Existe porque a decisao e UMA por inspecao, tomada no
   // ultimo formulario: o Visual que reprova numa inspecao Visual + Dimensional
@@ -523,14 +594,14 @@ export class InspecoesService {
     const entrega = await this.prisma.entregaPortaria.findUnique({
       where: { id: entregaId },
       include: {
-        inspecoesVisual: { select: { resultado: true } },
-        inspecoesLote: { select: { resultado: true } },
+        inspecoesVisual: { select: { resultado: true, rascunho: true } },
+        inspecoesLote: { select: { resultado: true, rascunho: true } },
       },
     });
     return [
       ...(entrega?.inspecoesVisual ?? []),
       ...(entrega?.inspecoesLote ?? []),
-    ].some((f) => f.resultado === 'REPROVADO');
+    ].some((f) => !f.rascunho && f.resultado === 'REPROVADO');
   }
 
   // Abrir RNC e decisao do inspetor, tomada na tela antes de gravar. Dizendo
@@ -575,11 +646,13 @@ export class InspecoesService {
     });
     // O formulario recem-criado ja resolveu a propria decisao; aqui so entram
     // os que ficaram para tras.
+    // Rascunho fica de fora: ele ainda nao tem veredito, entao nao entra na
+    // decisao da RNC. Quando for lancado, ele mesmo abre a sua.
     const visuais = entrega.inspecoesVisual.filter(
-      (f) => f.id !== atual.visualId && f.resultado === 'REPROVADO',
+      (f) => f.id !== atual.visualId && !f.rascunho && f.resultado === 'REPROVADO',
     );
     const lotes = entrega.inspecoesLote.filter(
-      (f) => f.id !== atual.loteId && f.resultado === 'REPROVADO',
+      (f) => f.id !== atual.loteId && !f.rascunho && f.resultado === 'REPROVADO',
     );
     if (!visuais.length && !lotes.length) return null;
 
@@ -671,7 +744,10 @@ export class InspecoesService {
   async criarVisual(dto: any, usuarioId: number) {
     const checklist = dto.checklist ?? checklistVisualInicial();
     const apurado = dto.resultado ?? resultadoVisual(checklist);
-    await this.exigirJustificativa(dto, apurado);
+    // Rascunho e trabalho pela metade: nao se cobra justificativa de desvio
+    // nem se decide RNC de uma inspecao que ainda nao terminou.
+    const rascunho = dto.rascunho === true;
+    if (!rascunho) await this.exigirJustificativa(dto, apurado);
 
     const ctx = await this.prepararInspecao(dto, usuarioId);
     const desvio = this.decidirDesvio(dto, ctx, apurado);
@@ -701,10 +777,20 @@ export class InspecoesService {
         resultado: desvio.resultado as any,
         desvioSemRnc: desvio.desvioSemRnc,
         observacaoDesvio: desvio.observacaoDesvio,
+        rascunho,
         inspetorId: usuarioId,
       },
       include: includeFormulario,
     });
+
+    // Rascunho nao soma no fornecedor nem zera o ciclo de periodicidade: o
+    // fornecedor continua devendo inspecao ate o relatorio ser lancado.
+    if (rascunho)
+      return {
+        inspecao: insp,
+        numeroInspecao: ctx.entrega.numeroInspecao,
+        rnc: null,
+      };
 
     const reprovado = insp.resultado === 'REPROVADO';
     await this.contabilizar({
@@ -766,7 +852,9 @@ export class InspecoesService {
     // exatamente o que vai para o banco e para o PDF.
     const cotas = (dto.cotas ?? []).map((c: CotaMaxMin) => calcularCotaMaxMin(c));
     const apurado = dto.resultado ?? resultadoDimensional(cotas);
-    await this.exigirJustificativa(dto, apurado);
+    // Ver criarVisual: rascunho nao responde por desvio nem por RNC.
+    const rascunho = dto.rascunho === true;
+    if (!rascunho) await this.exigirJustificativa(dto, apurado);
 
     const ctx = await this.prepararInspecao(dto, usuarioId);
     const desvio = this.decidirDesvio(dto, ctx, apurado);
@@ -790,14 +878,23 @@ export class InspecoesService {
         origem: dto.origem ?? 'PLANO_INSPECAO',
         origemOutros: dto.origemOutros ?? null,
         cotas,
+        desenhos: desenhosExtras(dto.desenhos) as any,
         observacoes: dto.observacoes ?? null,
         resultado: desvio.resultado as any,
         desvioSemRnc: desvio.desvioSemRnc,
         observacaoDesvio: desvio.observacaoDesvio,
+        rascunho,
         inspetorId: usuarioId,
       },
       include: includeFormulario,
     });
+
+    if (rascunho)
+      return {
+        inspecao: insp,
+        numeroInspecao: ctx.entrega.numeroInspecao,
+        rnc: null,
+      };
 
     const reprovado = insp.resultado === 'REPROVADO';
     await this.contabilizar({
@@ -878,8 +975,8 @@ export class InspecoesService {
     const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
       where: { id: entregaId },
       include: {
-        inspecoesVisual: { select: { resultado: true } },
-        inspecoesLote: { select: { resultado: true } },
+        inspecoesVisual: { select: { resultado: true, rascunho: true } },
+        inspecoesLote: { select: { resultado: true, rascunho: true } },
         rncs: { select: { id: true, numero: true, status: true } },
       },
     });
@@ -889,7 +986,7 @@ export class InspecoesService {
       reprovadoAntes: [
         ...entrega.inspecoesVisual,
         ...entrega.inspecoesLote,
-      ].some((f) => f.resultado === 'REPROVADO'),
+      ].some((f) => !f.rascunho && f.resultado === 'REPROVADO'),
       jaTemRnc: abertas.length > 0,
     };
   }
@@ -904,8 +1001,8 @@ export class InspecoesService {
     const entrega = await this.prisma.entregaPortaria.findUniqueOrThrow({
       where: { id: entregaId },
       include: {
-        inspecoesVisual: { select: { resultado: true } },
-        inspecoesLote: { select: { resultado: true } },
+        inspecoesVisual: { select: { resultado: true, rascunho: true } },
+        inspecoesLote: { select: { resultado: true, rascunho: true } },
         rncs: { select: { id: true, numero: true, status: true } },
         fornecedor: { select: { id: true, lotesReprovados: true } },
       },
@@ -913,7 +1010,7 @@ export class InspecoesService {
     const reprovadoAgora = [
       ...entrega.inspecoesVisual,
       ...entrega.inspecoesLote,
-    ].some((f) => f.resultado === 'REPROVADO');
+    ].some((f) => !f.rascunho && f.resultado === 'REPROVADO');
 
     if (reprovadoAntes !== reprovadoAgora)
       await this.prisma.fornecedor.update({
@@ -977,6 +1074,35 @@ export class InspecoesService {
 
     const checklist = dto.checklist ?? (atual.checklist as any);
     const apurado = dto.resultado ?? resultadoVisual(checklist);
+
+    // Rascunho que continua rascunho: so o conteudo do formulario e reescrito.
+    // Nada de veredito, contabilizacao ou RNC - ele segue fora de tudo ate ser
+    // lancado.
+    if (atual.rascunho && dto.rascunho === true) {
+      const inspecao = await this.prisma.inspecaoVisual.update({
+        where: { id },
+        data: {
+          ...this.camposEditaveis(
+            dto,
+            await this.resolverItemId({
+              ...dto,
+              fornecedorId: atual.fornecedorId,
+            }),
+            dto.dataInspecao ? new Date(dto.dataInspecao) : atual.dataInspecao,
+          ),
+          checklist,
+        },
+        include: includeFormulario,
+      });
+      return { inspecao, rnc: null, reprovadoAgora: false, rncsCanceladas: [] };
+    }
+
+    // Lancamento do rascunho: o formulario nasce para o sistema agora. Daqui
+    // para a frente ele e uma inspecao normal, entao passa pelas mesmas travas
+    // da criacao - justificativa do desvio, contagem no fornecedor e RNC.
+    if (atual.rascunho)
+      return this.lancarVisual(atual, dto, checklist, apurado, usuarioId);
+
     const { reprovadoAntes, jaTemRnc } = await this.antesDaEdicao(
       entregaId,
     );
@@ -1061,7 +1187,35 @@ export class InspecoesService {
     const cotas = dto.cotas
       ? dto.cotas.map((c: CotaMaxMin) => calcularCotaMaxMin(c))
       : (atual.cotas as any);
+    // Sempre array (nunca null): o campo e Json? e o Prisma cobraria JsonNull.
+    const desenhos = desenhosExtras(dto.desenhos ?? atual.desenhos) as any;
     const apurado = dto.resultado ?? resultadoDimensional(cotas);
+
+    // Ver editarVisual: rascunho que continua rascunho so reescreve o
+    // formulario, e rascunho que sai do rascunho vira lancamento.
+    if (atual.rascunho && dto.rascunho === true) {
+      const inspecao = await this.prisma.inspecaoLote.update({
+        where: { id },
+        data: {
+          ...this.camposEditaveis(
+            dto,
+            await this.resolverItemId({
+              ...dto,
+              fornecedorId: atual.fornecedorId,
+            }),
+            dto.dataInspecao ? new Date(dto.dataInspecao) : atual.dataInspecao,
+          ),
+          cotas,
+          desenhos,
+        },
+        include: includeFormulario,
+      });
+      return { inspecao, rnc: null, reprovadoAgora: false, rncsCanceladas: [] };
+    }
+
+    if (atual.rascunho)
+      return this.lancarLote(atual, dto, cotas, desenhos, apurado, usuarioId);
+
     const { reprovadoAntes, jaTemRnc } = await this.antesDaEdicao(
       entregaId,
     );
@@ -1083,6 +1237,7 @@ export class InspecoesService {
       data: {
         ...this.camposEditaveis(dto, itemId, dataInsp),
         cotas,
+        desenhos,
         resultado: desvio.resultado as any,
         desvioSemRnc: desvio.desvioSemRnc,
         observacaoDesvio: desvio.observacaoDesvio,
@@ -1123,6 +1278,241 @@ export class InspecoesService {
       usuarioId,
     );
     return { inspecao: insp, rnc, ...acerto };
+  }
+
+  // -------------------------------------------------------------- lancamento
+
+  // Rascunho virando inspecao de verdade. E o mesmo caminho da criacao, so que
+  // sobre um formulario que ja existe e ja tem numero: exige a justificativa do
+  // desvio, conta no fornecedor e resolve a RNC. Ate esta chamada o rascunho
+  // nao existia para nenhum indicador.
+  private async lancarVisual(
+    atual: any,
+    dto: any,
+    checklist: any,
+    apurado: string,
+    usuarioId: number,
+  ) {
+    const entregaId: number = atual.entregaId;
+    // A justificativa olha o recebimento inteiro, entao a entrega precisa ir
+    // junto: o dto da tela de correcao nao carrega esse campo.
+    await this.exigirJustificativa({ ...dto, entregaId }, apurado);
+
+    const { jaTemRnc } = await this.antesDaEdicao(entregaId);
+    const desvio = this.decidirDesvio(dto, { jaTemRnc }, apurado);
+    const itemId = await this.resolverItemId({
+      ...dto,
+      fornecedorId: atual.fornecedorId,
+    });
+    const dataInsp = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+
+    const insp = await this.prisma.inspecaoVisual.update({
+      where: { id: atual.id },
+      data: {
+        ...this.camposEditaveis(dto, itemId, dataInsp),
+        checklist,
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
+        rascunho: false,
+      },
+      include: includeFormulario,
+    });
+
+    const reprovado = insp.resultado === 'REPROVADO';
+    await this.contabilizarLancamento(
+      entregaId,
+      atual.fornecedorId,
+      insp.id,
+      'VISUAL',
+      reprovado,
+    );
+
+    let rnc: any = null;
+    if (reprovado && !dto.decidirNoFim) {
+      const itens = this.itensReprovados(checklist);
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId,
+          inspecaoVisualId: insp.id,
+          fornecedorId: atual.fornecedorId,
+          itemId,
+          notaFiscal: dto.notaFiscal,
+          po: dto.po,
+          quantidadeLote: dto.qtdTotal,
+          quantidadePecas: dto.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.VISUAL,
+          descricaoDesvio:
+            dto.observacoes ||
+            (itens.length
+              ? `Itens reprovados: ${itens.join('; ')}`
+              : 'Não conformidade identificada na inspeção visual.'),
+          disposicao: dto.disposicao ?? null,
+        },
+        usuarioId,
+      );
+    }
+
+    const rncPendentes = dto.decidirNoFim
+      ? null
+      : await this.fecharDecisaoDaInspecao(
+          { entregaId, jaTemRnc },
+          dto,
+          usuarioId,
+          { visualId: insp.id },
+        );
+
+    return {
+      inspecao: insp,
+      rnc: rncPendentes ?? rnc,
+      reprovadoAgora: reprovado,
+      rncsCanceladas: [] as string[],
+    };
+  }
+
+  private async lancarLote(
+    atual: any,
+    dto: any,
+    cotas: any,
+    desenhos: any,
+    apurado: string,
+    usuarioId: number,
+  ) {
+    const entregaId: number = atual.entregaId;
+    await this.exigirJustificativa({ ...dto, entregaId }, apurado);
+
+    const { jaTemRnc } = await this.antesDaEdicao(entregaId);
+    const desvio = this.decidirDesvio(dto, { jaTemRnc }, apurado);
+    const itemId = await this.resolverItemId({
+      ...dto,
+      fornecedorId: atual.fornecedorId,
+    });
+    const dataInsp = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : atual.dataInspecao;
+
+    const insp = await this.prisma.inspecaoLote.update({
+      where: { id: atual.id },
+      data: {
+        ...this.camposEditaveis(dto, itemId, dataInsp),
+        cotas,
+        desenhos,
+        resultado: desvio.resultado as any,
+        desvioSemRnc: desvio.desvioSemRnc,
+        observacaoDesvio: desvio.observacaoDesvio,
+        rascunho: false,
+      },
+      include: includeFormulario,
+    });
+
+    const reprovado = insp.resultado === 'REPROVADO';
+    await this.contabilizarLancamento(
+      entregaId,
+      atual.fornecedorId,
+      insp.id,
+      'LOTE',
+      reprovado,
+    );
+
+    let rnc: any = null;
+    if (reprovado && !dto.decidirNoFim) {
+      rnc = await this.rnc.abrirOuComplementar(
+        {
+          entregaId,
+          inspecaoLoteId: insp.id,
+          fornecedorId: atual.fornecedorId,
+          itemId,
+          notaFiscal: dto.notaFiscal,
+          po: dto.po,
+          quantidadeLote: dto.qtdTotal,
+          quantidadePecas: dto.qtdTotal,
+          tipoDesvio: TIPO_DESVIO.DIMENSIONAL,
+          descricaoDesvio:
+            dto.observacoes ||
+            'Não conformidade dimensional identificada na inspeção de lote.',
+          disposicao: dto.disposicao ?? null,
+        },
+        usuarioId,
+      );
+    }
+
+    const rncPendentes = dto.decidirNoFim
+      ? null
+      : await this.fecharDecisaoDaInspecao(
+          { entregaId, jaTemRnc },
+          dto,
+          usuarioId,
+          { loteId: insp.id },
+        );
+
+    return {
+      inspecao: insp,
+      rnc: rncPendentes ?? rnc,
+      reprovadoAgora: reprovado,
+      rncsCanceladas: [] as string[],
+    };
+  }
+
+  // ---------------------------------------------------------------- descarte
+
+  // Descartar rascunho e diferente da exclusao do ADMIN: aqui nao ha nada a
+  // desfazer no fornecedor, porque o rascunho nunca somou. Qualquer um que
+  // enxerga o modulo pode descartar - o rascunho e da equipe, nao de quem o
+  // abriu.
+  async descartarVisual(id: number) {
+    const insp = await this.prisma.inspecaoVisual.findUnique({
+      where: { id },
+      include: { entrega: { include: includeEntregaDoRascunho } },
+    });
+    if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    this.exigirRascunho(insp.rascunho);
+    await this.prisma.inspecaoVisual.delete({ where: { id } });
+    await this.limparEntregaDoRascunho(insp.entrega, id, 'VISUAL');
+    return { ok: true };
+  }
+
+  async descartarLote(id: number) {
+    const insp = await this.prisma.inspecaoLote.findUnique({
+      where: { id },
+      include: { entrega: { include: includeEntregaDoRascunho } },
+    });
+    if (!insp) throw new NotFoundException('Inspeção não encontrada');
+    this.exigirRascunho(insp.rascunho);
+    await this.prisma.inspecaoLote.delete({ where: { id } });
+    await this.limparEntregaDoRascunho(insp.entrega, id, 'LOTE');
+    return { ok: true };
+  }
+
+  private exigirRascunho(rascunho: boolean) {
+    if (!rascunho)
+      throw new ConflictException(
+        'Esta inspeção já foi lançada e não pode mais ser descartada.',
+      );
+  }
+
+  // Sobrou um recebimento sem nenhum formulario. Se ele nasceu junto com a
+  // inspecao descartada, vai junto. Se veio do Registro de Entrada, fica: a
+  // chegada aconteceu de verdade e continua valendo mesmo sem inspecao.
+  private async limparEntregaDoRascunho(
+    entrega: any,
+    id: number,
+    tipo: 'VISUAL' | 'LOTE',
+  ) {
+    if (!entrega || entrega.numeroEntregaAcumulado != null) return;
+    const restantes = [
+      ...entrega.inspecoesVisual.filter(
+        (f: any) => !(tipo === 'VISUAL' && f.id === id),
+      ),
+      ...entrega.inspecoesLote.filter(
+        (f: any) => !(tipo === 'LOTE' && f.id === id),
+      ),
+    ];
+    if (restantes.length) return;
+    await this.prisma.entregaPortaria
+      .delete({ where: { id: entrega.id } })
+      .catch(() => undefined);
   }
 
   private itensReprovados(checklist: any): string[] {

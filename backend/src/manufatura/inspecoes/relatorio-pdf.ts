@@ -1,8 +1,11 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { desenharTabelaCotas } from '../../comum/cotas-pdf';
-import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+import { desenharCotasPorDesenho } from '../../comum/cotas-pdf';
+import {
+  FotoEvidencia,
+  desenharFotosEvidencia,
+} from '../../comum/fotos-evidencia';
 import { labelNorma, ORIGENS_INSPECAO } from '../../comum/inspecao';
 import { nomeCurto } from '../../comum/nome';
 import { valorDeCelula } from '../../comum/pdf-texto';
@@ -10,7 +13,7 @@ import { valorDeCelula } from '../../comum/pdf-texto';
 // Fotos de cada tentativa, indexadas pelo id do relatorio dimensional.
 export type FotosRelatorio = Record<
   number,
-  { dimensional: Buffer[]; visual: Buffer[] }
+  { dimensional: FotoEvidencia[]; visual: FotoEvidencia[] }
 >;
 
 const LARANJA = '#E8792B';
@@ -271,7 +274,12 @@ export function gerarPdfRelatorioDimensional(
 
   // ---------------------------------------------------------- tabela de cotas
   const tabelaCotas = (rel: any) => {
-    y = desenharTabelaCotas(doc, rel.cotas, {
+    y = desenharCotasPorDesenho(doc, {
+      cotas: rel.cotas,
+      desenhos: rel.desenhos,
+      desenho: rel.desenho,
+      revisao: rel.desenhoRevisao,
+    }, {
       x0: X0,
       largura: W,
       y,
@@ -360,7 +368,7 @@ export function gerarPdfRelatorioDimensional(
     // Evidencia fotografica e opcional na Manufatura: cada bloco so aparece
     // no papel quando o inspetor subiu foto nele.
     const fotosRel = fotos[rel.id] ?? { dimensional: [], visual: [] };
-    const evidencias = (titulo: string, imagens: Buffer[]) => {
+    const evidencias = (titulo: string, imagens: FotoEvidencia[]) => {
       if (!imagens.length) return;
       y += 6;
       faixa(titulo);

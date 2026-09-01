@@ -12,10 +12,27 @@
 // Tolerancias
 // ---------------------------------------------------------------------------
 
-// Unidade da cota. Em "mm" vale a tabela linear; em "graus" vale a angular.
-// O inspetor digita so o numero (ex: 30) e escolhe a unidade; nao ha conversao
-// manual.
-export type UnidadeCota = 'mm' | 'graus';
+// Unidade da cota:
+//   - "mm": dimensao linear, unica em que a norma da a tolerancia pronta.
+//   - "graus": angulo, escrito em graus e minutos num campo so ("0°30'").
+//   - "raio": raio em milimetros.
+//
+// So o "mm" tem tabela. A tabela angular da norma e indexada pelo COMPRIMENTO
+// DO MENOR LADO do angulo, em milimetros - medida que o formulario nao tem -,
+// entao sugerir a tolerancia pelo valor do angulo daria numero errado (45°
+// caia na faixa "10 a 50" e recebia ±0°30'). Em graus e em raio quem informa a
+// tolerancia e o inspetor, com a tabela a vista na tela.
+export type UnidadeCota = 'mm' | 'graus' | 'raio';
+
+export const UNIDADES_COTA: { value: UnidadeCota; label: string }[] = [
+  { value: 'mm', label: 'mm' },
+  { value: 'graus', label: 'graus' },
+  { value: 'raio', label: 'raio (mm)' },
+];
+
+export function unidadeDaCota(valor: unknown): UnidadeCota {
+  return valor === 'graus' || valor === 'raio' ? valor : 'mm';
+}
 
 // Norma de referencia da cota.
 //
@@ -114,8 +131,10 @@ export const TOLERANCIA_LINEAR_M: { ate: number; tolerancia: number }[] = [
 // inspetor digitar.
 export const LIMITE_MINIMO_LINEAR = 0.5;
 
-// Angular em graus decimais (a norma traz em graus/minutos):
-// 1° | 0°30' = 0,5 | 0°20' = 0,3333 | 0°10' = 0,1667 | 0°5' = 0,0833.
+// Tabela angular da norma. O "ate" NAO e o valor do angulo: e o comprimento do
+// menor lado do angulo, em milimetros. Como o formulario nao pede esse
+// comprimento, ela nao entra no calculo - fica so como consulta na tela, para
+// o inspetor achar a tolerancia e digitar.
 // A linha "m" vem vazia na planilha de origem; por decisao do processo ela
 // repete a linha "f" (fino).
 export const TOLERANCIA_ANGULAR_M: { ate: number; tolerancia: number }[] = [
@@ -131,26 +150,24 @@ export function arredondar(n: number, casas: number): number {
   return Math.round(n * f) / f;
 }
 
-// Casas usadas em cada unidade: mm com 2, graus com 4 (0°5' = 0,0833).
+// Casas usadas em cada unidade: mm e raio com 2, graus com 4 (0°5' = 0,0833).
 export function casasDaUnidade(unidade: UnidadeCota): number {
   return unidade === 'graus' ? 4 : 2;
 }
 
-// Tolerancia da tabela para a medida especificada. Retorna null quando a
-// medida esta fora do alcance da norma (ai o campo abre para digitacao).
+// Tolerancia da tabela para a medida especificada. Retorna null quando o
+// sistema nao tem como saber (ai o campo abre para digitacao): fora do alcance
+// da tabela linear, ou unidade em graus/raio.
 export function toleranciaPadrao(
   especificado: number,
   unidade: UnidadeCota = 'mm',
 ): number | null {
+  if (unidade !== 'mm') return null;
   if (!Number.isFinite(especificado)) return null;
   const v = Math.abs(especificado);
-  if (v <= 0) return null;
+  if (v <= 0 || v < LIMITE_MINIMO_LINEAR) return null;
 
-  const tabela =
-    unidade === 'graus' ? TOLERANCIA_ANGULAR_M : TOLERANCIA_LINEAR_M;
-  if (unidade === 'mm' && v < LIMITE_MINIMO_LINEAR) return null;
-
-  const faixa = tabela.find((f) => v <= f.ate);
+  const faixa = TOLERANCIA_LINEAR_M.find((f) => v <= f.ate);
   if (!faixa) return null;
   return arredondar(faixa.tolerancia, casasDaUnidade(unidade));
 }
@@ -163,6 +180,59 @@ export function numero(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(String(v).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
+}
+
+// A norma nao passa do minuto, entao todo angulo e encaixado no minuto mais
+// proximo. Sem isso o valor exibido e o valor gravado divergiriam a cada
+// edicao (0°20' vira 0,3333, que volta como 0°20' mas nao e o mesmo numero).
+function arredondarMinuto(graus: number): number {
+  return arredondar(Math.round(graus * 60) / 60, 4);
+}
+
+/**
+ * Angulo escrito em graus e minutos num campo so. Aceita "1°30'", "1°30",
+ * "1°", "30'" e o numero puro em graus decimais ("0,5"), que e como os
+ * relatorios antigos foram gravados. Devolve sempre graus decimais.
+ */
+export function numeroAngulo(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const texto = String(v).trim().replace(/,/g, '.');
+  if (!texto) return null;
+
+  // Numero puro: graus decimais, formato dos registros antigos.
+  const puro = Number(texto);
+  if (Number.isFinite(puro)) return arredondarMinuto(puro);
+
+  const m = texto.match(
+    /^(-)?\s*(?:(\d+(?:\.\d+)?)\s*°)?\s*(?:(\d+(?:\.\d+)?)\s*'\s*)?$/,
+  );
+  if (!m) return null;
+  const [, sinal, grau, minuto] = m;
+  if (grau === undefined && minuto === undefined) return null;
+  const valor = Number(grau ?? 0) + Number(minuto ?? 0) / 60;
+  if (!Number.isFinite(valor)) return null;
+  return arredondarMinuto(sinal ? -valor : valor);
+}
+
+// Como o angulo aparece na tela e no papel: "1°" quando nao sobra minuto,
+// "0°30'" quando sobra - a mesma notacao da norma.
+export function textoAngulo(v: unknown): string {
+  const n = numeroAngulo(v);
+  if (n === null) return v === null || v === undefined ? '' : String(v);
+  const total = Math.round(Math.abs(n) * 60);
+  const grau = Math.floor(total / 60);
+  const minuto = total % 60;
+  return `${n < 0 ? '-' : ''}${grau}°${minuto ? `${minuto}'` : ''}`;
+}
+
+// Leitura e escrita de qualquer campo numerico da cota, na unidade dela.
+export function numeroCota(v: unknown, unidade: UnidadeCota): number | null {
+  return unidade === 'graus' ? numeroAngulo(v) : numero(v);
+}
+
+export function textoCota(v: unknown, unidade: UnidadeCota): string {
+  if (v === null || v === undefined || v === '') return '';
+  return unidade === 'graus' ? textoAngulo(v) : String(v).replace('.', ',');
 }
 
 // Campos comuns as duas variantes do formulario dimensional.
@@ -208,21 +278,22 @@ function limites(cota: CotaBase): {
   upper: number;
   lower: number;
 } | null {
-  const especificado = numero(cota.especificado);
+  const unidade = unidadeDaCota(cota.unidade);
+  const casas = casasDaUnidade(unidade);
+
+  const especificado = numeroCota(cota.especificado, unidade);
   if (especificado === null) return null;
 
-  const unidade: UnidadeCota = cota.unidade === 'graus' ? 'graus' : 'mm';
-  const casas = casasDaUnidade(unidade);
   const norma: NormaTolerancia = cota.norma ?? 'ISO2768';
-  const digitada = numero(cota.tolerancia);
+  const digitada = numeroCota(cota.tolerancia, unidade);
 
   // Em N/A quem manda sao os limites digitados: o desenho pode trazer campo
   // assimetrico (ex: +0,5 / -0,1), que uma tolerancia so nao representa. A
   // tolerancia continua valendo como atalho de quem tem o campo simetrico, e
   // por isso os registros antigos, que so guardavam ela, seguem batendo.
   if (norma === 'NA') {
-    const upperDigitado = numero(cota.upper);
-    const lowerDigitado = numero(cota.lower);
+    const upperDigitado = numeroCota(cota.upper, unidade);
+    const lowerDigitado = numeroCota(cota.lower, unidade);
     if (upperDigitado !== null && lowerDigitado !== null) {
       return {
         especificado,
@@ -237,9 +308,10 @@ function limites(cota: CotaBase): {
   }
 
   // Nas duas normas com tabela ela manda, e a digitada so entra quando a
-  // medida esta fora do alcance. Em norma informada pelo inspetor ("Outros")
-  // o sistema nao tem tabela: vale a digitada, com upper e lower calculados
-  // do mesmo jeito.
+  // medida esta fora do alcance (ou quando a unidade e graus/raio, que a
+  // tabela nao cobre). Em norma informada pelo inspetor ("Outros") o sistema
+  // nunca tem tabela: vale a digitada, com upper e lower calculados do mesmo
+  // jeito.
   const daTabela = normaTemTabela(norma)
     ? toleranciaPadrao(especificado, unidade)
     : null;
@@ -296,10 +368,11 @@ export function calcularCotaMaxMin(cota: CotaMaxMin): CotaMaxMin {
     return { ...cota, conformeAuto: null, conforme: cota.conformeManual ?? null };
   }
 
-  const { casas, tolerancia, upper, lower } = base;
-  const medidas = [numero(cota.encontradoMax), numero(cota.encontradoMin)].filter(
-    (n): n is number => n !== null,
-  );
+  const { casas, unidade, tolerancia, upper, lower } = base;
+  const medidas = [
+    numeroCota(cota.encontradoMax, unidade),
+    numeroCota(cota.encontradoMin, unidade),
+  ].filter((n): n is number => n !== null);
 
   const d = medidas.length
     ? desvios(medidas, upper, lower, casas)
@@ -308,7 +381,7 @@ export function calcularCotaMaxMin(cota: CotaMaxMin): CotaMaxMin {
 
   return {
     ...cota,
-    unidade: cota.unidade === 'graus' ? 'graus' : 'mm',
+    unidade,
     norma: cota.norma ?? 'ISO2768',
     tolerancia: tolerancia ?? '',
     upper,
@@ -327,9 +400,9 @@ export function calcularCotaPecas(cota: CotaPecas): CotaPecas {
     return { ...cota, conformeAuto: null, conforme: cota.conformeManual ?? null };
   }
 
-  const { casas, tolerancia, upper, lower } = base;
+  const { casas, unidade, tolerancia, upper, lower } = base;
   const medidas = (cota.pecas ?? [])
-    .map(numero)
+    .map((p) => numeroCota(p, unidade))
     .filter((n): n is number => n !== null);
 
   const d = medidas.length
@@ -339,7 +412,7 @@ export function calcularCotaPecas(cota: CotaPecas): CotaPecas {
 
   return {
     ...cota,
-    unidade: cota.unidade === 'graus' ? 'graus' : 'mm',
+    unidade,
     norma: cota.norma ?? 'ISO2768',
     tolerancia: tolerancia ?? '',
     upper,
@@ -556,6 +629,78 @@ export const labelOrigemInspecao: Record<string, string> = Object.fromEntries(
 );
 
 // ---------------------------------------------------------------------------
+// CONJUNTOS: mais de um desenho na mesma inspecao
+// Uma peca de conjunto e conferida por varios desenhos, e cada desenho tem as
+// suas proprias cotas. O primeiro desenho continua nos campos do cabecalho
+// (Desenho / Revisao), que e como todo relatorio ja gravado esta; os demais vao
+// no campo "desenhos", que guarda SO os extras (do 2o em diante).
+//
+// As cotas seguem num array unico, cada uma marcada com "desenhoIdx" (0 = o do
+// cabecalho, 1 = desenhos[0], e assim por diante). Assim tudo que ja lia a
+// lista plana de cotas - resultado, RNC, indicadores - continua lendo igual.
+// Relatorio antigo nao tem nem "desenhos" nem "desenhoIdx": vira um grupo so.
+// ---------------------------------------------------------------------------
+export type DesenhoExtra = { desenho?: string | null; revisao?: string | null };
+
+export type GrupoDesenho = {
+  // 0 = o desenho do cabecalho
+  indice: number;
+  desenho: string;
+  revisao: string;
+  cotas: any[];
+};
+
+export function desenhosExtras(valor: any): DesenhoExtra[] {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .filter((d) => d && typeof d === 'object')
+    .map((d: any) => ({
+      desenho: d.desenho ?? '',
+      // desenhoRevisao e o nome do campo no cabecalho de dois dos formularios;
+      // aceito aqui para o payload poder vir com qualquer um dos dois.
+      revisao: d.revisao ?? d.desenhoRevisao ?? '',
+    }));
+}
+
+// A que desenho a cota pertence. Cota sem marca e do desenho do cabecalho.
+export function desenhoDaCota(cota: any): number {
+  const i = Math.trunc(Number(cota?.desenhoIdx));
+  return Number.isFinite(i) && i > 0 ? i : 0;
+}
+
+export function gruposDeDesenho(
+  cotas: any,
+  desenhos: any,
+  cabecalho: {
+    desenho?: string | null;
+    revisao?: string | null;
+    // Campo unico dos registros antigos (desenho e revisao juntos).
+    legado?: string | null;
+  },
+): GrupoDesenho[] {
+  const extras = desenhosExtras(desenhos);
+  const grupos: GrupoDesenho[] = [
+    {
+      indice: 0,
+      desenho: cabecalho.desenho || cabecalho.legado || '-',
+      revisao: cabecalho.revisao || '-',
+      cotas: [],
+    },
+    ...extras.map((d, i) => ({
+      indice: i + 1,
+      desenho: d.desenho || '-',
+      revisao: d.revisao || '-',
+      cotas: [] as any[],
+    })),
+  ];
+  for (const c of Array.isArray(cotas) ? cotas : []) {
+    const i = desenhoDaCota(c);
+    (grupos[i] ?? grupos[0]).cotas.push(c);
+  }
+  return grupos;
+}
+
+// ---------------------------------------------------------------------------
 // EVIDENCIAS: o dimensional e o visual tem blocos de foto separados.
 // As fotos vivem na tabela polimorfica Anexo, identificadas pelo entidadeTipo
 // abaixo. No SQE cada formulario e um registro proprio, entao cada um tem um
@@ -574,6 +719,11 @@ export const EVID = {
   manufaturaVisualInspecao: 'INSPECAO_VISUAL_MANUFATURA',
   homologacaoItemDimensional: 'HOMOLOGACAO_ITEM_AMOSTRAS',
   homologacaoItemVisual: 'HOMOLOGACAO_ITEM_VISUAL',
+  // Fotos presas a um item REPROVADO do checklist visual. Ficam num bloco
+  // proprio para nao dividir o teto de 4 fotos com a evidencia geral: sao
+  // uma por desvio, e o numero de desvios e que manda.
+  sqeVisualDesvio: 'INSPECAO_VISUAL_DESVIO',
+  homologacaoItemVisualDesvio: 'HOMOLOGACAO_ITEM_VISUAL_DESVIO',
   // Os dois paineis de foto do Alerta da Qualidade.
   alertaErrado: 'ALERTA_QUALIDADE_ERRADO',
   alertaCerto: 'ALERTA_QUALIDADE_CERTO',

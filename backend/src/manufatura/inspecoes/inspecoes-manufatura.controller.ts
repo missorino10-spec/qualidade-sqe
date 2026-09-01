@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -63,6 +64,8 @@ class RelatorioDto {
   // [{ localizacao, especificado, norma, tolerancia, upper, lower, pecas: [],
   //    instrumento, desvioMin, desvioMax }]
   @IsOptional() @IsArray() cotas?: any[];
+  // Peca de conjunto: desenhos do 2o em diante. Ver comum/inspecao.ts.
+  @IsOptional() @IsArray() desenhos?: any[];
   // Inspecao visual, opcional no setup e na producao.
   @IsOptional() @IsString() inspecaoVisual?: string;
   @IsOptional() @IsString() observacoesFinais?: string;
@@ -74,6 +77,10 @@ class RelatorioDto {
   @IsOptional() @IsArray() defeitos?: any[];
   @IsOptional() @IsNumber() qtdAfetada?: number;
   @IsOptional() @IsString() descricaoDesvio?: string;
+  // Salvar sem terminar. O numero do relatorio ja e consumido, mas ele nao
+  // conta na maquina nem nos indicadores. Quando o PATCH vem sem esta marca, o
+  // rascunho e LANCADO e passa a valer como qualquer relatorio.
+  @IsOptional() @IsBoolean() rascunho?: boolean;
   // "Elaborado por" e "Inspecionado por" nao vem mais do formulario: o sistema
   // assina com o usuario logado.
 }
@@ -173,6 +180,17 @@ export class InspecoesManufaturaController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.corrigirRelatorio(id, relatorioId, dto, user.id);
+  }
+
+  // Descartar rascunho. Sem @Roles: o rascunho e visivel para todo mundo do
+  // modulo e nunca contou em lugar nenhum, entao jogar fora nao desfaz nada.
+  // Excluir inspecao ja lancada continua restrito, na rota abaixo.
+  @Delete(':id/relatorio/:relatorioId/rascunho')
+  descartarRascunho(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('relatorioId', ParseIntPipe) relatorioId: number,
+  ) {
+    return this.service.descartarRascunho(id, relatorioId);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

@@ -26,12 +26,18 @@ import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../../api';
 import { dataBR } from '../../formatos';
-import { CotasSomenteLeitura } from '../../components/TabelaCotas';
+import { CotasPorDesenho } from '../../components/TabelaCotas';
 import {
   FotosEvidenciaSalvas,
   enviarFotosEvidencia,
 } from '../../components/FotosEvidencia';
-import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
+import {
+  DesenhoExtra,
+  EVID,
+  desenhosExtras,
+  textoDesenho,
+  textoRevisao,
+} from '../../inspecao';
 import {
   CamposRelatorio,
   ORIGENS_INSPECAO,
@@ -56,10 +62,12 @@ function Tentativa({
   rel,
   total,
   onCorrigir,
+  onDescartar,
 }: {
   rel: any;
   total: number;
   onCorrigir: (rel: any) => void;
+  onDescartar: (rel: any) => void;
 }) {
   const defeitos = Array.isArray(rel.defeitos) ? rel.defeitos : [];
   const titulo =
@@ -75,18 +83,33 @@ function Tentativa({
           <Typography.Text type="secondary" style={{ fontWeight: 400 }}>
             {rel.numero} — Doc. BDBR.QUA.FMR.011.06
           </Typography.Text>
-          <Tag color={corResultadoManufatura[rel.resultado]}>
-            {labelResultadoManufatura[rel.resultado] ?? rel.resultado}
-          </Tag>
+          {/* Rascunho ainda nao tem veredito: o resultado gravado e so o valor
+              padrao do banco, e mostra-lo aqui seria mentir. */}
+          {rel.rascunho ? (
+            <Tag color="orange">Rascunho</Tag>
+          ) : (
+            <Tag color={corResultadoManufatura[rel.resultado]}>
+              {labelResultadoManufatura[rel.resultado] ?? rel.resultado}
+            </Tag>
+          )}
           {total > 1 && <Tag>{`${rel.tentativa} de ${total}`}</Tag>}
         </Space>
       }
       // Correcao do que foi digitado errado neste relatorio. Nao e reinspecao:
-      // e o mesmo documento, com o mesmo numero.
+      // e o mesmo documento, com o mesmo numero. Enquanto e rascunho, o mesmo
+      // botao continua o preenchimento - e da para jogar fora o que ficou pela
+      // metade, coisa que um relatorio ja lancado nao permite.
       extra={
-        <Button icon={<EditOutlined />} onClick={() => onCorrigir(rel)}>
-          Corrigir
-        </Button>
+        <Space>
+          {rel.rascunho && (
+            <Button danger icon={<DeleteOutlined />} onClick={() => onDescartar(rel)}>
+              Descartar rascunho
+            </Button>
+          )}
+          <Button icon={<EditOutlined />} onClick={() => onCorrigir(rel)}>
+            {rel.rascunho ? 'Continuar rascunho' : 'Corrigir'}
+          </Button>
+        </Space>
       }
     >
       <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }} style={{ marginBottom: 12 }}>
@@ -123,7 +146,13 @@ function Tentativa({
         </Descriptions.Item>
       </Descriptions>
 
-      <CotasSomenteLeitura cotas={rel.cotas} />
+      <CotasPorDesenho
+        cotas={rel.cotas}
+        desenhos={rel.desenhos}
+        desenho={rel.desenho}
+        revisao={rel.desenhoRevisao}
+        legado={rel.desenhoRev}
+      />
 
       <Card size="small" title="Evidências do dimensional" style={{ marginTop: 12 }}>
         <FotosEvidenciaSalvas
@@ -220,6 +249,8 @@ export default function InspecaoManufaturaDetalhe() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [cotas, setCotas] = useState<any[]>([]);
+  // Peca de conjunto: desenhos do 2o em diante. O 1o e o do cabecalho.
+  const [desenhos, setDesenhos] = useState<DesenhoExtra[]>([]);
   const [defeitos, setDefeitos] = useState<any[]>([]);
   const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
@@ -251,7 +282,11 @@ export default function InspecaoManufaturaDetalhe() {
 
   const relatorios: any[] = data.relatorios ?? [];
   const ultimo = relatorios[relatorios.length - 1];
-  const podeReinspecionar = ultimo?.resultado === 'REPROVADO';
+  // Rascunho aberto segura a reinspecao: seriam duas tentativas em aberto na
+  // mesma inspecao, sem veredito em nenhuma. O backend tambem barra.
+  const temRascunho = relatorios.some((r) => r.rascunho);
+  const podeReinspecionar =
+    !temRascunho && ultimo?.resultado === 'REPROVADO';
 
   // A reinspecao repete o formulario inteiro, ja pre-carregado com o que foi
   // medido na tentativa anterior — so as medidas mudam.
@@ -292,6 +327,8 @@ export default function InspecaoManufaturaDetalhe() {
           }))
         : [cotaVazia()],
     );
+    // A reinspecao mede a mesma peca, entao herda os mesmos desenhos.
+    setDesenhos(desenhosExtras(ultimo?.desenhos));
     setDefeitos([]);
     setFotosDimensional([]);
     setOpen(true);
@@ -324,18 +361,29 @@ export default function InspecaoManufaturaDetalhe() {
       descricaoDesvio: rel.descricaoDesvio ?? undefined,
     });
     setCotas(Array.isArray(rel.cotas) && rel.cotas.length ? rel.cotas : [cotaVazia()]);
+    setDesenhos(desenhosExtras(rel.desenhos));
     setDefeitos(Array.isArray(rel.defeitos) ? rel.defeitos : []);
     setFotosDimensional([]);
     setOpen(true);
   }
 
-  async function salvarCorrecao() {
-    const v = await form.validateFields();
+  // Rascunho so precisa da maquina; e sem a marca "rascunho" o PATCH LANCA o
+  // relatorio, que so entao conta na maquina e nos indicadores.
+  async function salvarCorrecao(rascunho = false) {
+    const v = rascunho
+      ? (await form.validateFields(['maquinaId']), form.getFieldsValue(true))
+      : await form.validateFields();
     setSalvando(true);
     try {
       const res = await api.patch(
         `/manufatura/inspecoes/${id}/relatorio/${edicao.id}`,
-        { ...v, cotas, defeitos: defeitos.filter((d) => d.tipoDefeitoId) },
+        {
+          ...v,
+          cotas,
+          desenhos,
+          defeitos: defeitos.filter((d) => d.tipoDefeitoId),
+          rascunho: rascunho || undefined,
+        },
       );
       if (fotosDimensional.length)
         await enviarFotosEvidencia(
@@ -343,7 +391,13 @@ export default function InspecaoManufaturaDetalhe() {
           EVID.manufaturaDimensional,
           edicao.id,
         );
-      message.success(`Relatório ${res.data.numero ?? edicao.numero} corrigido.`);
+      message.success(
+        rascunho
+          ? `Rascunho do relatório ${edicao.numero} salvo. Ele não conta nos indicadores até ser lançado.`
+          : edicao.rascunho
+            ? `Relatório ${res.data.numero ?? edicao.numero} lançado.`
+            : `Relatório ${res.data.numero ?? edicao.numero} corrigido.`,
+      );
       qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
       qc.invalidateQueries({ queryKey: ['maquinas'] });
@@ -358,14 +412,18 @@ export default function InspecaoManufaturaDetalhe() {
     }
   }
 
-  async function salvarReinspecao() {
-    const v = await form.validateFields();
+  async function salvarReinspecao(rascunho = false) {
+    const v = rascunho
+      ? (await form.validateFields(['maquinaId']), form.getFieldsValue(true))
+      : await form.validateFields();
     setSalvando(true);
     try {
       const res = await api.post(`/manufatura/inspecoes/${id}/reinspecao`, {
         ...v,
         cotas,
+        desenhos,
         defeitos: defeitos.filter((d) => d.tipoDefeitoId),
+        rascunho: rascunho || undefined,
       });
       // A evidencia e da tentativa, entao vai no relatorio recem-criado.
       const novos = res.data.relatorios ?? [];
@@ -376,7 +434,11 @@ export default function InspecaoManufaturaDetalhe() {
           EVID.manufaturaDimensional,
           relatorioId,
         );
-      message.success(`Reinspeção ${res.data.numero} registrada.`);
+      message.success(
+        rascunho
+          ? `Rascunho da reinspeção ${res.data.numero} salvo. Ele não conta nos indicadores até ser lançado.`
+          : `Reinspeção ${res.data.numero} registrada.`,
+      );
       qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
       qc.invalidateQueries({ queryKey: ['maquinas'] });
@@ -394,6 +456,37 @@ export default function InspecaoManufaturaDetalhe() {
     data.tipo === 'SETUP'
       ? '/manufatura/inspecoes/setup'
       : '/manufatura/inspecoes/producao';
+
+  // Descartar rascunho nao e exclusao: o rascunho nunca contou na maquina nem
+  // nos indicadores, entao nao ha nada a desfazer. Se era o unico relatorio, a
+  // inspecao inteira vai junto e a tela volta para a lista.
+  function descartarRascunho(rel: any) {
+    Modal.confirm({
+      title: `Descartar o rascunho ${rel.numero}?`,
+      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      content:
+        'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda nos indicadores nem nos contadores da máquina.',
+      okText: 'Descartar',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        try {
+          const res = await api.delete(
+            `/manufatura/inspecoes/${id}/relatorio/${rel.id}/rascunho`,
+          );
+          message.success('Rascunho descartado.');
+          qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
+          if (res.data?.inspecaoRemovida) navigate(rotaLista);
+          else qc.invalidateQueries({ queryKey: ['manufatura-inspecao', id] });
+        } catch (e: any) {
+          message.error(
+            e?.response?.data?.message ??
+              'Não foi possível descartar o rascunho.',
+          );
+        }
+      },
+    });
+  }
 
   // Excluir apaga a inspecao inteira, com as reinspecoes. E o caminho para o
   // lancamento errado; a inspecao valida fica no historico.
@@ -547,31 +640,70 @@ export default function InspecaoManufaturaDetalhe() {
           rel={rel}
           total={relatorios.length}
           onCorrigir={abrirCorrecao}
+          onDescartar={descartarRascunho}
         />
       ))}
 
       <Modal
         open={open}
         title={
-          edicao
-            ? `Corrigir ${edicao.numero} — Doc. BDBR.QUA.FMR.011.06`
-            : `Reinspeção — ${data.numero} — Doc. BDBR.QUA.FMR.011.06`
+          edicao?.rascunho
+            ? `Rascunho ${edicao.numero} — Doc. BDBR.QUA.FMR.011.06`
+            : edicao
+              ? `Corrigir ${edicao.numero} — Doc. BDBR.QUA.FMR.011.06`
+              : `Reinspeção — ${data.numero} — Doc. BDBR.QUA.FMR.011.06`
         }
         width={1100}
-        okText={edicao ? 'Salvar correção' : 'Salvar reinspeção'}
-        cancelText="Cancelar"
         confirmLoading={salvando}
-        onOk={edicao ? salvarCorrecao : salvarReinspecao}
         onCancel={() => {
           setOpen(false);
           setEdicao(null);
         }}
         destroyOnClose
+        /* Rodape na mao por causa do "Salvar rascunho". Relatorio JA LANCADO
+           nao volta a rascunho: o documento ja vale, e desfazer isso mexeria
+           nos indicadores para tras. */
+        footer={[
+          <Button
+            key="cancelar"
+            onClick={() => {
+              setOpen(false);
+              setEdicao(null);
+            }}
+          >
+            Cancelar
+          </Button>,
+          !edicao || edicao.rascunho ? (
+            <Button
+              key="rascunho"
+              loading={salvando}
+              onClick={() =>
+                edicao ? salvarCorrecao(true) : salvarReinspecao(true)
+              }
+            >
+              Salvar rascunho
+            </Button>
+          ) : null,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvando}
+            onClick={() => (edicao ? salvarCorrecao() : salvarReinspecao())}
+          >
+            {edicao?.rascunho
+              ? 'Lançar relatório'
+              : edicao
+                ? 'Salvar correção'
+                : 'Salvar reinspeção'}
+          </Button>,
+        ]}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          {edicao
-            ? 'Este é o mesmo relatório, não uma reinspeção: o número e a tentativa não mudam. Tudo pode ser corrigido, inclusive o resultado.'
-            : 'Novo relatório completo, com número próprio, dentro da mesma inspeção. Os campos vieram da tentativa anterior; preencha as medidas novamente.'}
+          {edicao?.rascunho
+            ? 'Rascunho: enquanto não for lançado, este relatório não conta nos contadores da máquina nem nos indicadores.'
+            : edicao
+              ? 'Este é o mesmo relatório, não uma reinspeção: o número e a tentativa não mudam. Tudo pode ser corrigido, inclusive o resultado.'
+              : 'Novo relatório completo, com número próprio, dentro da mesma inspeção. Os campos vieram da tentativa anterior; preencha as medidas novamente.'}
         </Typography.Paragraph>
         <Form form={form} layout="vertical">
           <CamposRelatorio
@@ -580,6 +712,8 @@ export default function InspecaoManufaturaDetalhe() {
             tipos={tipos}
             cotas={cotas}
             setCotas={setCotas}
+            desenhos={desenhos}
+            setDesenhos={setDesenhos}
             defeitos={defeitos}
             setDefeitos={setDefeitos}
             tipo={data.tipo}

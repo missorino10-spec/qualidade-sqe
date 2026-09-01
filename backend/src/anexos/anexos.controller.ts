@@ -45,6 +45,9 @@ export class AnexosController {
     @UploadedFile() file: Express.Multer.File,
     @Query('entidadeTipo') entidadeTipo: string,
     @Query('entidadeId') entidadeId: string,
+    // Legenda opcional: a foto do desvio visual sobe com o texto do item do
+    // checklist que reprovou, e e esse texto que sai embaixo dela no PDF.
+    @Query('legenda') legenda: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
@@ -71,6 +74,7 @@ export class AnexosController {
         caminho: nomeNoStorage,
         mimeType: file.mimetype,
         tamanho: file.size,
+        legenda: legenda?.trim() || null,
         uploadedById: user.id,
       },
     });

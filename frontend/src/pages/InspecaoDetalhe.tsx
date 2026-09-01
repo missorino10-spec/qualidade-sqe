@@ -19,7 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, abrirPdfEmNovaAba } from '../api';
-import { CotasSomenteLeitura } from '../components/TabelaCotas';
+import { CotasPorDesenho } from '../components/TabelaCotas';
 import { FotosEvidenciaSalvas } from '../components/FotosEvidencia';
 import NomeAssinatura from '../components/NomeAssinatura';
 import {
@@ -291,7 +291,13 @@ export default function InspecaoDetalhe() {
           doc="Doc. BDBR.QUA.FMR.011.06"
           dados={data.lote}
         >
-          <CotasSomenteLeitura cotas={data.lote.cotas} />
+          <CotasPorDesenho
+            cotas={data.lote.cotas}
+            desenhos={data.lote.desenhos}
+            desenho={data.lote.desenho}
+            revisao={data.lote.revisao}
+            legado={data.lote.desenhoRev}
+          />
           <Card
             size="small"
             title="Evidências do dimensional"

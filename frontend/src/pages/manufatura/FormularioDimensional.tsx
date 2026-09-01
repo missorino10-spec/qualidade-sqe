@@ -13,11 +13,11 @@ import {
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
+  BlocoDesenhos,
   SelectNorma,
-  TabelaCotasMaxMin,
   cotaVaziaMaxMin,
 } from '../../components/TabelaCotas';
-import { ORIGENS_INSPECAO } from '../../inspecao';
+import { DesenhoExtra, ORIGENS_INSPECAO } from '../../inspecao';
 import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
 import Tabela from '../../components/Tabela';
 import { CamposItem } from '../../components/CamposItem';
@@ -152,6 +152,8 @@ export function CamposRelatorio({
   tipos,
   cotas,
   setCotas,
+  desenhos,
+  setDesenhos,
   defeitos,
   setDefeitos,
   tipo,
@@ -165,6 +167,9 @@ export function CamposRelatorio({
   tipos?: any[];
   cotas: any[];
   setCotas: (c: any[]) => void;
+  // Desenhos EXTRAS da peca de conjunto (o 1o e o do cabecalho).
+  desenhos: DesenhoExtra[];
+  setDesenhos: (d: DesenhoExtra[]) => void;
   defeitos: any[];
   setDefeitos: (d: any[]) => void;
   tipo: 'SETUP' | 'PRODUCAO';
@@ -178,6 +183,8 @@ export function CamposRelatorio({
   const origem = Form.useWatch('origem', form);
   const resultado = Form.useWatch('resultado', form);
   const norma = Form.useWatch('toleranciasNorm', form) ?? 'ISO2768';
+  const desenho = Form.useWatch('desenho', form);
+  const desenhoRevisao = Form.useWatch('desenhoRevisao', form);
 
   return (
     <>
@@ -280,7 +287,15 @@ export function CamposRelatorio({
       <Divider orientation="left" plain>
         Cotas
       </Divider>
-      <TabelaCotasMaxMin cotas={cotas} setCotas={setCotas} norma={norma} />
+      <BlocoDesenhos
+        cotas={cotas}
+        setCotas={setCotas}
+        desenhos={desenhos}
+        setDesenhos={setDesenhos}
+        norma={norma}
+        desenhoCabecalho={desenho}
+        revisaoCabecalho={desenhoRevisao}
+      />
 
       {/* Foto e opcional na Manufatura: o inspetor sobe so o que precisar
           comprovar. A inspecao VISUAL saiu daqui - virou documento proprio,

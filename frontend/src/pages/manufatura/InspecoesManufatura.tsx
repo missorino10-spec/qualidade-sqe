@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
-import { EVID } from '../../inspecao';
+import { DesenhoExtra, EVID } from '../../inspecao';
 import { enviarFotosEvidencia } from '../../components/FotosEvidencia';
 import {
   CamposRelatorio,
@@ -45,6 +45,8 @@ export default function InspecoesManufatura({
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [cotas, setCotas] = useState<any[]>([]);
+  // Peca de conjunto: desenhos do 2o em diante. O 1o e o do cabecalho.
+  const [desenhos, setDesenhos] = useState<DesenhoExtra[]>([]);
   const [defeitos, setDefeitos] = useState<any[]>([]);
   const [fotosDimensional, setFotosDimensional] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
@@ -100,6 +102,7 @@ export default function InspecoesManufatura({
       toleranciasNorm: 'ISO2768',
     });
     setCotas([cotaVazia()]);
+    setDesenhos([]);
     setDefeitos([]);
     setFotosDimensional([]);
     setOpen(true);
@@ -116,19 +119,32 @@ export default function InspecoesManufatura({
     setOpenVisual(true);
   }
 
-  async function salvarVisual() {
-    const v = await formVisual.validateFields();
+  // Rascunho so precisa da maquina, que e quem da o numero ao documento. O
+  // resto do formulario pode ficar pela metade - e exatamente para isso que o
+  // rascunho existe.
+  async function salvarVisual(rascunho = false) {
+    const v = rascunho
+      ? (await formVisual.validateFields(['maquinaId']),
+        formVisual.getFieldsValue(true))
+      : await formVisual.validateFields();
     setSalvandoVisual(true);
     try {
       const rota = tipo === 'SETUP' ? 'setup' : 'producao';
-      const res = await api.post(`/manufatura/inspecoes-visuais/${rota}`, v);
+      const res = await api.post(`/manufatura/inspecoes-visuais/${rota}`, {
+        ...v,
+        rascunho: rascunho || undefined,
+      });
       if (fotosVisual.length)
         await enviarFotosEvidencia(
           fotosVisual,
           EVID.manufaturaVisualInspecao,
           res.data.id,
         );
-      message.success(`Inspeção visual ${res.data.numero} registrada.`);
+      message.success(
+        rascunho
+          ? `Rascunho da inspeção visual ${res.data.numero} salvo. Ele não conta nos indicadores até ser lançado.`
+          : `Inspeção visual ${res.data.numero} registrada.`,
+      );
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes-visuais'] });
       setOpenVisual(false);
       navigate(`/manufatura/inspecoes-visuais/${res.data.id}`);
@@ -142,15 +158,20 @@ export default function InspecoesManufatura({
     }
   }
 
-  async function salvar() {
-    const v = await form.validateFields();
+  // Ver salvarVisual: no rascunho so a maquina e cobrada.
+  async function salvar(rascunho = false) {
+    const v = rascunho
+      ? (await form.validateFields(['maquinaId']), form.getFieldsValue(true))
+      : await form.validateFields();
     setSalvando(true);
     try {
       const rota = tipo === 'SETUP' ? 'setup' : 'producao';
       const res = await api.post(`/manufatura/inspecoes/${rota}`, {
         ...v,
         cotas,
+        desenhos,
         defeitos: defeitos.filter((d) => d.tipoDefeitoId),
+        rascunho: rascunho || undefined,
       });
       // As fotos ficam presas ao RELATORIO (a tentativa), nao a inspecao:
       // cada reinspecao tem a sua propria evidencia.
@@ -162,7 +183,11 @@ export default function InspecoesManufatura({
           EVID.manufaturaDimensional,
           relatorioId,
         );
-      message.success(`Inspeção ${res.data.numero} registrada.`);
+      message.success(
+        rascunho
+          ? `Rascunho da inspeção ${res.data.numero} salvo. Ele não conta nos indicadores até ser lançado.`
+          : `Inspeção ${res.data.numero} registrada.`,
+      );
       qc.invalidateQueries({ queryKey: ['manufatura-inspecoes'] });
       qc.invalidateQueries({ queryKey: ['maquinas'] });
       setOpen(false);
@@ -313,11 +338,18 @@ export default function InspecoesManufatura({
                         ([v, t]) => ({ text: t as string, value: v }),
                       ),
                       onFilter: (v: any, r: any) => r.status === v,
-                      render: (s: string) => (
-                        <Tag color={corStatusInspecao[s]}>
-                          {labelStatusInspecao[s]}
-                        </Tag>
-                      ),
+                      // Rascunho na ultima tentativa nao tem veredito: o
+                      // status guardado ainda e o da tentativa anterior (ou
+                      // PENDENTE, na primeira), e mostra-lo aqui daria a
+                      // entender que a inspecao ja foi decidida.
+                      render: (s: string, r: any) =>
+                        r.relatorios?.some((x: any) => x.rascunho) ? (
+                          <Tag color="orange">Rascunho</Tag>
+                        ) : (
+                          <Tag color={corStatusInspecao[s]}>
+                            {labelStatusInspecao[s]}
+                          </Tag>
+                        ),
                     },
                     ...colunaAcoes('inspecoes'),
                   ]}
@@ -374,6 +406,18 @@ export default function InspecoesManufatura({
                       render: (_: any, r: any) =>
                         nomeCurto(r.inspetor?.nome) || '-',
                     },
+                    // A visual nao tem resultado, entao a unica situacao que
+                    // interessa na lista e se o documento ja foi lancado.
+                    {
+                      title: 'Situação',
+                      width: 120,
+                      render: (_: any, r: any) =>
+                        r.rascunho ? (
+                          <Tag color="orange">Rascunho</Tag>
+                        ) : (
+                          <Tag color="green">Lançada</Tag>
+                        ),
+                    },
                     ...colunaAcoes('inspecoes-visuais'),
                   ]}
                 />
@@ -387,12 +431,27 @@ export default function InspecoesManufatura({
         open={open}
         title={`Nova ${titulo} — Doc. BDBR.QUA.FMR.011.06`}
         width={1100}
-        okText="Salvar inspeção"
-        cancelText="Cancelar"
         confirmLoading={salvando}
-        onOk={salvar}
         onCancel={() => setOpen(false)}
         destroyOnClose
+        /* Rodape na mao por causa do "Salvar rascunho": o mesmo formulario sai
+           pela metade ou completo, e quem decide e o botao clicado. */
+        footer={[
+          <Button key="cancelar" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>,
+          <Button key="rascunho" loading={salvando} onClick={() => salvar(true)}>
+            Salvar rascunho
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvando}
+            onClick={() => salvar()}
+          >
+            Salvar inspeção
+          </Button>,
+        ]}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           Relatório de Inspeção Dimensional — o mesmo formulário usado para
@@ -405,6 +464,8 @@ export default function InspecoesManufatura({
             tipos={tipos}
             cotas={cotas}
             setCotas={setCotas}
+            desenhos={desenhos}
+            setDesenhos={setDesenhos}
             defeitos={defeitos}
             setDefeitos={setDefeitos}
             tipo={tipo}
@@ -419,12 +480,29 @@ export default function InspecoesManufatura({
         open={openVisual}
         title={`Nova inspeção visual — ${tipo === 'SETUP' ? 'setup' : 'produção'}`}
         width={900}
-        okText="Salvar inspeção visual"
-        cancelText="Cancelar"
         confirmLoading={salvandoVisual}
-        onOk={salvarVisual}
         onCancel={() => setOpenVisual(false)}
         destroyOnClose
+        footer={[
+          <Button key="cancelar" onClick={() => setOpenVisual(false)}>
+            Cancelar
+          </Button>,
+          <Button
+            key="rascunho"
+            loading={salvandoVisual}
+            onClick={() => salvarVisual(true)}
+          >
+            Salvar rascunho
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            loading={salvandoVisual}
+            onClick={() => salvarVisual()}
+          >
+            Salvar inspeção visual
+          </Button>,
+        ]}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           Relatório de Inspeção Visual — documento próprio, sem medição de

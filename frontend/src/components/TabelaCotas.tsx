@@ -1,21 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input, Radio, Select, Table, Tag, Tooltip } from 'antd';
+import {
+  Button,
+  Card,
+  Col,
+  Input,
+  Radio,
+  Row,
+  Select,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   CotaMaxMin,
   CotaPecas,
+  DesenhoExtra,
   NORMA_OUTROS,
   NormaTolerancia,
   OPCOES_NORMA,
+  TOLERANCIA_ANGULAR_M,
+  UNIDADES_COTA,
   UnidadeCota,
   calcularCotaMaxMin,
   calcularCotaPecas,
+  desenhoDaCota,
+  gruposDeDesenho,
   labelNorma,
   normaCurta,
   normaDigitada,
   normaSelecionada,
   normaTemTabela,
+  numeroCota,
+  textoAngulo,
+  textoCota,
   toleranciaPadrao,
+  unidadeDaCota,
 } from '../inspecao';
 import { useInstrumentos, opcoesInstrumento } from '../hooks';
 import Tabela from './Tabela';
@@ -27,10 +47,18 @@ import Tabela from './Tabela';
 // O calculo vem de src/inspecao.ts (espelho do backend): a tela mostra na hora
 // e o backend refaz a conta no salvamento.
 
-const OPCOES_UNIDADE = [
-  { value: 'mm', label: 'mm' },
-  { value: 'graus', label: 'graus' },
-];
+// Dica da tabela angular, mostrada no campo de tolerancia quando a cota esta
+// em graus: a norma indexa pelo comprimento do MENOR LADO do angulo, que o
+// formulario nao pede, entao o sistema nao tem como sugerir - mas o inspetor
+// precisa da tabela a vista para digitar.
+const DICA_ANGULAR = [
+  'Tolerância angular ISO 2768 / DIN 7168, pelo comprimento do menor lado do ângulo:',
+  ...TOLERANCIA_ANGULAR_M.map((f, i, todas) => {
+    const de = i === 0 ? 'até' : `acima de ${todas[i - 1].ate} até`;
+    const faixa = f.ate === Infinity ? 'acima de 400' : `${de} ${f.ate}`;
+    return `${faixa} mm: ±${textoAngulo(f.tolerancia)}`;
+  }),
+].join('\n');
 
 // A lista de normas vem do arquivo compartilhado (espelho do backend), para
 // nao existir uma segunda lista aqui.
@@ -158,32 +186,38 @@ function SelectInstrumento({
   );
 }
 
-// Numeros na tela seguem o padrao BR (virgula decimal).
-function br(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '';
-  return String(v).replace('.', ',');
+// Valor na unidade da cota: mm e raio com virgula decimal, angulo em graus e
+// minutos ("0°30'").
+function fmt(cota: any, campo: string): string {
+  return textoCota(cota?.[campo], unidadeDaCota(cota?.unidade));
 }
 
-function sufixo(unidade?: UnidadeCota) {
-  return unidade === 'graus' ? '°' : '';
+function rotuloUnidade(cota: any): string {
+  const unidade = unidadeDaCota(cota?.unidade);
+  return UNIDADES_COTA.find((u) => u.value === unidade)?.label ?? unidade;
 }
 
-// Campo numerico que o motor de calculo devolve arredondado (tolerancia, upper
-// e lower). Enquanto o inspetor digita o que vale e o texto dele: sem isso a
-// virgula sumia no meio da digitacao, porque "0," ja e o numero 0 e voltava
-// para a tela como "0".
+/**
+ * Campo numerico da cota. Enquanto o inspetor digita o que vale e o texto
+ * dele: sem isso a virgula sumia no meio da digitacao, porque "0," ja e o
+ * numero 0 e voltava para a tela como "0" - e em graus o mesmo aconteceria com
+ * o "°" antes de vir o minuto. Ao sair do campo o valor volta formatado.
+ */
 function CampoNumero({
   valor,
+  unidade,
   onChange,
 }: {
   valor: unknown;
+  unidade?: UnidadeCota;
   onChange: (v: string) => void;
 }) {
   const [digitando, setDigitando] = useState<string | null>(null);
   return (
     <Input
       size="small"
-      value={digitando ?? br(valor)}
+      placeholder={unidadeDaCota(unidade) === 'graus' ? "0°30'" : undefined}
+      value={digitando ?? textoCota(valor, unidadeDaCota(unidade))}
       onChange={(e) => {
         setDigitando(e.target.value);
         onChange(e.target.value);
@@ -199,9 +233,10 @@ function CampoNumero({
 function toleranciaEditavel(cota: CotaMaxMin | CotaPecas): boolean {
   const norma: NormaTolerancia = cota.norma ?? 'ISO2768';
   if (!normaTemTabela(norma)) return true;
-  const especificado = Number(String(cota.especificado ?? '').replace(',', '.'));
-  if (!Number.isFinite(especificado) || !especificado) return true;
-  return toleranciaPadrao(especificado, cota.unidade ?? 'mm') === null;
+  const unidade = unidadeDaCota(cota.unidade);
+  const especificado = numeroCota(cota.especificado, unidade);
+  if (!especificado) return true;
+  return toleranciaPadrao(especificado, unidade) === null;
 }
 
 // Em N/A os limites vem do desenho e podem ser assimetricos (ex: +0,5 / -0,1),
@@ -218,11 +253,23 @@ function trocarNorma<T extends CotaMaxMin | CotaPecas>(
   norma: NormaTolerancia,
   calcular: (c: T) => T,
 ): T {
+  const nova = { ...cota, norma };
   return calcular({
-    ...cota,
-    norma,
-    tolerancia: normaTemTabela(norma) ? '' : cota.tolerancia,
+    ...nova,
+    tolerancia: toleranciaEditavel(nova) ? cota.tolerancia : '',
   });
+}
+
+// Trocar a unidade muda a base do numero: o que estava em mm nao vale em graus
+// nem em raio. A tolerancia da tabela e refeita; a digitada e apagada, porque
+// carregar o numero antigo para outra unidade seria inventar medida.
+function trocarUnidade<T extends CotaMaxMin | CotaPecas>(
+  cota: T,
+  unidade: UnidadeCota,
+  calcular: (c: T) => T,
+): T {
+  if (unidadeDaCota(cota.unidade) === unidade) return cota;
+  return calcular({ ...cota, unidade, tolerancia: '', upper: '', lower: '' });
 }
 
 // Colunas iguais nas duas variantes, montadas com o recalculo ja embutido.
@@ -262,25 +309,55 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
       limitesEditaveis(r) ? (
         <CampoNumero
           valor={r[campo]}
+          unidade={r.unidade}
           onChange={(v) => edit(i, campo, v)}
         />
       ) : (
-        <Input size="small" disabled value={br(r[campo])} />
+        <Input size="small" disabled value={fmt(r, campo)} />
       ),
+  });
+
+  // Medida digitada pelo inspetor (encontrado e pecas): mesma formatacao dos
+  // demais campos, para a coluna nao misturar "0.5" com "0°30'".
+  const medida = (
+    campo: string,
+    titulo: string,
+    onChange: (i: number, v: string) => void,
+  ) => ({
+    title: titulo,
+    width: 100,
+    render: (_: any, r: any, i: number) => (
+      <CampoNumero
+        valor={r[campo]}
+        unidade={r.unidade}
+        onChange={(v) => onChange(i, v)}
+      />
+    ),
   });
 
   return {
     localizacao: txt('LOCALIZAÇÃO', 'localizacao', 150),
-    especificado: txt('ESPECIFICADO', 'especificado', 110),
+    especificado: {
+      title: 'ESPECIFICADO',
+      width: 110,
+      render: (_: any, r: any, i: number) => (
+        <CampoNumero
+          valor={r.especificado}
+          unidade={r.unidade}
+          onChange={(v) => edit(i, 'especificado', v)}
+        />
+      ),
+    },
+    medida,
     unidade: {
       title: 'UN.',
-      width: 90,
+      width: 110,
       render: (_: any, r: any, i: number) => (
         <Select
           size="small"
           style={{ width: '100%' }}
-          value={r.unidade ?? 'mm'}
-          options={OPCOES_UNIDADE}
+          value={unidadeDaCota(r.unidade)}
+          options={UNIDADES_COTA}
           onChange={(v) => edit(i, 'unidade', v)}
         />
       ),
@@ -331,6 +408,7 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
       width: 110,
       render: (_: any, r: any, i: number) => {
         const editavel = toleranciaEditavel(r);
+        const unidade = unidadeDaCota(r.unidade);
         return (
           <Tooltip
             title={
@@ -338,22 +416,24 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
                 ? 'Tolerância da norma (ISO 2768 / DIN 7168, classe m).'
                 : limitesEditaveis(r)
                   ? 'Opcional: em N/A quem manda são o upper e o lower digitados.'
-                  : 'O sistema não tem a tabela desta norma: informe a tolerância.'
+                  : unidade === 'graus'
+                    ? DICA_ANGULAR
+                    : unidade === 'raio'
+                      ? 'Raio não tem tabela na norma: informe a tolerância.'
+                      : 'O sistema não tem a tabela desta norma: informe a tolerância.'
             }
+            overlayStyle={{ whiteSpace: 'pre-line', maxWidth: 420 }}
           >
             {editavel ? (
               <span>
                 <CampoNumero
                   valor={r.tolerancia}
+                  unidade={r.unidade}
                   onChange={(v) => edit(i, 'tolerancia', v)}
                 />
               </span>
             ) : (
-              <Input
-                size="small"
-                disabled
-                value={`±${br(r.tolerancia)}${sufixo(r.unidade)}`}
-              />
+              <Input size="small" disabled value={`±${fmt(r, 'tolerancia')}`} />
             )}
           </Tooltip>
         );
@@ -374,8 +454,8 @@ function colunasComuns<T extends CotaMaxMin | CotaPecas>(
     desvio: {
       title: 'DESVIO',
       children: [
-        somenteLeitura('Mín.', 90, (r) => br(r.desvioMin)),
-        somenteLeitura('Máx.', 90, (r) => br(r.desvioMax)),
+        somenteLeitura('Mín.', 90, (r) => fmt(r, 'desvioMin')),
+        somenteLeitura('Máx.', 90, (r) => fmt(r, 'desvioMax')),
       ],
     } as any,
     conforme: {
@@ -435,7 +515,8 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
         children: Array.from({ length: pecas }, (_, p) => ({
           title: `PEÇA ${String(p + 1).padStart(2, '0')}`,
           width: 90,
-          render: (_: any, r: any) => br(r.pecas?.[p]) || '-',
+          render: (_: any, r: any) =>
+            textoCota(r.pecas?.[p], unidadeDaCota(r.unidade)) || '-',
         })),
       }
     : {
@@ -444,12 +525,12 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
           {
             title: 'Máx.',
             width: 90,
-            render: (_: any, r: any) => br(r.encontradoMax) || '-',
+            render: (_: any, r: any) => fmt(r, 'encontradoMax') || '-',
           },
           {
             title: 'Mín.',
             width: 90,
-            render: (_: any, r: any) => br(r.encontradoMin) || '-',
+            render: (_: any, r: any) => fmt(r, 'encontradoMin') || '-',
           },
         ],
       };
@@ -467,8 +548,14 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
         {
           title: 'ESPECIFICADO',
           width: 120,
-          render: (_: any, r: any) =>
-            `${br(r.especificado)}${sufixo(r.unidade)}`,
+          render: (_: any, r: any) => fmt(r, 'especificado') || '-',
+        },
+        // A unidade vira coluna: em graus o proprio valor ja traz "°" e "'",
+        // entao repetir o simbolo no fim de cada numero so poluia a leitura.
+        {
+          title: 'UN.',
+          width: 80,
+          render: (_: any, r: any) => rotuloUnidade(r),
         },
         {
           title: 'NORMA',
@@ -479,12 +566,18 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
           title: 'TOLERÂNCIA',
           width: 110,
           render: (_: any, r: any) =>
-            r.tolerancia === '' || r.tolerancia === undefined
-              ? '-'
-              : `±${br(r.tolerancia)}${sufixo(r.unidade)}`,
+            fmt(r, 'tolerancia') ? `±${fmt(r, 'tolerancia')}` : '-',
         },
-        { title: 'UPPER', width: 90, render: (_: any, r: any) => br(r.upper) || '-' },
-        { title: 'LOWER', width: 90, render: (_: any, r: any) => br(r.lower) || '-' },
+        {
+          title: 'UPPER',
+          width: 90,
+          render: (_: any, r: any) => fmt(r, 'upper') || '-',
+        },
+        {
+          title: 'LOWER',
+          width: 90,
+          render: (_: any, r: any) => fmt(r, 'lower') || '-',
+        },
         encontrado as any,
         { title: 'INSTRUMENTO', dataIndex: 'instrumento', width: 150 },
         {
@@ -493,12 +586,12 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
             {
               title: 'Mín.',
               width: 90,
-              render: (_: any, r: any) => br(r.desvioMin) || '-',
+              render: (_: any, r: any) => fmt(r, 'desvioMin') || '-',
             },
             {
               title: 'Máx.',
               width: 90,
-              render: (_: any, r: any) => br(r.desvioMax) || '-',
+              render: (_: any, r: any) => fmt(r, 'desvioMax') || '-',
             },
           ],
         } as any,
@@ -519,21 +612,62 @@ export function CotasSomenteLeitura({ cotas }: { cotas: any }) {
   );
 }
 
+// Leitura de um relatorio de peca de conjunto: uma tabela por desenho, na
+// ordem dos desenhos. Com um desenho so (todo relatorio antigo, e a maioria dos
+// novos) cai direto na tabela de sempre, sem nenhum enfeite a mais.
+export function CotasPorDesenho({
+  cotas,
+  desenhos,
+  desenho,
+  revisao,
+  legado,
+}: {
+  cotas: any;
+  desenhos?: any;
+  desenho?: string | null;
+  revisao?: string | null;
+  legado?: string | null;
+}) {
+  const grupos = gruposDeDesenho(cotas, desenhos, { desenho, revisao, legado });
+  if (grupos.length === 1) return <CotasSomenteLeitura cotas={cotas} />;
+
+  return (
+    <>
+      {grupos.map((g) => (
+        <Card
+          key={g.indice}
+          size="small"
+          style={{ marginBottom: 12 }}
+          title={`Desenho ${g.indice + 1} de ${grupos.length} — ${g.desenho} (Rev. ${g.revisao})`}
+        >
+          <CotasSomenteLeitura cotas={g.cotas} />
+        </Card>
+      ))}
+    </>
+  );
+}
+
 // Variante do LOTE: uma linha por cota, com o maior e o menor valor do lote.
 export function TabelaCotasMaxMin({
   cotas,
   setCotas,
   norma = 'ISO2768',
+  sincronizarNorma = true,
 }: {
   cotas: CotaMaxMin[];
   setCotas: (c: CotaMaxMin[]) => void;
   norma?: NormaTolerancia;
+  // Desligado quando quem manda e o BlocoDesenhos: com varias tabelas na tela
+  // cada uma refaria so as suas cotas e uma sobrescreveria a outra, entao a
+  // troca de norma passa a ser feita uma vez so, no array inteiro.
+  sincronizarNorma?: boolean;
 }) {
   // A norma do cabecalho e o padrao do relatorio: quando o inspetor a troca,
   // todas as cotas acompanham. Depois disso cada cota pode ser mudada na sua
   // propria coluna, e a troca individual nao e desfeita.
   const normaAnterior = useRef(norma);
   useEffect(() => {
+    if (!sincronizarNorma) return;
     if (normaAnterior.current === norma) return;
     normaAnterior.current = norma;
     if (!cotas.length) return;
@@ -548,6 +682,11 @@ export function TabelaCotasMaxMin({
     const copia = cotas.map((c) => ({ ...c }));
     if (campo === 'norma') {
       copia[idx] = trocarNorma(copia[idx], valor, calcularCotaMaxMin);
+      setCotas(copia);
+      return;
+    }
+    if (campo === 'unidade') {
+      copia[idx] = trocarUnidade(copia[idx], valor, calcularCotaMaxMin);
       setCotas(copia);
       return;
     }
@@ -578,28 +717,12 @@ export function TabelaCotasMaxMin({
           {
             title: 'ENCONTRADO',
             children: [
-              {
-                title: 'Máx.',
-                width: 100,
-                render: (_: any, r: any, i: number) => (
-                  <Input
-                    size="small"
-                    value={r.encontradoMax ?? ''}
-                    onChange={(e) => edit(i, 'encontradoMax', e.target.value)}
-                  />
-                ),
-              },
-              {
-                title: 'Mín.',
-                width: 100,
-                render: (_: any, r: any, i: number) => (
-                  <Input
-                    size="small"
-                    value={r.encontradoMin ?? ''}
-                    onChange={(e) => edit(i, 'encontradoMin', e.target.value)}
-                  />
-                ),
-              },
+              c.medida('encontradoMax', 'Máx.', (i, v) =>
+                edit(i, 'encontradoMax', v),
+              ),
+              c.medida('encontradoMin', 'Mín.', (i, v) =>
+                edit(i, 'encontradoMin', v),
+              ),
             ],
           } as any,
           c.instrumento,
@@ -627,11 +750,14 @@ export function TabelaCotasPecas({
   setCotas,
   qtdPecas,
   norma = 'ISO2768',
+  sincronizarNorma = true,
 }: {
   cotas: CotaPecas[];
   setCotas: (c: CotaPecas[]) => void;
   qtdPecas: number;
   norma?: NormaTolerancia;
+  // Ver TabelaCotasMaxMin.
+  sincronizarNorma?: boolean;
 }) {
   const pecas = Math.max(1, Math.min(10, qtdPecas || 1));
 
@@ -642,6 +768,7 @@ export function TabelaCotasPecas({
   // Igual a variante do lote: o cabecalho e o padrao, a coluna manda na cota.
   const normaAnterior = useRef(norma);
   useEffect(() => {
+    if (!sincronizarNorma) return;
     if (normaAnterior.current === norma) return;
     normaAnterior.current = norma;
     if (!cotas.length) return;
@@ -656,6 +783,11 @@ export function TabelaCotasPecas({
     const copia = copiar();
     if (campo === 'norma') {
       copia[idx] = trocarNorma(copia[idx], valor, calcularCotaPecas);
+      setCotas(copia);
+      return;
+    }
+    if (campo === 'unidade') {
+      copia[idx] = trocarUnidade(copia[idx], valor, calcularCotaPecas);
       setCotas(copia);
       return;
     }
@@ -674,12 +806,12 @@ export function TabelaCotasPecas({
 
   const colunasPecas = Array.from({ length: pecas }, (_, p) => ({
     title: `PEÇA ${String(p + 1).padStart(2, '0')}`,
-    width: 90,
+    width: 100,
     render: (_: any, r: any, i: number) => (
-      <Input
-        size="small"
-        value={r.pecas?.[p] ?? ''}
-        onChange={(e) => editPeca(i, p, e.target.value)}
+      <CampoNumero
+        valor={r.pecas?.[p]}
+        unidade={r.unidade}
+        onChange={(v) => editPeca(i, p, v)}
       />
     ),
   }));
@@ -717,6 +849,189 @@ export function TabelaCotasPecas({
       >
         Adicionar cota
       </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CONJUNTOS: mais de um desenho na mesma inspecao
+// Peca de conjunto e conferida por varios desenhos, e cada desenho tem a sua
+// tabela de cotas, contada do comeco. O desenho 1 e o do cabecalho do
+// formulario (campos Desenho / Revisao); do 2o em diante o numero e a revisao
+// sao digitados aqui e ficam no campo "desenhos" do relatorio.
+//
+// As cotas continuam num array unico, cada uma marcada com "desenhoIdx" - e
+// por isso que resultado, RNC e indicadores nao precisaram mudar. O array volta
+// agrupado e na ordem dos desenhos, que e a ordem em que o PDF imprime.
+//
+// Com um desenho so a tela fica exatamente como sempre foi: a tabela e nada
+// mais. Os cartoes por desenho so aparecem quando ha o segundo.
+// ---------------------------------------------------------------------------
+export function BlocoDesenhos({
+  cotas,
+  setCotas,
+  desenhos,
+  setDesenhos,
+  norma = 'ISO2768',
+  qtdPecas,
+  desenhoCabecalho,
+  revisaoCabecalho,
+}: {
+  cotas: any[];
+  setCotas: (c: any[]) => void;
+  // So os EXTRAS (do 2o desenho em diante).
+  desenhos: DesenhoExtra[];
+  setDesenhos: (d: DesenhoExtra[]) => void;
+  norma?: NormaTolerancia;
+  // Informado = variante AMOSTRAS (uma coluna por peca); ausente = Max/Min.
+  qtdPecas?: number;
+  // So para o inspetor se situar: o desenho 1 e editado no cabecalho.
+  desenhoCabecalho?: string;
+  revisaoCabecalho?: string;
+}) {
+  const calcular: any =
+    qtdPecas === undefined ? calcularCotaMaxMin : calcularCotaPecas;
+  const total = desenhos.length + 1;
+
+  // Troca de norma no cabecalho: refaz as cotas de TODOS os desenhos de uma vez
+  // (as tabelas estao com a sincronia propria desligada).
+  const normaAnterior = useRef(norma);
+  useEffect(() => {
+    if (normaAnterior.current === norma) return;
+    normaAnterior.current = norma;
+    if (!cotas.length) return;
+    setCotas(cotas.map((c) => trocarNorma({ ...c }, norma, calcular)));
+  }, [norma]);
+
+  function separar(): any[][] {
+    const por: any[][] = Array.from({ length: total }, () => []);
+    for (const c of cotas) {
+      const i = desenhoDaCota(c);
+      por[i < total ? i : 0].push(c);
+    }
+    return por;
+  }
+
+  // No desenho 1 o campo nem e gravado: relatorio de um desenho so continua
+  // sendo salvo exatamente como antes de existir conjunto.
+  function juntar(por: any[][]) {
+    setCotas(
+      por.flatMap((g, i) =>
+        g.map((c) => ({ ...c, desenhoIdx: i || undefined })),
+      ),
+    );
+  }
+
+  function aplicar(idx: number, novas: any[]) {
+    const por = separar();
+    por[idx] = novas;
+    juntar(por);
+  }
+
+  function removerDesenho(idx: number) {
+    const por = separar();
+    por.splice(idx, 1);
+    setDesenhos(desenhos.filter((_, i) => i + 1 !== idx));
+    juntar(por);
+  }
+
+  function editarDesenho(i: number, campo: 'desenho' | 'revisao', v: string) {
+    setDesenhos(desenhos.map((d, k) => (k === i ? { ...d, [campo]: v } : d)));
+  }
+
+  const por = separar();
+
+  const tabela = (idx: number) =>
+    qtdPecas === undefined ? (
+      <TabelaCotasMaxMin
+        cotas={por[idx]}
+        setCotas={(c) => aplicar(idx, c)}
+        norma={norma}
+        sincronizarNorma={false}
+      />
+    ) : (
+      <TabelaCotasPecas
+        cotas={por[idx]}
+        setCotas={(c) => aplicar(idx, c)}
+        qtdPecas={qtdPecas}
+        norma={norma}
+        sincronizarNorma={false}
+      />
+    );
+
+  const botaoAdicionar = (
+    <Button
+      type="dashed"
+      block
+      icon={<PlusOutlined />}
+      onClick={() => setDesenhos([...desenhos, { desenho: '', revisao: '' }])}
+      style={{ marginTop: 8 }}
+    >
+      Adicionar outro desenho (peça de conjunto)
+    </Button>
+  );
+
+  if (total === 1)
+    return (
+      <div>
+        {tabela(0)}
+        {botaoAdicionar}
+      </div>
+    );
+
+  return (
+    <div>
+      {por.map((_, idx) => (
+        <Card
+          key={idx}
+          size="small"
+          style={{ marginBottom: 12 }}
+          title={`Desenho ${idx + 1} de ${total}`}
+          extra={
+            idx > 0 ? (
+              <Button
+                type="text"
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                onClick={() => removerDesenho(idx)}
+              >
+                Remover desenho
+              </Button>
+            ) : null
+          }
+        >
+          {idx === 0 ? (
+            <Tag color="blue">
+              {desenhoCabecalho || '(sem número)'} — Rev.{' '}
+              {revisaoCabecalho || '-'} · preenchido no cabeçalho
+            </Tag>
+          ) : (
+            <Row gutter={12}>
+              <Col span={10}>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Desenho</div>
+                <Input
+                  value={desenhos[idx - 1]?.desenho ?? ''}
+                  onChange={(e) =>
+                    editarDesenho(idx - 1, 'desenho', e.target.value)
+                  }
+                />
+              </Col>
+              <Col span={6}>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Revisão</div>
+                <Input
+                  value={desenhos[idx - 1]?.revisao ?? ''}
+                  onChange={(e) =>
+                    editarDesenho(idx - 1, 'revisao', e.target.value)
+                  }
+                />
+              </Col>
+            </Row>
+          )}
+          <div style={{ marginTop: 12 }}>{tabela(idx)}</div>
+        </Card>
+      ))}
+      {botaoAdicionar}
     </div>
   );
 }

@@ -85,6 +85,10 @@ export class InspecaoVisualManufaturaService {
             qtdInspecionada: dto.qtdInspecionada ?? null,
             qtdTotal: dto.qtdTotal ?? null,
             observacoes: dto.observacoes ?? null,
+            // Salva pela metade, para terminar depois. O numero ja e consumido
+            // aqui; o que muda e que a listagem marca RASCUNHO e o documento
+            // ainda nao vale como inspecao feita.
+            rascunho: dto.rascunho === true,
             // Quem assina e o usuario logado (inspetorId); os campos digitados
             // sairam do formulario.
             inspetorId: usuarioId,
@@ -126,6 +130,9 @@ export class InspecaoVisualManufaturaService {
         qtdInspecionada: dto.qtdInspecionada ?? null,
         qtdTotal: dto.qtdTotal ?? null,
         observacoes: dto.observacoes ?? null,
+        // Rascunho que continua rascunho segue pela metade. Salvo sem a marca,
+        // e um LANCAMENTO: o documento passa a valer agora.
+        rascunho: atual.rascunho && dto.rascunho === true,
         // Quem corrigiu passa a assinar: e ele que responde pelo que esta
         // escrito no documento agora.
         inspetorId: usuarioId,
@@ -136,6 +143,18 @@ export class InspecaoVisualManufaturaService {
 
   async remover(id: number) {
     await this.detalhe(id);
+    await this.prisma.inspecaoVisualManufatura.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  // Descartar rascunho: joga fora o que ficou pela metade. Documento ja
+  // lancado continua so podendo ser excluido por quem tem o papel para isso.
+  async descartarRascunho(id: number) {
+    const insp = await this.detalhe(id);
+    if (!insp.rascunho)
+      throw new ConflictException(
+        'Esta inspeção já foi lançada e não pode mais ser descartada.',
+      );
     await this.prisma.inspecaoVisualManufatura.delete({ where: { id } });
     return { ok: true };
   }

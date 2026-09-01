@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -56,6 +57,9 @@ class CamposVisualDto {
   @IsOptional() @IsNumber() qtdInspecionada?: number;
   @IsOptional() @IsNumber() qtdTotal?: number;
   @IsOptional() @IsString() observacoes?: string;
+  // Salvar sem terminar. O numero ja e consumido, mas o documento so vale como
+  // inspecao feita depois de lancado. PATCH sem esta marca LANCA o rascunho.
+  @IsOptional() @IsBoolean() rascunho?: boolean;
   // "Elaborado por" e "Inspecionado por" nao vem mais do formulario: o sistema
   // assina com o usuario logado.
 }
@@ -122,6 +126,13 @@ export class InspecaoVisualManufaturaController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.corrigir(id, dto, user.id);
+  }
+
+  // Descartar rascunho. Sem @Roles: o rascunho e visivel para todo mundo do
+  // modulo e nunca valeu como inspecao, entao jogar fora nao desfaz nada.
+  @Delete(':id/rascunho')
+  descartarRascunho(@Param('id', ParseIntPipe) id: number) {
+    return this.service.descartarRascunho(id);
   }
 
   @Roles('QUALIDADE', 'ADMIN')

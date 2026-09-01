@@ -79,6 +79,12 @@ class CamposInspecaoDto {
   // desvio fica gravado esperando: a pergunta da RNC e uma so, no fim do
   // ciclo, para o inspetor decidir olhando o recebimento inteiro.
   @IsOptional() @IsBoolean() decidirNoFim?: boolean;
+
+  // Salvar sem terminar. O rascunho ja consome o numero do relatorio, mas nao
+  // conta em lugar nenhum: nao soma no fornecedor, nao zera a periodicidade,
+  // nao abre RNC e fica fora dos indicadores. Quando o PATCH vem sem esta
+  // marca, o rascunho e LANCADO e passa a valer como qualquer inspecao.
+  @IsOptional() @IsBoolean() rascunho?: boolean;
 }
 
 class CabecalhoDto extends CamposInspecaoDto {
@@ -92,6 +98,8 @@ class CreateVisualDto extends CabecalhoDto {
 
 class CreateLoteDto extends CabecalhoDto {
   @IsOptional() @IsArray() cotas?: any[];
+  // Peca de conjunto: desenhos do 2o em diante. Ver comum/inspecao.ts.
+  @IsOptional() @IsArray() desenhos?: any[];
 }
 
 class EditarVisualDto extends CamposInspecaoDto {
@@ -100,6 +108,7 @@ class EditarVisualDto extends CamposInspecaoDto {
 
 class EditarLoteDto extends CamposInspecaoDto {
   @IsOptional() @IsArray() cotas?: any[];
+  @IsOptional() @IsArray() desenhos?: any[];
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
@@ -174,7 +183,7 @@ export class InspecoesController {
   async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const insp = await this.service.detalhe(id);
     // Dois blocos independentes de evidencia: um por formulario.
-    const [fotosVisual, fotosDimensional] = await Promise.all([
+    const [fotosVisual, fotosDimensional, fotosDesvio] = await Promise.all([
       carregarFotosEvidencia(
         this.prisma,
         this.storage,
@@ -187,12 +196,26 @@ export class InspecoesController {
         EVID.sqeDimensional,
         insp.lote?.id,
       ),
+      // Sem teto: e uma foto por item reprovado, e cortar em 4 esconderia
+      // justamente o desvio que o relatorio precisa mostrar.
+      carregarFotosEvidencia(
+        this.prisma,
+        this.storage,
+        EVID.sqeVisualDesvio,
+        insp.visual?.id,
+        Infinity,
+      ),
     ]);
     const numero = insp.numeroInspecao ?? `recebimento-${id}`;
     const nomeArquivo = `${numero.replace('/', '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo}"`);
-    const doc = gerarPdfInspecao(insp, fotosVisual, fotosDimensional);
+    const doc = gerarPdfInspecao(
+      insp,
+      fotosVisual,
+      fotosDimensional,
+      fotosDesvio,
+    );
     doc.pipe(res);
     doc.end();
   }
@@ -227,6 +250,20 @@ export class InspecoesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.service.editarLote(id, dto, user.id);
+  }
+
+  // Descartar rascunho. Sem @Roles e sem cascade: o rascunho e visivel para
+  // todo mundo do modulo, nunca teve RNC e nunca somou nada - jogar fora nao
+  // desfaz coisa nenhuma. Inspecao ja lancada continua so podendo ser
+  // excluida pelo ADMIN, pelas rotas abaixo.
+  @Delete('visual/:id/rascunho')
+  descartarVisual(@Param('id', ParseIntPipe) id: number) {
+    return this.service.descartarVisual(id);
+  }
+
+  @Delete('lote/:id/rascunho')
+  descartarLote(@Param('id', ParseIntPipe) id: number) {
+    return this.service.descartarLote(id);
   }
 
   // Exclusao permanente - restrito a ADMIN.

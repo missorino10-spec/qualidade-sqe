@@ -34,6 +34,7 @@ export const MODULO_DA_ENTIDADE: Record<string, ModuloSistema> = {
   [DESVIO.rnc]: ModuloSistema.SQE,
   [EVID.sqeVisual]: ModuloSistema.SQE,
   [EVID.sqeDimensional]: ModuloSistema.SQE,
+  [EVID.sqeVisualDesvio]: ModuloSistema.SQE,
 
   // MANUFATURA
   [EVID.manufaturaDimensional]: ModuloSistema.MANUFATURA,
@@ -59,6 +60,7 @@ export const MODULO_DA_ENTIDADE: Record<string, ModuloSistema> = {
   [TIPO_ANEXO_PLANO_ACAO_ITEM]: ModuloSistema.SQD,
   [EVID.homologacaoItemDimensional]: ModuloSistema.SQD,
   [EVID.homologacaoItemVisual]: ModuloSistema.SQD,
+  [EVID.homologacaoItemVisualDesvio]: ModuloSistema.SQD,
   [DESVIO.homologacaoItem]: ModuloSistema.SQD,
   [TIPO_ANEXO_RELATORIO_AUDITORIA]: ModuloSistema.SQD,
   [TIPO_ANEXO_PLANO_ACAO_AUDITORIA]: ModuloSistema.SQD,

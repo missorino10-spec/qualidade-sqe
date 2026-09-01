@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { desenharTabelaCotas } from '../../comum/cotas-pdf';
+import { desenharCotasPorDesenho } from '../../comum/cotas-pdf';
 import { nomeCurto } from '../../comum/nome';
 import { valorDeCelula } from '../../comum/pdf-texto';
 import {
@@ -9,7 +9,10 @@ import {
   labelNorma,
   labelOrigemInspecao,
 } from '../../comum/inspecao';
-import { desenharFotosEvidencia } from '../../comum/fotos-evidencia';
+import {
+  FotoEvidencia,
+  desenharFotosEvidencia,
+} from '../../comum/fotos-evidencia';
 
 const LARANJA = '#E8792B';
 const PRETO = '#000000';
@@ -46,8 +49,11 @@ function txt(v: any): string {
 // ficam no Supabase Storage, nao no disco do servidor.
 export function gerarPdfInspecao(
   insp: any,
-  fotosVisual: Buffer[] = [],
-  fotosDimensional: Buffer[] = [],
+  fotosVisual: FotoEvidencia[] = [],
+  fotosDimensional: FotoEvidencia[] = [],
+  // Fotos presas a um item REPROVADO do checklist. Cada uma sai com a legenda
+  // do seu item, entao o bloco diz QUAL desvio a imagem esta mostrando.
+  fotosDesvio: FotoEvidencia[] = [],
 ): PDFKit.PDFDocument {
   // bufferPages: sem isso o rodape "Pagina X de Y" nao consegue voltar nas
   // paginas anteriores - bufferedPageRange() enxergaria so a pagina atual.
@@ -395,13 +401,33 @@ export function gerarPdfInspecao(
         rodape: RODAPE,
       });
     }
+
+    // As fotos dos desvios vem depois das evidencias gerais: primeiro o que a
+    // inspecao viu, depois o que ela reprovou.
+    if (fotosDesvio.length) {
+      y += 6;
+      faixa('FOTOS DOS DESVIOS');
+      y = desenharFotosEvidencia(doc, fotosDesvio, {
+        x0: X0,
+        largura: W,
+        y,
+        margem: M,
+        rodape: RODAPE,
+      });
+    }
   }
 
   // ---------------------------------------------------------- lote
   if (insp.lote) {
     y += 6;
     faixa('INSPEÇÃO DE LOTE / DIMENSIONAL — cotas medidas');
-    y = desenharTabelaCotas(doc, insp.lote.cotas, {
+    y = desenharCotasPorDesenho(doc, {
+      cotas: insp.lote.cotas,
+      desenhos: insp.lote.desenhos,
+      desenho: insp.lote.desenho,
+      revisao: insp.lote.revisao,
+      legado: insp.lote.desenhoRev,
+    }, {
       x0: X0,
       largura: W,
       y,
