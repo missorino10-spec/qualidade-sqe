@@ -10,15 +10,16 @@ type Semente = { mes: number; dia: number; descricao: string; tipo: string };
 
 // Feriados nacionais de data fixa (Lei 662/1949, 6.802/1980 e 14.759/2023, que
 // tornou o 20 de novembro feriado nacional).
+// As descricoes sao texto de tela, nao comentario: vao com acento.
 const FIXOS_NACIONAIS: Semente[] = [
-  { mes: 1, dia: 1, descricao: 'Confraternizacao Universal', tipo: 'NACIONAL' },
+  { mes: 1, dia: 1, descricao: 'Confraternização Universal', tipo: 'NACIONAL' },
   { mes: 4, dia: 21, descricao: 'Tiradentes', tipo: 'NACIONAL' },
   { mes: 5, dia: 1, descricao: 'Dia do Trabalho', tipo: 'NACIONAL' },
-  { mes: 9, dia: 7, descricao: 'Independencia do Brasil', tipo: 'NACIONAL' },
+  { mes: 9, dia: 7, descricao: 'Independência do Brasil', tipo: 'NACIONAL' },
   { mes: 10, dia: 12, descricao: 'Nossa Senhora Aparecida', tipo: 'NACIONAL' },
   { mes: 11, dia: 2, descricao: 'Finados', tipo: 'NACIONAL' },
-  { mes: 11, dia: 15, descricao: 'Proclamacao da Republica', tipo: 'NACIONAL' },
-  { mes: 11, dia: 20, descricao: 'Consciencia Negra', tipo: 'NACIONAL' },
+  { mes: 11, dia: 15, descricao: 'Proclamação da República', tipo: 'NACIONAL' },
+  { mes: 11, dia: 20, descricao: 'Consciência Negra', tipo: 'NACIONAL' },
   { mes: 12, dia: 25, descricao: 'Natal', tipo: 'NACIONAL' },
 ];
 
@@ -28,19 +29,19 @@ const FIXOS_LOCAIS: Semente[] = [
   {
     mes: 7,
     dia: 9,
-    descricao: 'Revolucao Constitucionalista de 1932',
+    descricao: 'Revolução Constitucionalista de 1932',
     tipo: 'ESTADUAL',
   },
   {
     mes: 7,
     dia: 11,
-    descricao: 'Sao Bento, padroeiro de Araraquara',
+    descricao: 'São Bento, padroeiro de Araraquara',
     tipo: 'MUNICIPAL',
   },
   {
     mes: 8,
     dia: 22,
-    descricao: 'Aniversario de Araraquara',
+    descricao: 'Aniversário de Araraquara',
     tipo: 'MUNICIPAL',
   },
 ];
@@ -88,7 +89,7 @@ export function calendarioDoAno(ano: number): FeriadoGerado[] {
     },
     {
       data: somarDias(pascoa, -47),
-      descricao: 'Carnaval (terca)',
+      descricao: 'Carnaval (terça)',
       tipo: 'FACULTATIVO',
     },
     {
