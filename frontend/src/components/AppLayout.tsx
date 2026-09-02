@@ -24,6 +24,7 @@ import {
   CheckSquareOutlined,
   InboxOutlined,
   SolutionOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -186,6 +187,11 @@ const itensMenu: {
         key: '/admin/colaboradores',
         icon: <UserOutlined />,
         label: 'Colaboradores e Acessos',
+      },
+      {
+        key: '/admin/feriados',
+        icon: <CalendarOutlined />,
+        label: 'Calendário de Feriados',
       },
     ],
   },

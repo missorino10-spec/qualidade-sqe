@@ -4,6 +4,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { PrismaModule } from './prisma/prisma.module';
+import { FeriadosModule } from './feriados/feriados.module';
 import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { FornecedoresModule } from './fornecedores/fornecedores.module';
@@ -49,6 +50,7 @@ const servirFrontend = existsSync(frontendDir);
         ]
       : []),
     PrismaModule,
+    FeriadosModule,
     AuthModule,
     UsuariosModule,
     FornecedoresModule,

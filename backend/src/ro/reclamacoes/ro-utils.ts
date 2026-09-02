@@ -6,19 +6,9 @@ export function numeroRo(sequencial: number, ano: number): string {
   return `RO-${ano}-${String(sequencial).padStart(4, '0')}`;
 }
 
-// Prazo de conclusao: 5 dias uteis contados do recebimento na Qualidade
-// ("Calculado pelo sistema (5 dias uteis)" na planilha). Sabado e domingo nao
-// contam; feriado nao entra porque o sistema nao tem calendario de feriados.
-export function somarDiasUteis(inicio: Date, dias: number): Date {
-  const data = new Date(inicio.getTime());
-  let restantes = dias;
-  while (restantes > 0) {
-    data.setUTCDate(data.getUTCDate() + 1);
-    const dow = data.getUTCDay();
-    if (dow !== 0 && dow !== 6) restantes--;
-  }
-  return data;
-}
+// O prazo de conclusao (5 dias uteis do recebimento na Qualidade, conforme a
+// planilha) usa o somarDiasUteis de comum/dias-uteis.ts, que ja desconta os
+// feriados do calendario.
 
 export function custoTotalRo(
   quantidade?: number | null,

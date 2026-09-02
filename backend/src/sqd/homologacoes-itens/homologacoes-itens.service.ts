@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
-import { diasUteisEntre, numeroSqd } from '../sqd-utils';
+import { diasUteisEntre } from '../../comum/dias-uteis';
+import { FeriadosService } from '../../feriados/feriados.service';
+import { numeroSqd } from '../sqd-utils';
 import {
   CHECKLIST_VISUAL,
   CotaPecas,
@@ -56,7 +58,10 @@ function numero(v: unknown): number | null {
 
 @Injectable()
 export class HomologacoesItensService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private feriados: FeriadosService,
+  ) {}
 
   // O checklist VISUAL em branco: e daqui que a tela monta os 12 grupos.
   formulario() {
@@ -96,9 +101,10 @@ export class HomologacoesItensService {
     };
   }
 
-  private dias(inicio: Date | null, fim: Date | null) {
+  // Dias uteis entre duas datas, ja descontando o calendario de feriados.
+  private async dias(inicio: Date | null, fim: Date | null) {
     if (!inicio || !fim) return null;
-    return diasUteisEntre(inicio, fim);
+    return diasUteisEntre(inicio, fim, await this.feriados.conjunto());
   }
 
   // O ciclo so fecha quando a homologacao esta completa: item inspecionado,
@@ -186,7 +192,7 @@ export class HomologacoesItensService {
             custoEvitado: numero(dto.custoEvitado),
             dataSolicitacao,
             dataEnvioRelatorio,
-            leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+            leadTimeDiasUteis: await this.dias(dataSolicitacao, dataEnvioRelatorio),
             observacoes: dto.observacoes ?? null,
             criadoPorId: usuarioId,
           },
@@ -329,7 +335,7 @@ export class HomologacoesItensService {
       data: {
         resultado,
         dataRetornoFornecedor,
-        tempoRespostaDiasUteis: this.dias(
+        tempoRespostaDiasUteis: await this.dias(
           atual.dataSolicitacao,
           dataRetornoFornecedor,
         ),
@@ -427,14 +433,14 @@ export class HomologacoesItensService {
         dataSolicitacao,
         semana: dataSolicitacao ? semanaAno(dataSolicitacao).semana : undefined,
         dataEnvioRelatorio,
-        leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+        leadTimeDiasUteis: await this.dias(dataSolicitacao, dataEnvioRelatorio),
         dataRetornoFornecedor,
-        tempoRespostaDiasUteis: this.dias(
+        tempoRespostaDiasUteis: await this.dias(
           dataSolicitacao,
           dataRetornoFornecedor,
         ),
         dataFinalizacao,
-        tempoTotalDiasUteis: this.dias(dataSolicitacao, dataFinalizacao),
+        tempoTotalDiasUteis: await this.dias(dataSolicitacao, dataFinalizacao),
         // "Cancelado" e resultado e status ao mesmo tempo: cancelar o registro
         // carimba o resultado, e reabrir devolve o que o relatorio disser.
         resultado:
@@ -479,7 +485,7 @@ export class HomologacoesItensService {
       data: {
         statusHomologacao: 'FINALIZADO',
         dataFinalizacao,
-        tempoTotalDiasUteis: this.dias(atual.dataSolicitacao, dataFinalizacao),
+        tempoTotalDiasUteis: await this.dias(atual.dataSolicitacao, dataFinalizacao),
       },
     });
     return this.detalhe(id);

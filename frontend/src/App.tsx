@@ -37,6 +37,7 @@ import Reclamacoes from './pages/ro/Reclamacoes';
 import ReclamacaoDetalhe from './pages/ro/ReclamacaoDetalhe';
 import Instrumentos from './pages/Instrumentos';
 import Colaboradores from './pages/admin/Colaboradores';
+import Feriados from './pages/admin/Feriados';
 import TrocarSenha from './pages/TrocarSenha';
 
 function SemAcesso() {
@@ -176,6 +177,12 @@ export default function App() {
       <Route
         path="/admin/colaboradores"
         element={<Privado admin><Colaboradores /></Privado>}
+      />
+      {/* O calendario nao e de modulo nenhum: ele conta os prazos da casa
+          inteira, entao fica com o admin, junto de Colaboradores. */}
+      <Route
+        path="/admin/feriados"
+        element={<Privado admin><Feriados /></Privado>}
       />
 
       <Route path="/trocar-senha" element={<TrocarSenha />} />

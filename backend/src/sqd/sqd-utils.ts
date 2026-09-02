@@ -446,27 +446,8 @@ export function calcularAutoavaliacao(
   return { blocos, nota, resultado: classificarNota(nota) };
 }
 
-// Contagem em DIAS UTEIS (segunda a sexta) entre duas datas. Mesmo dia = 0.
-// Serve para os tres relogios da homologacao: a resposta do fornecedor, o lead
-// time da planilha e o tempo total ate o fechamento.
-export function diasUteisEntre(inicio: Date, fim: Date): number {
-  const a = new Date(
-    Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate()),
-  );
-  const b = new Date(
-    Date.UTC(fim.getUTCFullYear(), fim.getUTCMonth(), fim.getUTCDate()),
-  );
-  if (b <= a) return 0;
-
-  let dias = 0;
-  const cursor = new Date(a);
-  while (cursor < b) {
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-    const dow = cursor.getUTCDay();
-    if (dow !== 0 && dow !== 6) dias += 1;
-  }
-  return dias;
-}
+// A contagem de dias uteis mora em comum/dias-uteis.ts: e a mesma do R.O e do
+// painel do SQE, e leva o calendario de feriados junto.
 
 // Prazo da planilha (aba "KPI's"): da solicitacao ate o envio do relatorio.
 export const SLA_HOMOLOGACAO_DIAS = 3;

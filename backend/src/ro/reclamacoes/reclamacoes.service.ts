@@ -5,13 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DOC_RO, FOTO_RO } from '../../comum/ro';
+import { somarDiasUteis } from '../../comum/dias-uteis';
+import { FeriadosService } from '../../feriados/feriados.service';
 import {
   blocosCompletosRo,
   camposFaltandoRo,
   custoTotalRo,
   derivarStatusAcoes,
   numeroRo,
-  somarDiasUteis,
 } from './ro-utils';
 
 const includeRo = {
@@ -48,7 +49,10 @@ function opcao(v: any): any {
 
 @Injectable()
 export class ReclamacoesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private feriados: FeriadosService,
+  ) {}
 
   listar(de?: string, ate?: string, status?: string) {
     return this.prisma.reclamacao.findMany({
@@ -149,6 +153,11 @@ export class ReclamacoesService {
     const recebidoEm = new Date();
     const ano = recebidoEm.getFullYear();
     const tarefas = this.tarefas(dto);
+    const prazoConclusao = somarDiasUteis(
+      recebidoEm,
+      5,
+      await this.feriados.conjunto(),
+    );
 
     // Retry: dois R.O abertos no mesmo instante cairiam no mesmo sequencial.
     for (let i = 0; i < 5; i++) {
@@ -165,7 +174,7 @@ export class ReclamacoesService {
             sequencial,
             ...campos,
             recebidoEm,
-            prazoConclusao: somarDiasUteis(recebidoEm, 5),
+            prazoConclusao,
             custoTotal: custoTotalRo(
               campos.quantidadeAfetada,
               campos.valorUnitario,
@@ -193,6 +202,11 @@ export class ReclamacoesService {
 
     const campos = this.campos(dto);
     const tarefas = this.tarefas(dto);
+    const prazoConclusao = somarDiasUteis(
+      atual.recebidoEm,
+      5,
+      await this.feriados.conjunto(),
+    );
 
     await this.prisma.$transaction([
       // As linhas nao carregam anexo nem historico: trocar o conjunto inteiro
@@ -202,7 +216,7 @@ export class ReclamacoesService {
         where: { id },
         data: {
           ...campos,
-          prazoConclusao: somarDiasUteis(atual.recebidoEm, 5),
+          prazoConclusao,
           custoTotal: custoTotalRo(
             campos.quantidadeAfetada,
             campos.valorUnitario,

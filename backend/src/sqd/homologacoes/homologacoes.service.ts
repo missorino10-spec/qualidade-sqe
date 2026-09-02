@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
+import { diasUteisEntre } from '../../comum/dias-uteis';
+import { FeriadosService } from '../../feriados/feriados.service';
 import {
   BLOCOS_AUTOAVALIACAO,
   CODIGOS_AUTOAVALIACAO,
   RespostaSqd,
   calcularAutoavaliacao,
-  diasUteisEntre,
   numeroSqd,
 } from '../sqd-utils';
 
@@ -32,7 +33,10 @@ function dataPura(v?: string | null): Date | null {
 
 @Injectable()
 export class HomologacoesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private feriados: FeriadosService,
+  ) {}
 
   // O formulario em branco: e daqui que a tela monta os 10 blocos.
   formulario() {
@@ -73,9 +77,10 @@ export class HomologacoesService {
     return saida;
   }
 
-  private dias(inicio: Date | null, fim: Date | null) {
+  // Dias uteis entre duas datas, ja descontando o calendario de feriados.
+  private async dias(inicio: Date | null, fim: Date | null) {
     if (!inicio || !fim) return null;
-    return diasUteisEntre(inicio, fim);
+    return diasUteisEntre(inicio, fim, await this.feriados.conjunto());
   }
 
   // O ciclo so fecha quando a homologacao esta completa: fornecedor avaliado,
@@ -142,7 +147,7 @@ export class HomologacoesService {
             processosTerceirizados: dto.processosTerceirizados ?? null,
             dataSolicitacao,
             dataEnvioRelatorio,
-            leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+            leadTimeDiasUteis: await this.dias(dataSolicitacao, dataEnvioRelatorio),
             observacoes: dto.observacoes ?? null,
             criadoPorId: usuarioId,
           },
@@ -189,7 +194,7 @@ export class HomologacoesService {
         setor: dto.setor ?? undefined,
         dataAvaliacao,
         dataRetornoFornecedor,
-        tempoRespostaDiasUteis: this.dias(
+        tempoRespostaDiasUteis: await this.dias(
           atual.dataSolicitacao,
           dataRetornoFornecedor,
         ),
@@ -244,14 +249,14 @@ export class HomologacoesService {
         dataSolicitacao,
         semana: dataSolicitacao ? semanaAno(dataSolicitacao).semana : undefined,
         dataEnvioRelatorio,
-        leadTimeDiasUteis: this.dias(dataSolicitacao, dataEnvioRelatorio),
+        leadTimeDiasUteis: await this.dias(dataSolicitacao, dataEnvioRelatorio),
         dataRetornoFornecedor,
-        tempoRespostaDiasUteis: this.dias(
+        tempoRespostaDiasUteis: await this.dias(
           dataSolicitacao,
           dataRetornoFornecedor,
         ),
         dataFinalizacao,
-        tempoTotalDiasUteis: this.dias(dataSolicitacao, dataFinalizacao),
+        tempoTotalDiasUteis: await this.dias(dataSolicitacao, dataFinalizacao),
         statusHomologacao: dto.statusHomologacao ?? undefined,
         statusPlanoAcao: dto.statusPlanoAcao ?? undefined,
         dataReavaliacao:
@@ -292,7 +297,7 @@ export class HomologacoesService {
       data: {
         statusHomologacao: 'FINALIZADO',
         dataFinalizacao,
-        tempoTotalDiasUteis: this.dias(atual.dataSolicitacao, dataFinalizacao),
+        tempoTotalDiasUteis: await this.dias(atual.dataSolicitacao, dataFinalizacao),
       },
     });
     return this.detalhe(id);

@@ -90,6 +90,9 @@ model Usuario {
 
   // Metrologia
   instrumentos Instrumento[] @relation("InstrumentoCriadoPor")
+
+  // Calendario de feriados
+  feriados Feriado[] @relation("FeriadoCriadoPor")
 }
 
 // O que o admin libera para cada colaborador. SQE, MANUFATURA e SQD sao o
@@ -1871,4 +1874,43 @@ model BlocoReclamacao {
   concluidoPor   Usuario? @relation("BlocoReclamacaoConcluidoPor", fields: [concluidoPorId], references: [id])
 
   @@unique([reclamacaoId, numero])
+}
+
+// ---------------------------------------------------------------------------
+// CALENDARIO DE FERIADOS
+//
+// Alimenta a contagem de DIAS UTEIS de todo o sistema: o prazo da R.O, os
+// prazos do SQD e os indicadores de prazo do painel do SQE. Sem esta tabela a
+// contagem seria so segunda-a-sexta e um prazo de 5 dias que cai no Carnaval
+// venceria com a fabrica fechada.
+//
+// Toda linha aqui e um dia NAO util - o "tipo" e so a etiqueta que explica de
+// onde o dia veio. Ponto facultativo que a fabrica para (Carnaval, Corpus
+// Christi) entra na lista do mesmo jeito, porque o que importa e se tem gente
+// trabalhando.
+//
+// A lista nasce gerada (nacionais + estaduais de SP + municipais de
+// Araraquara) e a Qualidade completa a mao com o que for da casa: recesso de
+// fim de ano, parada de manutencao, ponte.
+// ---------------------------------------------------------------------------
+enum TipoFeriado {
+  NACIONAL
+  ESTADUAL
+  MUNICIPAL
+  FACULTATIVO
+  PARADA // parada da fabrica: recesso, manutencao, ponte
+}
+
+model Feriado {
+  id        Int         @id @default(autoincrement())
+  // So a data importa: sem hora, para a comparacao ser exata em qualquer fuso.
+  data      DateTime    @unique @db.Date
+  descricao String
+  tipo      TipoFeriado @default(NACIONAL)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("FeriadoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([data])
 }

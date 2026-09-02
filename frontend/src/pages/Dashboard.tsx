@@ -9,6 +9,7 @@ import {
   Space,
   Statistic,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
@@ -16,23 +17,21 @@ import {
   CheckCircleOutlined,
   DollarOutlined,
   ClockCircleOutlined,
-  FileSearchOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
   MinusOutlined,
   ReconciliationOutlined,
+  FieldTimeOutlined,
+  FileDoneOutlined,
+  SafetyCertificateOutlined,
+  RetweetOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import dayjs, { Dayjs } from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { Dayjs } from 'dayjs';
 import { api } from '../api';
-import {
-  corStatusRnc,
-  labelStatusRnc,
-} from './RncLista';
 import { useAuth } from '../auth';
 import Tabela from '../components/Tabela';
-import { rotuloTipoDesvio } from '../tipo-desvio';
 
 const { RangePicker } = DatePicker;
 
@@ -56,13 +55,20 @@ function tendenciaTag(t: string) {
         Piorou
       </Tag>
     );
+  return <Tag icon={<MinusOutlined />}>Estável</Tag>;
+}
+
+// Linha pequena embaixo do cartao com os numeros crus. 100% de uma RNC so e
+// muito diferente de 100% de cinquenta, e o percentual sozinho nao conta isso.
+function Base({ texto }: { texto: string }) {
   return (
-    <Tag icon={<MinusOutlined />}>Estável</Tag>
+    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      {texto}
+    </Typography.Text>
   );
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<[Dayjs, Dayjs] | null>(null);
@@ -74,11 +80,6 @@ export default function Dashboard() {
     queryKey: ['kpis-sqe', de, ate],
     queryFn: async () =>
       (await api.get('/dashboard/kpis-sqe', { params: { de, ate } })).data,
-  });
-
-  const { data: rncs, isLoading: loadingRnc } = useQuery<any[]>({
-    queryKey: ['rnc', 'dashboard'],
-    queryFn: async () => (await api.get('/rnc')).data,
   });
 
   const { data: evolucao, isLoading: loadingEvo } = useQuery<any[]>({
@@ -101,11 +102,95 @@ export default function Dashboard() {
 
   const ind = kpis?.indicadores ?? {};
   const cont = kpis?.contadores ?? {};
-
-  const emAndamento = (rncs ?? []).filter((r) => r.status === 'EM_ANDAMENTO');
+  const base = kpis?.bases ?? {};
+  const prazos = kpis?.prazos ?? {};
 
   const podeAdmin =
     usuario?.papel === 'ADMIN' || usuario?.papel === 'QUALIDADE';
+
+  // Os nove indicadores do painel, na ordem e com os nomes definidos pela
+  // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
+  const indicadores = [
+    {
+      titulo: 'Aprovação de lotes no recebimento',
+      metrica: 'Lotes aprovados ÷ lotes inspecionados × 100.',
+      valor: ind.pctAprovacaoLotes,
+      sufixo: '%',
+      icone: <CheckCircleOutlined />,
+      cor: '#3f8600',
+      rodape: `${base.lotesAprovados ?? 0} de ${base.lotesInspecionados ?? 0} lotes inspecionados`,
+    },
+    {
+      titulo: 'Tempo médio de resposta a RNC',
+      metrica:
+        'Mediana dos dias entre a emissão da RNC e a resposta do fornecedor.',
+      valor: ind.medianaRespostaRncDias,
+      sufixo: 'dias',
+      icone: <ClockCircleOutlined />,
+      rodape: `${base.rncsComResposta ?? 0} RNC(s) com resposta`,
+    },
+    {
+      titulo: 'Savings por bloqueio de lotes com RNC',
+      metrica:
+        'Somatório do valor evitado pelos bloqueios validados. Cada RNC é um bloqueio.',
+      valor: ind.savingsBloqueioReais,
+      prefixo: <DollarOutlined />,
+      moeda: true,
+      cor: '#D37119',
+      rodape: `${base.rncsTotal ?? 0} bloqueio(s) no período`,
+    },
+    {
+      titulo: 'Abertura tempestiva de RNCs',
+      metrica: `RNCs abertas dentro do prazo ÷ desvios que exigem RNC × 100. Prazo: ${prazos.aberturaRncDiasUteis ?? 1} dia útil da identificação do desvio.`,
+      valor: ind.pctAberturaTempestiva,
+      sufixo: '%',
+      icone: <FieldTimeOutlined />,
+      rodape: `${base.aberturasNoPrazo ?? 0} de ${base.cargasComDesvio ?? 0} desvios`,
+    },
+    {
+      titulo: 'Planos de ação de RNC no prazo',
+      metrica: `RNCs com plano recebido no prazo ÷ RNCs que exigem ação × 100. Prazo: ${prazos.planoRncDiasUteis ?? 5} dias úteis de quando o fornecedor recebe a notificação.`,
+      valor: ind.pctPlanosNoPrazo,
+      sufixo: '%',
+      icone: <FileDoneOutlined />,
+      rodape: `${base.planosNoPrazo ?? 0} de ${base.rncsTotal ?? 0} RNCs`,
+    },
+    {
+      titulo: 'Encerramento de RNCs no prazo',
+      metrica: `RNCs encerradas no prazo ÷ RNCs encerradas no período × 100. Prazo: ${prazos.encerramentoRncDiasUteis ?? 7} dias úteis após a abertura.`,
+      valor: ind.pctEncerramentoNoPrazo,
+      sufixo: '%',
+      icone: <FieldTimeOutlined />,
+      rodape: `${base.encerramentosNoPrazo ?? 0} de ${base.rncsEncerradasPeriodo ?? 0} encerradas`,
+    },
+    {
+      titulo: 'Eficácia das ações de RNC',
+      metrica: 'Ações eficazes ÷ ações verificadas × 100.',
+      valor: ind.pctEficaciaAcoes,
+      sufixo: '%',
+      icone: <SafetyCertificateOutlined />,
+      rodape: `${base.acoesEficazes ?? 0} de ${base.acoesVerificadas ?? 0} verificadas`,
+    },
+    {
+      titulo: 'Reincidência de RNCs no recebimento',
+      metrica: 'RNCs reincidentes ÷ RNCs abertas no período × 100.',
+      valor: ind.pctReincidencia,
+      sufixo: '%',
+      icone: <RetweetOutlined />,
+      // Unico indicador em que numero alto e ruim.
+      cor: ind.pctReincidencia ? '#cf1322' : undefined,
+      rodape: `${base.rncsReincidentes ?? 0} de ${base.rncsTotal ?? 0} RNCs`,
+    },
+    {
+      titulo: 'Conformidade de calibração',
+      metrica:
+        'Instrumentos calibrados dentro da validade ÷ instrumentos previstos × 100. É uma foto de hoje do inventário, não do período.',
+      valor: ind.pctConformidadeCalibracao,
+      sufixo: '%',
+      icone: <ToolOutlined />,
+      rodape: `${base.instrumentosEmDia ?? 0} de ${base.instrumentosPrevistos ?? 0} instrumentos`,
+    },
+  ];
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -120,107 +205,47 @@ export default function Dashboard() {
         />
       </Row>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Fornecedores inspecionados"
-              value={ind.pctFornecedoresInspecionados ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              prefix={<FileSearchOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Itens inspecionados"
-              value={ind.pctItensInspecionados ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              prefix={<FileSearchOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Aprovação no recebimento"
-              value={ind.pctAprovacaoRecebimento ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              valueStyle={{ color: '#3f8600' }}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Custos evitados (R$)"
-              value={ind.custosEvitadosReais ?? 0}
-              precision={2}
-              loading={isLoading}
-              prefix={<DollarOutlined />}
-              valueStyle={{ color: '#D37119' }}
-              formatter={(v) =>
-                Number(v).toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })
-              }
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Resposta às RNCs"
-              value={ind.pctRespostaRnc ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Eficácia das respostas"
-              value={ind.pctEficaciaResposta ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Eficácia no encerramento"
-              value={ind.pctEficaciaEncerramento ?? 0}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Tempo médio de resposta"
-              value={ind.tempoMedioRespostaRncDias ?? 0}
-              suffix="dias"
-              precision={1}
-              loading={isLoading}
-              prefix={<ClockCircleOutlined />}
-            />
-          </Card>
-        </Col>
+      <Row gutter={[16, 16]} align="stretch">
+        {indicadores.map((i) => (
+          <Col xs={24} sm={12} lg={8} key={i.titulo}>
+            <Card style={{ height: '100%' }}>
+              <Statistic
+                title={
+                  <Tooltip title={i.metrica}>
+                    {/* minHeight alinha os valores: os titulos tem uma e duas
+                        linhas, e sem isso os numeros ficavam em alturas
+                        diferentes na mesma fileira. */}
+                    <span
+                      style={{
+                        display: 'block',
+                        minHeight: 44,
+                        lineHeight: '22px',
+                      }}
+                    >
+                      {i.titulo}
+                    </span>
+                  </Tooltip>
+                }
+                value={i.valor ?? 0}
+                suffix={i.sufixo}
+                prefix={i.prefixo ?? i.icone}
+                precision={i.moeda ? 2 : 1}
+                loading={isLoading}
+                valueStyle={i.cor ? { color: i.cor } : undefined}
+                formatter={
+                  i.moeda
+                    ? (v) =>
+                        Number(v).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                    : undefined
+                }
+              />
+              <Base texto={i.rodape} />
+            </Card>
+          </Col>
+        ))}
       </Row>
 
       <Row gutter={[16, 16]} align="stretch">
@@ -355,49 +380,6 @@ export default function Dashboard() {
               width: 130,
               align: 'center',
               render: (t: string) => tendenciaTag(t),
-            },
-          ]}
-        />
-      </Card>
-
-      <Card title="RNCs em andamento">
-        <Tabela
-          rowKey="id"
-          size="small"
-          loading={loadingRnc}
-          dataSource={emAndamento}
-          scroll={{ x: 'max-content' }}
-          locale={{ emptyText: 'Nenhuma RNC em andamento' }}
-          onRow={(r) => ({
-            onClick: () => navigate(`/rnc/${r.id}`),
-            style: { cursor: 'pointer' },
-          })}
-          columns={[
-            { title: 'Número', dataIndex: 'numero', width: 110 },
-            {
-              title: 'Abertura',
-              dataIndex: 'dataAbertura',
-              width: 110,
-              render: (d: string) => dayjs(d).format('DD/MM/YYYY'),
-            },
-            {
-              title: 'Fornecedor',
-              render: (_: any, r: any) => r.fornecedor?.nome,
-            },
-            { title: 'Item', render: (_: any, r: any) => r.item?.descricao },
-            {
-              title: 'Tipo de desvio',
-              dataIndex: 'tipoDesvio',
-              width: 160,
-              render: (v?: string) => rotuloTipoDesvio(v) || '-',
-            },
-            {
-              title: 'Status',
-              dataIndex: 'status',
-              width: 130,
-              render: (s: string) => (
-                <Tag color={corStatusRnc[s]}>{labelStatusRnc[s]}</Tag>
-              ),
             },
           ]}
         />
