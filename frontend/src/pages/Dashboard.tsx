@@ -229,17 +229,16 @@ export default function Dashboard() {
                 value={i.valor ?? 0}
                 suffix={i.sufixo}
                 prefix={i.prefixo ?? i.icone}
-                precision={i.moeda ? 2 : 1}
                 loading={isLoading}
                 valueStyle={i.cor ? { color: i.cor } : undefined}
-                formatter={
-                  i.moeda
-                    ? (v) =>
-                        Number(v).toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })
-                    : undefined
+                // Numero em pt-BR em todos os cartoes: sem isto o percentual
+                // sairia "50.0%" ao lado de um savings "526.306,40" na mesma
+                // fileira.
+                formatter={(v) =>
+                  Number(v).toLocaleString('pt-BR', {
+                    minimumFractionDigits: i.moeda ? 2 : 1,
+                    maximumFractionDigits: i.moeda ? 2 : 1,
+                  })
                 }
               />
               <Base texto={i.rodape} />
