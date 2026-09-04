@@ -8,13 +8,13 @@ import {
   Row,
   Space,
   Statistic,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
 import {
   AlertOutlined,
   CheckCircleOutlined,
-  DollarOutlined,
   ReconciliationOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
@@ -29,6 +29,18 @@ const { RangePicker } = DatePicker;
 
 const moeda = (v: number) =>
   (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+const numero = (v: number) => (v ?? 0).toLocaleString('pt-BR');
+
+// Linha pequena embaixo do cartao com os numeros crus. 100% de um setup so e
+// muito diferente de 100% de cinquenta, e o percentual sozinho nao conta isso.
+function Base({ texto }: { texto: string }) {
+  return (
+    <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+      {texto}
+    </Typography.Text>
+  );
+}
 
 // Painel da Qualidade da Manufatura. Mesma leitura do painel do SQE, com os
 // indicadores da fabrica: PPM, CNQ e o andamento dos ciclos de inspecao.
@@ -66,10 +78,60 @@ export default function PainelManufatura() {
   });
 
   const ind = kpis?.indicadores ?? {};
+  const base = kpis?.bases ?? {};
   const cont = kpis?.contadores ?? {};
   const icaq = kpis?.icaq ?? {};
 
   const podeAdmin = usuario?.papel === 'ADMIN' || usuario?.papel === 'QUALIDADE';
+
+  // Os quatro indicadores do painel, na ordem e com os nomes definidos pela
+  // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
+  const indicadores = [
+    {
+      titulo: 'Efetividade da liberação de setup',
+      metrica:
+        'Setups liberados sem ocorrência atribuível ao setup ÷ setups liberados × 100. Na prática: liberou na primeira tentativa. Precisou de reinspeção, perde o indicador.',
+      valor: ind.pctSetupPrimeiraTentativa,
+      sufixo: '%',
+      casas: 1,
+      icone: <ToolOutlined />,
+      cor: '#3f8600',
+      rodape: `${base.setupsDePrimeira ?? 0} de ${base.setupsRealizados ?? 0} setups`,
+    },
+    {
+      titulo: 'Refugo em PPM e valor',
+      metrica:
+        'PPM: peças refugadas ÷ peças produzidas × 1.000.000. R$: custo do refugo, somado dos lançamentos de CNQ do período.',
+      valor: ind.ppm,
+      casas: 0,
+      icone: <AlertOutlined />,
+      cor: '#D37119',
+      secundario: ind.custoRefugoReais ?? 0,
+      rodape: `${numero(base.pecasRefugadas ?? 0)} refugadas de ${numero(base.pecasProduzidas ?? 0)} produzidas`,
+    },
+    {
+      titulo: 'Efetividade das inspeções de produção',
+      metrica:
+        'Inspeções sem falha posterior atribuível ÷ inspeções realizadas × 100. Na prática: aprovou na primeira tentativa. Precisou de reinspeção, perde o indicador.',
+      valor: ind.pctInspecaoPrimeiraTentativa,
+      sufixo: '%',
+      casas: 1,
+      icone: <CheckCircleOutlined />,
+      cor: '#3f8600',
+      rodape: `${base.inspecoesDePrimeira ?? 0} de ${base.inspecoesRealizadas ?? 0} inspeções`,
+    },
+    {
+      titulo: 'Refugo sobre a produção',
+      metrica:
+        'Unidades refugadas ÷ unidades produzidas × 100. É o mesmo refugo do PPM, na escala percentual.',
+      valor: ind.pctRefugoProducao,
+      sufixo: '%',
+      casas: 1,
+      icone: <ReconciliationOutlined />,
+      cor: '#cf1322',
+      rodape: `${numero(base.pecasRefugadas ?? 0)} de ${numero(base.pecasProduzidas ?? 0)} unidades`,
+    },
+  ];
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -85,78 +147,51 @@ export default function PainelManufatura() {
       </Row>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="PPM"
-              value={ind.ppm ?? 0}
-              {...separadoresBR}
-              loading={isLoading}
-              prefix={<AlertOutlined />}
-              valueStyle={{ color: '#D37119' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Peças produzidas"
-              value={ind.pecasProduzidas ?? 0}
-              {...separadoresBR}
-              loading={isLoading}
-              prefix={<ToolOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Peças com defeito"
-              value={ind.pecasComDefeito ?? 0}
-              {...separadoresBR}
-              loading={isLoading}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="CNQ do período (R$)"
-              value={ind.cnqTotal ?? 0}
-              loading={isLoading}
-              prefix={<DollarOutlined />}
-              valueStyle={{ color: '#D37119' }}
-              formatter={(v) => moeda(Number(v))}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Aprovação nas inspeções"
-              value={ind.pctAprovacao ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              valueStyle={{ color: '#3f8600' }}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Índice de defeito"
-              value={ind.pctDefeito ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={2}
-              loading={isLoading}
-            />
-          </Card>
-        </Col>
+        {indicadores.map((i) => (
+          <Col xs={24} sm={12} lg={6} key={i.titulo}>
+            <Card style={{ height: '100%' }}>
+              <Statistic
+                title={
+                  <Tooltip title={i.metrica}>
+                    {/* minHeight alinha os valores: os titulos tem uma e duas
+                        linhas, e sem isso os numeros ficavam em alturas
+                        diferentes na mesma fileira. */}
+                    <span
+                      style={{
+                        display: 'block',
+                        minHeight: 44,
+                        lineHeight: '22px',
+                      }}
+                    >
+                      {i.titulo}
+                    </span>
+                  </Tooltip>
+                }
+                value={i.valor ?? 0}
+                suffix={i.sufixo}
+                prefix={i.icone}
+                loading={isLoading}
+                valueStyle={i.cor ? { color: i.cor } : undefined}
+                // Numero em pt-BR: o PPM e inteiro, os percentuais vao com uma
+                // casa. Sem isto o percentual sairia "50.0%" com ponto.
+                formatter={(v) =>
+                  Number(v).toLocaleString('pt-BR', {
+                    minimumFractionDigits: i.casas,
+                    maximumFractionDigits: i.casas,
+                  })
+                }
+              />
+              {/* O refugo tem duas metricas no mesmo cartao: o PPM em cima e o
+                  custo aqui, como na planilha. */}
+              {i.secundario && (
+                <Typography.Text strong style={{ color: '#D37119' }}>
+                  R$ {moeda(i.secundario)}
+                </Typography.Text>
+              )}
+              <Base texto={i.rodape} />
+            </Card>
+          </Col>
+        ))}
       </Row>
 
       <Row gutter={[16, 16]} align="stretch">

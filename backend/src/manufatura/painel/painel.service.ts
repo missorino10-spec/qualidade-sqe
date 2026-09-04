@@ -65,14 +65,28 @@ export class PainelManufaturaService {
     const pecasComDefeito = producao.reduce((s, p) => s + p.qtdDefeito, 0);
     const cnqTotal = cnqs.reduce((s, c) => s + c.valorTotal, 0);
 
-    // A inspecao entra nos indicadores pelo resultado da ULTIMA tentativa:
-    // enquanto estiver reprovada ela ainda esta pendente de reinspecao.
-    const comResultado = inspecoes.filter((i) => i.relatorios.length > 0);
-    const aprovadas = comResultado.filter((i) =>
-      contaComoAprovado(i.relatorios[0].resultado),
-    ).length;
     const setups = inspecoes.filter((i) => i.tipo === 'SETUP');
     const producoes = inspecoes.filter((i) => i.tipo === 'PRODUCAO');
+
+    // Acerto de primeira: a inspecao tem UMA unica tentativa lancada e ela nao
+    // reprovou. Precisou de reinspecao, perdeu o indicador. Reprovar na
+    // primeira ja perde, mesmo que a reinspecao ainda nao tenha acontecido - o
+    // setup nao liberou de primeira e isso nao muda depois.
+    // A inspecao visual fica de fora: ela e um lancamento avulso, sem
+    // tentativa e sem reinspecao, entao nao existe "liberar de primeira" nela.
+    const dePrimeira = (lista: typeof inspecoes) => {
+      // So conta como realizada a inspecao que tem relatorio lancado: a que so
+      // tem rascunho ainda nao aconteceu.
+      const feitas = lista.filter((i) => i.relatorios.length > 0);
+      const acertos = feitas.filter(
+        (i) =>
+          i.relatorios.length === 1 &&
+          contaComoAprovado(i.relatorios[0].resultado),
+      ).length;
+      return { feitas: feitas.length, acertos, pct: pct(acertos, feitas.length) };
+    };
+    const setupPrimeira = dePrimeira(setups);
+    const producaoPrimeira = dePrimeira(producoes);
 
     // TOP defeitos: quantidade e custo, como na aba "Coleta - Qualidade".
     const porDefeito = new Map<string, { nome: string; qtd: number; cnq: number }>();
@@ -155,13 +169,27 @@ export class PainelManufaturaService {
           a.maquina ? `${a.maquina.codigo} — ${a.maquina.nome}` : '(sem equipamento)',
         ),
       },
+      // Os quatro indicadores do painel, na ordem que o usuario definiu.
       indicadores: {
+        // 01 - Efetividade da liberacao de setup
+        pctSetupPrimeiraTentativa: setupPrimeira.pct,
+        // 02 - Refugo em PPM e valor (o cartao mostra os dois numeros)
         ppm: calcularPpm(pecasProduzidas, pecasComDefeito),
+        custoRefugoReais: Math.round(cnqTotal * 100) / 100,
+        // 03 - Efetividade das inspecoes de producao
+        pctInspecaoPrimeiraTentativa: producaoPrimeira.pct,
+        // 04 - Refugo sobre a producao
+        pctRefugoProducao: pct(pecasComDefeito, pecasProduzidas),
+      },
+      // Os numeros crus de cada indicador, para a tela mostrar de onde saiu o
+      // percentual sem obrigar ninguem a abrir relatorio.
+      bases: {
+        setupsDePrimeira: setupPrimeira.acertos,
+        setupsRealizados: setupPrimeira.feitas,
+        inspecoesDePrimeira: producaoPrimeira.acertos,
+        inspecoesRealizadas: producaoPrimeira.feitas,
         pecasProduzidas,
-        pecasComDefeito,
-        cnqTotal: Math.round(cnqTotal * 100) / 100,
-        pctAprovacao: pct(aprovadas, comResultado.length),
-        pctDefeito: pct(pecasComDefeito, pecasProduzidas),
+        pecasRefugadas: pecasComDefeito,
       },
       contadores: {
         maquinas: maquinas.length,
