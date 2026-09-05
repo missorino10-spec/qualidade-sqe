@@ -112,7 +112,7 @@ export default function HomologacoesItens() {
         extra={
           podeEditar && (
             <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
-              Novo registro de homologação
+              Nova homologação de item
             </Button>
           )
         }
@@ -271,7 +271,7 @@ export default function HomologacoesItens() {
 
       <Modal
         open={open}
-        title="Novo registro de homologação de item — Doc. BDBR.QUA.FMR.025.01"
+        title="Nova homologação de item — Doc. BDBR.QUA.FMR.025.01"
         width={760}
         okText="Abrir registro"
         cancelText="Cancelar"

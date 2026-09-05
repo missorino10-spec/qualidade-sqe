@@ -25,6 +25,7 @@ import Tabela from '../components/Tabela';
 import { CamposItem } from '../components/CamposItem';
 import { CampoValorTotal, useValorTotal } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
+import { numeroBR } from '../formatos';
 
 const CAMPOS_VALOR = {
   quantidade: 'quantidadePecas',
@@ -207,12 +208,7 @@ export default function RncLista() {
             align: 'right',
             sorter: (a: any, b: any) =>
               (a.valorTotal ?? 0) - (b.valorTotal ?? 0),
-            render: (v?: number) =>
-              v
-                ? Number(v).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                  })
-                : '-',
+            render: (v?: number) => (v ? numeroBR(v, 2) : '-'),
           },
           {
             title: 'Status',

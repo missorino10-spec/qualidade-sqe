@@ -2,7 +2,7 @@
 // As opcoes vieram das listas de validacao do BDBR.QUA.FMR.029.01
 // (abas "2026" e "Base de Dados").
 
-import { dataBR } from '../../formatos';
+import { dataBR, numeroBR } from '../../formatos';
 import { labelOrigemInspecao } from '../../inspecao';
 
 export const labelResultado: Record<string, string> = {
@@ -207,8 +207,5 @@ export function opcoes(mapa: Record<string, string>) {
 
 // Nota com uma casa decimal no padrao brasileiro: 87,5
 export function nota(v?: number | null): string {
-  return v == null ? '-' : Number(v).toLocaleString('pt-BR', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  return v == null ? '-' : numeroBR(v, 1);
 }

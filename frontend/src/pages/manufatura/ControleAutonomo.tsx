@@ -19,7 +19,7 @@ import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { useAuth } from '../../auth';
-import { dataBR } from '../../formatos';
+import { dataBR, numeroBR } from '../../formatos';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import {
   corClassificacaoIcaq,
@@ -27,6 +27,7 @@ import {
   rotuloTurnoIcaq,
   TURNOS_ICAQ,
 } from '../../icaq';
+import { COR } from '../../design/tokens';
 
 // ICAQ — Auditoria do Controle Autonomo da Qualidade.
 // A auditoria e lancada e fechada de uma vez: esta tela lista o que ja foi
@@ -192,7 +193,7 @@ export default function ControleAutonomo() {
               value={pct(conformes, lista.length)}
               precision={1}
               suffix="%"
-              valueStyle={{ color: '#3f8600' }}
+              valueStyle={{ color: COR.sucesso }}
             />
           </Card>
         </Col>
@@ -203,7 +204,7 @@ export default function ControleAutonomo() {
               value={pct(foraDoPadrao, lista.length)}
               precision={1}
               suffix="%"
-              valueStyle={{ color: '#cf1322' }}
+              valueStyle={{ color: COR.critico }}
             />
           </Card>
         </Col>
@@ -278,7 +279,7 @@ export default function ControleAutonomo() {
               width: 90,
               align: 'right',
               sorter: (a: any, b: any) => (a.nota ?? 0) - (b.nota ?? 0),
-              render: (v: number) => <strong>{(v ?? 0).toFixed(2)}%</strong>,
+              render: (v: number) => <strong>{numeroBR(v, 2)}%</strong>,
             },
             {
               title: 'Classificação',

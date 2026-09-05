@@ -4,6 +4,7 @@ import { LockOutlined } from '@ant-design/icons';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
+import { MARCA } from '../design/tokens';
 
 /**
  * Primeiro acesso: o admin entrega uma senha provisoria e a pessoa define a
@@ -43,7 +44,7 @@ export default function TrocarSenha() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #2B2622 0%, #B85F12 100%)',
+        background: `linear-gradient(135deg, ${MARCA.grafite} 0%, ${MARCA.laranjaEscuro} 100%)`,
       }}
     >
       <Card style={{ width: 420, boxShadow: '0 8px 30px rgba(0,0,0,0.25)' }}>

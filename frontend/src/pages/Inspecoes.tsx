@@ -60,6 +60,8 @@ import {
 import Tabela from '../components/Tabela';
 import { CamposItem } from '../components/CamposItem';
 import { TIPOS_DESVIO } from '../tipo-desvio';
+import { numeroBR } from '../formatos';
+import { COR } from '../design/tokens';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
@@ -859,7 +861,7 @@ export default function Inspecoes() {
   ) {
     Modal.confirm({
       title: `Descartar o rascunho ${numero ?? ''}?`,
-      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content:
         'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda nos indicadores nem no ciclo do fornecedor.',
       okText: 'Descartar',
@@ -925,7 +927,7 @@ export default function Inspecoes() {
   function confirmarExclusao(r: any) {
     Modal.confirm({
       title: `Excluir a inspeção ${r.numeroInspecao ?? ''}?`,
-      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content:
         'Todos os formulários desta inspeção serão removidos. A remoção é permanente e não pode ser desfeita.',
       okText: 'Excluir',
@@ -1788,7 +1790,7 @@ export default function Inspecoes() {
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="quantidadePecas" label="Quantidade de peças">
+              <Form.Item name="quantidadePecas" label="Qtd. de peças">
                 <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
@@ -1799,11 +1801,13 @@ export default function Inspecoes() {
             </Col>
             <Col span={8}>
               <Form.Item label="Valor total (R$)">
+                {/* Campo so de leitura: o total e o produto dos dois campos ao
+                    lado. Em padrao brasileiro, como todo valor do sistema. */}
                 <Input
                   disabled
                   value={
                     qtdPecasRnc && valorUnitRnc
-                      ? (qtdPecasRnc * valorUnitRnc).toFixed(2)
+                      ? numeroBR(qtdPecasRnc * valorUnitRnc, 2)
                       : '-'
                   }
                 />

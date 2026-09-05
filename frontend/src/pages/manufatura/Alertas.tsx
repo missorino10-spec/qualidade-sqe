@@ -47,6 +47,7 @@ import {
 } from '../../components/FotosEvidencia';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
+import { COR } from '../../design/tokens';
 
 // ALERTA DA QUALIDADE — espelha o formulario .docx da empresa: titulo + data,
 // "Descricao do problema", texto da acao obrigatoria e os dois paineis de foto
@@ -261,7 +262,7 @@ export default function Alertas() {
             <Statistic
               title="Vencidos"
               value={vencidos.length}
-              valueStyle={vencidos.length ? { color: '#cf1322' } : undefined}
+              valueStyle={vencidos.length ? { color: COR.critico } : undefined}
             />
           </Card>
         </Col>

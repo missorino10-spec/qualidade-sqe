@@ -48,6 +48,7 @@ import {
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 import Tabela from '../../components/Tabela';
 import { nomeCurto } from '../../formatos';
+import { BORDA } from '../../design/tokens';
 
 // Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
 // A tela segue passo a passo a planilha "Analise de Problemas da Qualidade -
@@ -781,7 +782,7 @@ export default function OitoDDetalhe() {
           </Form.Item>
           <div
             style={{
-              border: '1px solid #f0f0f0',
+              border: `1px solid ${BORDA.suave}`,
               borderRadius: 8,
               padding: 8,
               marginBottom: 16,

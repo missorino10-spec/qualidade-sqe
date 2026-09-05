@@ -15,13 +15,8 @@ import { EditOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import Tabela from '../components/Tabela';
-
-const corClasse: Record<string, string> = {
-  A: 'green',
-  B: 'blue',
-  C: 'orange',
-  D: 'red',
-};
+import { numeroBR } from '../formatos';
+import { corClasse } from '../fornecedor';
 
 export default function Periodicidade() {
   const qc = useQueryClient();
@@ -111,7 +106,7 @@ export default function Periodicidade() {
             dataIndex: 'nqa',
             width: 80,
             align: 'center',
-            render: (v: number) => v.toFixed(1),
+            render: (v: number) => numeroBR(v, 1),
           },
           {
             title: 'Conformidade mín.',

@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR, separadoresBR } from '../../formatos';
+import { moeda } from '../../moeda';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import {
   BLOCOS_RO,
@@ -30,6 +31,7 @@ import {
   ListasRo,
   rotuloDe,
 } from '../../ro';
+import { COR } from '../../design/tokens';
 
 // R.O — Gestao de Reclamacoes da Qualidade.
 // A lista mostra o andamento de cada reclamacao recebida da Sala de Controle e,
@@ -207,7 +209,7 @@ export default function Reclamacoes() {
             <Statistic
               title="Fora do prazo"
               value={atrasadas}
-              valueStyle={atrasadas ? { color: '#cf1322' } : undefined}
+              valueStyle={atrasadas ? { color: COR.critico } : undefined}
             />
           </Card>
         </Col>
@@ -317,7 +319,7 @@ export default function Reclamacoes() {
                   r.status !== 'ENCERRADA' &&
                   dayjs(String(d).slice(0, 10)).isBefore(dayjs().startOf('day'));
                 return (
-                  <span style={vencido ? { color: '#cf1322' } : undefined}>
+                  <span style={vencido ? { color: COR.critico } : undefined}>
                     {dataBR(d)}
                   </span>
                 );
@@ -330,13 +332,7 @@ export default function Reclamacoes() {
               align: 'right',
               sorter: (a: any, b: any) =>
                 (a.custoTotal ?? 0) - (b.custoTotal ?? 0),
-              render: (v: number) =>
-                v == null
-                  ? '-'
-                  : v.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    }),
+              render: (v: number) => moeda(v),
             },
             {
               title: 'Blocos concluídos',

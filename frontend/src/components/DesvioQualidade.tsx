@@ -278,7 +278,7 @@ export function CardDesvioQualidade({
           </Form.Item>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="quantidade" label="Quantidade de peças">
+              <Form.Item name="quantidade" label="Qtd. de peças">
                 <InputNumber style={{ width: '100%' }} min={1} />
               </Form.Item>
             </Col>

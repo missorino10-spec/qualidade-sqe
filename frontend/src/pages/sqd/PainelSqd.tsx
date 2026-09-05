@@ -12,6 +12,13 @@ import {
   Typography,
 } from 'antd';
 import {
+  Base,
+  CabecalhoPagina,
+  CartaoIndicador,
+  FaixaContadores,
+  type Indicador,
+} from '../../design/painel';
+import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   FieldTimeOutlined,
@@ -22,7 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
-import { dataBR, separadoresBR } from '../../formatos';
+import { dataBR, numeroBR } from '../../formatos';
 import {
   corResultado,
   corResultadoAuditoria,
@@ -37,69 +44,9 @@ import {
   nota,
 } from './comum';
 import Tabela from '../../components/Tabela';
+import { COR, MARCA } from '../../design/tokens';
 
 const { RangePicker } = DatePicker;
-
-const numero = (v: number) => (v ?? 0).toLocaleString('pt-BR');
-
-// Linha pequena embaixo do cartao com os numeros crus. 100% de uma homologacao
-// so e muito diferente de 100% de trinta, e o percentual sozinho nao conta isso.
-function Base({ texto }: { texto: string }) {
-  return (
-    <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-      {texto}
-    </Typography.Text>
-  );
-}
-
-type Indicador = {
-  titulo: string;
-  metrica: string;
-  valor: number;
-  sufixo?: string;
-  casas: number;
-  icone: JSX.Element;
-  cor?: string;
-  rodape: string;
-};
-
-// Cartao de indicador: o titulo carrega a formula no tooltip e o rodape mostra
-// de onde saiu o percentual, sem obrigar ninguem a abrir relatorio.
-function CartaoIndicador({
-  i,
-  carregando,
-}: {
-  i: Indicador;
-  carregando: boolean;
-}) {
-  return (
-    <Card>
-      <Statistic
-        title={
-          <Tooltip title={i.metrica}>
-            <span
-              style={{ display: 'block', minHeight: 44, lineHeight: '22px' }}
-            >
-              {i.titulo}
-            </span>
-          </Tooltip>
-        }
-        value={i.valor}
-        formatter={(v) =>
-          Number(v).toLocaleString('pt-BR', {
-            minimumFractionDigits: i.casas,
-            maximumFractionDigits: i.casas,
-          })
-        }
-        suffix={i.sufixo}
-        loading={carregando}
-        prefix={i.icone}
-        valueStyle={i.cor ? { color: i.cor } : undefined}
-      />
-      <Base texto={i.rodape} />
-    </Card>
-  );
-}
 
 // Painel do SQD. Os indicadores sao os seis que o usuario definiu: aprovacao de
 // itens e de fornecedores, aprovacao condicional, mediana do tempo de
@@ -160,8 +107,8 @@ export default function PainelSqd() {
       sufixo: '%',
       casas: 1,
       icone: <CheckCircleOutlined />,
-      cor: '#3f8600',
-      rodape: `${numero((kpis?.aprovados ?? 0) + (kpis?.condicionais ?? 0))} de ${numero(kpis?.avaliadas ?? 0)} avaliados`,
+      cor: COR.sucesso,
+      rodape: `${numeroBR((kpis?.aprovados ?? 0) + (kpis?.condicionais ?? 0))} de ${numeroBR(kpis?.avaliadas ?? 0)} avaliados`,
     },
     {
       titulo: 'Aprovação Condicional de fornecedores',
@@ -171,8 +118,8 @@ export default function PainelSqd() {
       sufixo: '%',
       casas: 1,
       icone: <ExclamationCircleOutlined />,
-      cor: '#d46b08',
-      rodape: `${numero(kpis?.condicionais ?? 0)} de ${numero(kpis?.avaliadas ?? 0)} avaliados`,
+      cor: COR.atencao,
+      rodape: `${numeroBR(kpis?.condicionais ?? 0)} de ${numeroBR(kpis?.avaliadas ?? 0)} avaliados`,
     },
     {
       titulo: 'Tempo de homologação de fornecedores',
@@ -183,7 +130,7 @@ export default function PainelSqd() {
       sufixo: '\u00a0dias úteis',
       casas: 1,
       icone: <FieldTimeOutlined />,
-      rodape: `mediana de ${numero(kpis?.ciclosMedidos ?? 0)} homologações concluídas`,
+      rodape: `mediana de ${numeroBR(kpis?.ciclosMedidos ?? 0)} homologações concluídas`,
     },
   ];
 
@@ -195,8 +142,8 @@ export default function PainelSqd() {
       sufixo: '%',
       casas: 1,
       icone: <CheckCircleOutlined />,
-      cor: '#3f8600',
-      rodape: `${numero(kpisItens?.aprovados ?? 0)} de ${numero(kpisItens?.analisados ?? 0)} com veredito`,
+      cor: COR.sucesso,
+      rodape: `${numeroBR(kpisItens?.aprovados ?? 0)} de ${numeroBR(kpisItens?.analisados ?? 0)} com veredito`,
     },
     {
       titulo: 'Aprovação de itens na primeira submissão',
@@ -206,8 +153,8 @@ export default function PainelSqd() {
       sufixo: '%',
       casas: 1,
       icone: <RetweetOutlined />,
-      cor: '#D37119',
-      rodape: `${numero(kpisItens?.aprovadosPrimeiraSubmissao ?? 0)} de ${numero(kpisItens?.analisados ?? 0)} com veredito`,
+      cor: MARCA.laranja,
+      rodape: `${numeroBR(kpisItens?.aprovadosPrimeiraSubmissao ?? 0)} de ${numeroBR(kpisItens?.analisados ?? 0)} com veredito`,
     },
   ];
 
@@ -215,16 +162,16 @@ export default function PainelSqd() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Painel Resumo — SQD (Desenvolvimento de Fornecedores)
-        </Typography.Title>
-        <RangePicker
-          format="DD/MM/YYYY"
-          placeholder={['Início', 'Fim']}
-          onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
-        />
-      </Row>
+      <CabecalhoPagina
+        titulo="Painel Resumo — SQD (Desenvolvimento de Fornecedores)"
+        acoes={
+          <RangePicker
+            format="DD/MM/YYYY"
+            placeholder={['Início', 'Fim']}
+            onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
+          />
+        }
+      />
 
       <Divider orientation="left" plain>
         Homologação de Fornecedores — Doc. BDBR.QUA.FMR.029.01
@@ -255,7 +202,7 @@ export default function PainelSqd() {
                 </Tooltip>
               }
               value={kpis?.fornecedoresAtivos ?? 0}
-              formatter={(v) => numero(Number(v))}
+              formatter={(v) => numeroBR(Number(v))}
               loading={isLoading}
               prefix={<TagsOutlined />}
             />
@@ -267,14 +214,10 @@ export default function PainelSqd() {
                     {c.classe}
                   </Typography.Text>
                   <Typography.Text style={{ display: 'block' }}>
-                    {numero(c.qtd)}
+                    {numeroBR(c.qtd)}
                   </Typography.Text>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {c.pct.toLocaleString('pt-BR', {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                    %
+                    {numeroBR(c.pct, 1)}%
                   </Typography.Text>
                 </Col>
               ))}
@@ -283,50 +226,33 @@ export default function PainelSqd() {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} align="stretch">
-        {[
+      <FaixaContadores
+        carregando={isLoading}
+        itens={[
           { t: 'Homologações registradas', v: kpis?.total },
           {
             t: 'Aguardando fornecedor',
             v: kpis?.aguardandoFornecedor,
-            cor: '#0958d9',
+            cor: COR.informativo,
           },
           { t: 'Autoavaliações lançadas', v: kpis?.avaliadas },
-          { t: 'Aprovados', v: kpis?.aprovados, cor: '#3f8600' },
+          { t: 'Aprovados', v: kpis?.aprovados, cor: COR.sucesso },
           {
             t: 'Aprovados condicionalmente',
             v: kpis?.condicionais,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
-          { t: 'Reprovados', v: kpis?.reprovados, cor: '#cf1322' },
+          { t: 'Reprovados', v: kpis?.reprovados, cor: COR.critico },
           { t: 'Em andamento', v: kpis?.emAndamento },
-          { t: 'Finalizadas', v: kpis?.finalizadas, cor: '#3f8600' },
+          { t: 'Finalizadas', v: kpis?.finalizadas, cor: COR.sucesso },
           { t: 'Canceladas', v: kpis?.canceladas },
           {
             t: 'Planos de ação em andamento',
             v: kpis?.planosEmAndamento,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
-        ].map((c) => (
-          <Col xs={12} sm={8} lg={6} key={c.t}>
-            <Card size="small" style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <span
-                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
-                  >
-                    {c.t}
-                  </span>
-                }
-                value={c.v ?? 0}
-                {...separadoresBR}
-                loading={isLoading}
-                valueStyle={c.cor ? { color: c.cor } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+        ]}
+      />
 
       <Card title="Últimas homologações de fornecedores">
         <Tabela
@@ -396,45 +322,28 @@ export default function PainelSqd() {
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} align="stretch">
-        {[
+      <FaixaContadores
+        carregando={loadingItens}
+        itens={[
           { t: 'Itens registrados', v: kpisItens?.total },
           {
             t: 'Aguardando amostras',
             v: kpisItens?.aguardandoAmostras,
-            cor: '#0958d9',
+            cor: COR.informativo,
           },
           { t: 'Itens inspecionados', v: kpisItens?.analisados },
-          { t: 'Aprovados', v: kpisItens?.aprovados, cor: '#3f8600' },
-          { t: 'Reprovados', v: kpisItens?.reprovados, cor: '#cf1322' },
+          { t: 'Aprovados', v: kpisItens?.aprovados, cor: COR.sucesso },
+          { t: 'Reprovados', v: kpisItens?.reprovados, cor: COR.critico },
           { t: 'Em andamento', v: kpisItens?.emAndamento },
-          { t: 'Finalizadas', v: kpisItens?.finalizadas, cor: '#3f8600' },
+          { t: 'Finalizadas', v: kpisItens?.finalizadas, cor: COR.sucesso },
           { t: 'Canceladas', v: kpisItens?.canceladas },
           {
             t: 'Planos de ação em andamento',
             v: kpisItens?.planosEmAndamento,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
-        ].map((c) => (
-          <Col xs={12} sm={8} lg={6} key={c.t}>
-            <Card size="small" style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <span
-                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
-                  >
-                    {c.t}
-                  </span>
-                }
-                value={c.v ?? 0}
-                {...separadoresBR}
-                loading={loadingItens}
-                valueStyle={c.cor ? { color: c.cor } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+        ]}
+      />
 
       <Card title="Últimas homologações de itens">
         <Tabela
@@ -505,61 +414,44 @@ export default function PainelSqd() {
       {/* A auditoria nao tem cartao de indicador nesta fase, mas o semaforo do
           prazo de reavaliacao e alarme operacional e nao pode sumir: desceu
           para os contadores, em vermelho (venceu) e amarelo (ultimos 15 dias). */}
-      <Row gutter={[16, 16]} align="stretch">
-        {[
+      <FaixaContadores
+        carregando={loadingAud}
+        itens={[
           { t: 'Auditorias registradas', v: kpisAud?.total },
           {
             t: 'Aguardando checklist',
             v: kpisAud?.aguardandoChecklist,
-            cor: '#0958d9',
+            cor: COR.informativo,
           },
           { t: 'Auditorias avaliadas', v: kpisAud?.avaliadas },
-          { t: 'Aprovados', v: kpisAud?.aprovados, cor: '#3f8600' },
+          { t: 'Aprovados', v: kpisAud?.aprovados, cor: COR.sucesso },
           {
             t: 'Aprovados condicionalmente',
             v: kpisAud?.condicionais,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
-          { t: 'Reprovados', v: kpisAud?.reprovados, cor: '#cf1322' },
+          { t: 'Reprovados', v: kpisAud?.reprovados, cor: COR.critico },
           {
             t: 'Reavaliações vencidas',
             v: kpisAud?.reavaliacoesVencidas,
-            cor: '#cf1322',
+            cor: COR.critico,
           },
           {
             t: 'Reavaliações a vencer (15 dias)',
             v: kpisAud?.reavaliacoesAVencer,
-            cor: '#d4b106',
+            cor: COR.alerta,
           },
           {
             t: 'No loop de reavaliação',
             v: kpisAud?.emReavaliacao,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
           { t: 'Reavaliadas (2ª rodada ou mais)', v: kpisAud?.reavaliadas },
           { t: 'Em andamento', v: kpisAud?.emAndamento },
-          { t: 'Encerradas', v: kpisAud?.finalizadas, cor: '#3f8600' },
+          { t: 'Encerradas', v: kpisAud?.finalizadas, cor: COR.sucesso },
           { t: 'Canceladas', v: kpisAud?.canceladas },
-        ].map((c) => (
-          <Col xs={12} sm={8} lg={6} key={c.t}>
-            <Card size="small" style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <span
-                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
-                  >
-                    {c.t}
-                  </span>
-                }
-                value={c.v ?? 0}
-                {...separadoresBR}
-                loading={loadingAud}
-                valueStyle={c.cor ? { color: c.cor } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+        ]}
+      />
 
       <Card title="Últimas auditorias de fornecedores">
         <Tabela

@@ -29,6 +29,15 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import type { Modulo } from '../permissoes';
+import {
+  BORDA,
+  ESPACO,
+  MARCA,
+  RAIO,
+  SOMBRA,
+  SUPERFICIE,
+  TEXTO,
+} from '../design/tokens';
 
 const { Header, Sider, Content } = Layout;
 
@@ -55,7 +64,7 @@ const itensMenu: {
   {
     key: 'sqe',
     icon: <ExperimentOutlined />,
-    label: 'QUALIDADE - SQE',
+    label: 'Qualidade — SQE',
     modulo: 'SQE',
     children: [
       { key: '/', icon: <DashboardOutlined />, label: 'Painel' },
@@ -76,7 +85,7 @@ const itensMenu: {
   {
     key: 'manufatura',
     icon: <ToolOutlined />,
-    label: 'QUALIDADE - MANUFATURA',
+    label: 'Qualidade — Manufatura',
     modulo: 'MANUFATURA',
     children: [
       { key: '/manufatura', icon: <DashboardOutlined />, label: 'Painel' },
@@ -112,7 +121,7 @@ const itensMenu: {
   {
     key: 'sqd',
     icon: <SafetyCertificateOutlined />,
-    label: 'QUALIDADE - SQD',
+    label: 'Qualidade — SQD',
     modulo: 'SQD',
     children: [
       { key: '/sqd', icon: <DashboardOutlined />, label: 'Painel' },
@@ -136,7 +145,7 @@ const itensMenu: {
   {
     key: 'ro',
     icon: <SolutionOutlined />,
-    label: 'QUALIDADE - R.O',
+    label: 'Qualidade — R.O',
     modulo: 'RO',
     children: [
       {
@@ -149,7 +158,7 @@ const itensMenu: {
   {
     key: 'cadastros',
     icon: <DatabaseOutlined />,
-    label: 'CADASTROS',
+    label: 'Cadastros',
     children: [
       {
         key: '/fornecedores',
@@ -180,7 +189,7 @@ const itensMenu: {
   {
     key: 'administracao',
     icon: <TeamOutlined />,
-    label: 'ADMINISTRAÇÃO',
+    label: 'Administração',
     somenteAdmin: true,
     children: [
       {
@@ -245,22 +254,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
             (location.pathname === r || location.pathname.startsWith(`${r}/`)),
         ) ?? '/' + location.pathname.split('/')[1]);
 
+  // Onde o usuario esta, em texto: modulo + tela. Sai da MESMA lista que monta
+  // o menu, entao nunca diverge dele. E so leitura da rota atual - nao cria
+  // rota nem navegacao nova.
+  const grupoAtual = itensMenu.find((g) =>
+    g.children.some((c) => c.key === selecionado),
+  );
+  const telaAtual = grupoAtual?.children.find((c) => c.key === selecionado);
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider theme="dark" breakpoint="lg" collapsedWidth="0" width={230}>
+      <Sider
+        theme="dark"
+        breakpoint="lg"
+        collapsedWidth="0"
+        width={240}
+        style={{ borderRight: `1px solid ${MARCA.grafiteFundo}` }}
+      >
+        {/* A marca fica numa faixa propria, separada do menu por uma linha:
+            sem isso o logo parecia mais um item da lista. */}
         <div
           style={{
-            height: 72,
+            height: 56,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px 12px',
+            padding: `0 ${ESPACO.lg}px`,
+            borderBottom: `1px solid ${MARCA.grafiteHover}`,
+            marginBottom: ESPACO.sm,
           }}
         >
           <img
             src="/logo-big-dutchman.png"
             alt="Big Dutchman"
-            style={{ height: 28, objectFit: 'contain' }}
+            style={{ height: 26, objectFit: 'contain' }}
           />
         </div>
         <Menu
@@ -271,23 +297,55 @@ export function AppLayout({ children }: { children: ReactNode }) {
             if (key.startsWith('/')) navigate(key);
           }}
           items={menuVisivel}
+          style={{ borderInlineEnd: 'none' }}
         />
       </Sider>
       <Layout>
         <Header
           style={{
-            background: '#fff',
-            padding: '0 24px',
+            background: SUPERFICIE.cartao,
+            padding: `0 ${ESPACO.xl}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+            gap: ESPACO.lg,
+            borderBottom: `1px solid ${BORDA.padrao}`,
+            boxShadow: SOMBRA.cabecalho,
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
           }}
         >
-          <Typography.Text strong style={{ fontSize: 15 }}>
-            Big Dutchman Brasil — Sistema de Qualidade
-          </Typography.Text>
+          {/* Modulo em cima, tela embaixo: dois niveis de peso resolvem o
+              "onde estou" sem gastar uma faixa inteira de breadcrumb. */}
+          <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+            <Typography.Text
+              type="secondary"
+              style={{
+                display: 'block',
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {grupoAtual?.label ?? 'Big Dutchman Brasil'}
+            </Typography.Text>
+            <Typography.Text
+              strong
+              style={{
+                fontSize: 15,
+                color: TEXTO.forte,
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {telaAtual?.label ?? 'Sistema de Qualidade'}
+            </Typography.Text>
+          </div>
           <Dropdown
+            trigger={['click']}
             menu={{
               items: [
                 {
@@ -302,14 +360,36 @@ export function AppLayout({ children }: { children: ReactNode }) {
               ],
             }}
           >
-            <span style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} style={{ marginRight: 8 }} />
-              {usuario?.nome}{' '}
-              <Typography.Text type="secondary">({usuario?.papel})</Typography.Text>
+            <span
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: ESPACO.sm,
+                padding: `${ESPACO.xs}px ${ESPACO.sm}px`,
+                borderRadius: RAIO.md,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Avatar
+                size={28}
+                icon={<UserOutlined />}
+                style={{ background: MARCA.laranja, flex: 'none' }}
+              />
+              <span style={{ lineHeight: 1.25, textAlign: 'right' }}>
+                <Typography.Text strong style={{ display: 'block', fontSize: 13 }}>
+                  {usuario?.nome}
+                </Typography.Text>
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  {usuario?.papel}
+                </Typography.Text>
+              </span>
             </span>
           </Dropdown>
         </Header>
-        <Content style={{ margin: 24 }}>{children}</Content>
+        <Content style={{ margin: ESPACO.xl, marginBottom: ESPACO.xxl }}>
+          {children}
+        </Content>
       </Layout>
     </Layout>
   );

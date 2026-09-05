@@ -7,12 +7,15 @@ import {
   Modal,
   Row,
   Space,
-  Statistic,
   Tag,
-  Tooltip,
-  Typography,
   message,
 } from 'antd';
+import {
+  CabecalhoPagina,
+  CartaoIndicador,
+  FaixaContadores,
+  type Indicador,
+} from '../design/painel';
 import {
   CheckCircleOutlined,
   DollarOutlined,
@@ -32,15 +35,11 @@ import { Dayjs } from 'dayjs';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import Tabela from '../components/Tabela';
+import { numeroBR } from '../formatos';
+import { corClasse } from '../fornecedor';
+import { COR, MARCA, TEXTO } from '../design/tokens';
 
 const { RangePicker } = DatePicker;
-
-const corClasse: Record<string, string> = {
-  A: 'green',
-  B: 'blue',
-  C: 'orange',
-  D: 'red',
-};
 
 function tendenciaTag(t: string) {
   if (t === 'UPGRADE')
@@ -56,16 +55,6 @@ function tendenciaTag(t: string) {
       </Tag>
     );
   return <Tag icon={<MinusOutlined />}>Estável</Tag>;
-}
-
-// Linha pequena embaixo do cartao com os numeros crus. 100% de uma RNC so e
-// muito diferente de 100% de cinquenta, e o percentual sozinho nao conta isso.
-function Base({ texto }: { texto: string }) {
-  return (
-    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-      {texto}
-    </Typography.Text>
-  );
 }
 
 export default function Dashboard() {
@@ -110,14 +99,14 @@ export default function Dashboard() {
 
   // Os nove indicadores do painel, na ordem e com os nomes definidos pela
   // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
-  const indicadores = [
+  const indicadores: Indicador[] = [
     {
       titulo: 'Aprovação de lotes no recebimento',
       metrica: 'Lotes aprovados ÷ lotes inspecionados × 100.',
       valor: ind.pctAprovacaoLotes,
       sufixo: '%',
       icone: <CheckCircleOutlined />,
-      cor: '#3f8600',
+      cor: COR.sucesso,
       rodape: `${base.lotesAprovados ?? 0} de ${base.lotesInspecionados ?? 0} lotes inspecionados`,
     },
     {
@@ -125,7 +114,8 @@ export default function Dashboard() {
       metrica:
         'Mediana dos dias entre a emissão da RNC e a resposta do fornecedor.',
       valor: ind.medianaRespostaRncDias,
-      sufixo: 'dias',
+      // Espaco inseparavel: o HTML come o espaco comum e imprime "3,0dias".
+      sufixo: '\u00a0dias',
       icone: <ClockCircleOutlined />,
       rodape: `${base.rncsComResposta ?? 0} RNC(s) com resposta`,
     },
@@ -134,9 +124,9 @@ export default function Dashboard() {
       metrica:
         'Somatório do valor evitado pelos bloqueios validados. Cada RNC é um bloqueio.',
       valor: ind.savingsBloqueioReais,
-      prefixo: <DollarOutlined />,
-      moeda: true,
-      cor: '#D37119',
+      icone: <DollarOutlined />,
+      casas: 2,
+      cor: MARCA.laranja,
       rodape: `${base.rncsTotal ?? 0} bloqueio(s) no período`,
     },
     {
@@ -178,7 +168,7 @@ export default function Dashboard() {
       sufixo: '%',
       icone: <RetweetOutlined />,
       // Unico indicador em que numero alto e ruim.
-      cor: ind.pctReincidencia ? '#cf1322' : undefined,
+      cor: ind.pctReincidencia ? COR.critico : undefined,
       rodape: `${base.rncsReincidentes ?? 0} de ${base.rncsTotal ?? 0} RNCs`,
     },
     {
@@ -194,112 +184,55 @@ export default function Dashboard() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Painel Resumo — Qualidade de Fornecedores (SQE)
-        </Typography.Title>
-        <RangePicker
-          format="DD/MM/YYYY"
-          placeholder={['Início', 'Fim']}
-          onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
-        />
-      </Row>
+      <CabecalhoPagina
+        titulo="Painel Resumo — Qualidade de Fornecedores (SQE)"
+        acoes={
+          <RangePicker
+            format="DD/MM/YYYY"
+            placeholder={['Início', 'Fim']}
+            onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
+          />
+        }
+      />
 
       <Row gutter={[16, 16]} align="stretch">
         {indicadores.map((i) => (
           <Col xs={24} sm={12} lg={8} key={i.titulo}>
-            <Card style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <Tooltip title={i.metrica}>
-                    {/* minHeight alinha os valores: os titulos tem uma e duas
-                        linhas, e sem isso os numeros ficavam em alturas
-                        diferentes na mesma fileira. */}
-                    <span
-                      style={{
-                        display: 'block',
-                        minHeight: 44,
-                        lineHeight: '22px',
-                      }}
-                    >
-                      {i.titulo}
-                    </span>
-                  </Tooltip>
-                }
-                value={i.valor ?? 0}
-                suffix={i.sufixo}
-                prefix={i.prefixo ?? i.icone}
-                loading={isLoading}
-                valueStyle={i.cor ? { color: i.cor } : undefined}
-                // Numero em pt-BR em todos os cartoes: sem isto o percentual
-                // sairia "50.0%" ao lado de um savings "526.306,40" na mesma
-                // fileira.
-                formatter={(v) =>
-                  Number(v).toLocaleString('pt-BR', {
-                    minimumFractionDigits: i.moeda ? 2 : 1,
-                    maximumFractionDigits: i.moeda ? 2 : 1,
-                  })
-                }
-              />
-              <Base texto={i.rodape} />
-            </Card>
+            <CartaoIndicador i={i} carregando={isLoading} />
           </Col>
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} align="stretch">
-        {[
+      <FaixaContadores
+        carregando={isLoading}
+        itens={[
           { t: 'Entregas', v: cont.entregas },
           { t: 'Inspeções', v: cont.inspecoes },
           {
             // Fora do plano de periodicidade: fornecedor eventual ou pedido
             // pontual da Qualidade. Os desvios contam nos demais indicadores.
-            t: 'Qtde de inspeção extra',
+            t: 'Inspeções extras',
             v: cont.inspecoesExtra,
-            cor: '#d46b08',
+            cor: COR.atencao,
           },
           {
             t: 'Recebimentos sem inspeção',
             v: cont.recebimentosSemInspecao,
-            cor: '#8c8c8c',
+            cor: TEXTO.suave,
           },
           { t: 'RNCs (total)', v: cont.rncsTotal },
           {
             t: 'RNCs em andamento',
             v: cont.rncsAbertas,
-            cor: '#cf1322',
+            cor: COR.critico,
           },
           {
             t: 'RNCs finalizadas',
             v: cont.rncsEncerradas,
-            cor: '#3f8600',
+            cor: COR.sucesso,
           },
-        ].map((c) => (
-          // Com 7 contadores, espremer todos numa fileira deixava ~100px por
-          // cartao e quebrava os titulos em varias linhas. lg={6} acomoda 4 por
-          // fileira, com largura suficiente para o titulo respirar.
-          <Col xs={12} sm={8} lg={6} key={c.t}>
-            <Card size="small" style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <span
-                    style={{
-                      display: 'block',
-                      minHeight: 40,
-                      lineHeight: '20px',
-                    }}
-                  >
-                    {c.t}
-                  </span>
-                }
-                value={c.v ?? 0}
-                loading={isLoading}
-                valueStyle={c.cor ? { color: c.cor } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+        ]}
+      />
 
       <Card
         title="Evolução e histórico dos fornecedores"
@@ -353,7 +286,7 @@ export default function Dashboard() {
               dataIndex: 'pctConformidade',
               width: 120,
               align: 'center',
-              render: (v: number) => `${v.toFixed(1)}%`,
+              render: (v: number) => `${numeroBR(v, 1)}%`,
             },
             {
               title: 'Cargas recebidas',

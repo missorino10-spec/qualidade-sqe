@@ -49,6 +49,7 @@ import {
 } from './FormularioDimensional';
 import Tabela from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
+import { COR } from '../../design/tokens';
 
 // Detalhe da inspecao da Manufatura: mostra TODAS as tentativas (1a inspecao e
 // reinspecoes), cada uma com seu proprio numero, como sai no PDF do 011.06.
@@ -463,7 +464,7 @@ export default function InspecaoManufaturaDetalhe() {
   function descartarRascunho(rel: any) {
     Modal.confirm({
       title: `Descartar o rascunho ${rel.numero}?`,
-      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content:
         'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda nos indicadores nem nos contadores da máquina.',
       okText: 'Descartar',

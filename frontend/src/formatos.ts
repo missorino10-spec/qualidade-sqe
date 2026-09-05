@@ -95,3 +95,13 @@ export const separadoresBR = {
   groupSeparator: '.',
   decimalSeparator: ',',
 } as const;
+
+// Numero no padrao brasileiro: ponto no milhar, virgula no decimal e sempre a
+// mesma quantidade de casas. Uma funcao so para nao aparecer "50.0%" ao lado de
+// "526.306,40" na mesma fileira de cartoes.
+export function numeroBR(valor?: number | null, casas = 0): string {
+  return Number(valor ?? 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+}

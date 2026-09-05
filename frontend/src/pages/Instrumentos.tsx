@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import { api, abrirPdfEmNovaAba } from '../api';
 import { useAuth } from '../auth';
 import Tabela, { filtrosDe } from '../components/Tabela';
+import { COR } from '../design/tokens';
 
 /**
  * Inventário de Instrumentos e Equipamentos — BDBR.QUA.FMR.004.01.
@@ -246,7 +247,7 @@ export default function Instrumentos() {
             <Statistic
               title="Calibração vencida"
               value={vencidos}
-              valueStyle={{ color: vencidos ? '#cf1322' : undefined }}
+              valueStyle={{ color: vencidos ? COR.critico : undefined }}
             />
           </Card>
         </Col>
@@ -255,7 +256,7 @@ export default function Instrumentos() {
             <Statistic
               title="Vence em até 30 dias"
               value={aVencer}
-              valueStyle={{ color: aVencer ? '#d46b08' : undefined }}
+              valueStyle={{ color: aVencer ? COR.atencao : undefined }}
             />
           </Card>
         </Col>

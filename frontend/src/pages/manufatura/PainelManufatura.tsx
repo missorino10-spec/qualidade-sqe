@@ -7,11 +7,14 @@ import {
   Modal,
   Row,
   Space,
-  Statistic,
-  Tooltip,
-  Typography,
   message,
 } from 'antd';
+import {
+  CabecalhoPagina,
+  CartaoIndicador,
+  FaixaContadores,
+  type Indicador,
+} from '../../design/painel';
 import {
   AlertOutlined,
   CheckCircleOutlined,
@@ -22,25 +25,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dayjs } from 'dayjs';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
-import { separadoresBR } from '../../formatos';
+import { numeroBR } from '../../formatos';
 import Tabela from '../../components/Tabela';
+import { COR, MARCA } from '../../design/tokens';
 
 const { RangePicker } = DatePicker;
 
-const moeda = (v: number) =>
-  (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-
-const numero = (v: number) => (v ?? 0).toLocaleString('pt-BR');
-
-// Linha pequena embaixo do cartao com os numeros crus. 100% de um setup so e
-// muito diferente de 100% de cinquenta, e o percentual sozinho nao conta isso.
-function Base({ texto }: { texto: string }) {
-  return (
-    <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-      {texto}
-    </Typography.Text>
-  );
-}
+// Coluna de dinheiro nas tabelas: o "R$" ja esta no titulo da coluna, entao
+// aqui vai so o numero com duas casas.
+const moeda = (v: number) => numeroBR(v, 2);
 
 // Painel da Qualidade da Manufatura. Mesma leitura do painel do SQE, com os
 // indicadores da fabrica: PPM, CNQ e o andamento dos ciclos de inspecao.
@@ -86,7 +79,7 @@ export default function PainelManufatura() {
 
   // Os quatro indicadores do painel, na ordem e com os nomes definidos pela
   // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
-  const indicadores = [
+  const indicadores: Indicador[] = [
     {
       titulo: 'Efetividade da liberação de setup',
       metrica:
@@ -95,7 +88,7 @@ export default function PainelManufatura() {
       sufixo: '%',
       casas: 1,
       icone: <ToolOutlined />,
-      cor: '#3f8600',
+      cor: COR.sucesso,
       rodape: `${base.setupsDePrimeira ?? 0} de ${base.setupsRealizados ?? 0} setups`,
     },
     {
@@ -105,9 +98,9 @@ export default function PainelManufatura() {
       valor: ind.ppm,
       casas: 0,
       icone: <AlertOutlined />,
-      cor: '#D37119',
+      cor: MARCA.laranja,
       secundario: ind.custoRefugoReais ?? 0,
-      rodape: `${numero(base.pecasRefugadas ?? 0)} refugadas de ${numero(base.pecasProduzidas ?? 0)} produzidas`,
+      rodape: `${numeroBR(base.pecasRefugadas ?? 0)} refugadas de ${numeroBR(base.pecasProduzidas ?? 0)} produzidas`,
     },
     {
       titulo: 'Efetividade das inspeções de produção',
@@ -117,7 +110,7 @@ export default function PainelManufatura() {
       sufixo: '%',
       casas: 1,
       icone: <CheckCircleOutlined />,
-      cor: '#3f8600',
+      cor: COR.sucesso,
       rodape: `${base.inspecoesDePrimeira ?? 0} de ${base.inspecoesRealizadas ?? 0} inspeções`,
     },
     {
@@ -128,113 +121,57 @@ export default function PainelManufatura() {
       sufixo: '%',
       casas: 1,
       icone: <ReconciliationOutlined />,
-      cor: '#cf1322',
-      rodape: `${numero(base.pecasRefugadas ?? 0)} de ${numero(base.pecasProduzidas ?? 0)} unidades`,
+      cor: COR.critico,
+      rodape: `${numeroBR(base.pecasRefugadas ?? 0)} de ${numeroBR(base.pecasProduzidas ?? 0)} unidades`,
     },
   ];
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Painel Resumo — Qualidade da Manufatura
-        </Typography.Title>
-        <RangePicker
-          format="DD/MM/YYYY"
-          placeholder={['Início', 'Fim']}
-          onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
-        />
-      </Row>
+      <CabecalhoPagina
+        titulo="Painel Resumo — Qualidade da Manufatura"
+        acoes={
+          <RangePicker
+            format="DD/MM/YYYY"
+            placeholder={['Início', 'Fim']}
+            onChange={(v) => setPeriodo(v as [Dayjs, Dayjs] | null)}
+          />
+        }
+      />
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} align="stretch">
         {indicadores.map((i) => (
           <Col xs={24} sm={12} lg={6} key={i.titulo}>
-            <Card style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <Tooltip title={i.metrica}>
-                    {/* minHeight alinha os valores: os titulos tem uma e duas
-                        linhas, e sem isso os numeros ficavam em alturas
-                        diferentes na mesma fileira. */}
-                    <span
-                      style={{
-                        display: 'block',
-                        minHeight: 44,
-                        lineHeight: '22px',
-                      }}
-                    >
-                      {i.titulo}
-                    </span>
-                  </Tooltip>
-                }
-                value={i.valor ?? 0}
-                suffix={i.sufixo}
-                prefix={i.icone}
-                loading={isLoading}
-                valueStyle={i.cor ? { color: i.cor } : undefined}
-                // Numero em pt-BR: o PPM e inteiro, os percentuais vao com uma
-                // casa. Sem isto o percentual sairia "50.0%" com ponto.
-                formatter={(v) =>
-                  Number(v).toLocaleString('pt-BR', {
-                    minimumFractionDigits: i.casas,
-                    maximumFractionDigits: i.casas,
-                  })
-                }
-              />
-              {/* O refugo tem duas metricas no mesmo cartao: o PPM em cima e o
-                  custo aqui, como na planilha. */}
-              {i.secundario && (
-                <Typography.Text strong style={{ color: '#D37119' }}>
-                  R$ {moeda(i.secundario)}
-                </Typography.Text>
-              )}
-              <Base texto={i.rodape} />
-            </Card>
+            <CartaoIndicador i={i} carregando={isLoading} />
           </Col>
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} align="stretch">
-        {[
+      <FaixaContadores
+        carregando={isLoading}
+        itens={[
           { t: 'Máquinas ativas', v: cont.maquinas },
           { t: 'Inspeções de setup', v: cont.inspecoesSetup },
           { t: 'Inspeções de produção', v: cont.inspecoesProducao },
           {
             t: 'Pendentes de reinspeção',
             v: cont.inspecoesPendentes,
-            cor: '#cf1322',
+            cor: COR.critico,
           },
           { t: 'Reinspeções realizadas', v: cont.reinspecoes },
           { t: 'Lançamentos de CNQ', v: cont.lancamentosCnq },
-          { t: '8D abertos', v: cont.oitoDsAbertos, cor: '#cf1322' },
-          { t: '8D concluídos', v: cont.oitoDsConcluidos, cor: '#3f8600' },
-        ].map((c) => (
-          <Col xs={12} sm={8} lg={6} key={c.t}>
-            <Card size="small" style={{ height: '100%' }}>
-              <Statistic
-                title={
-                  <span
-                    style={{ display: 'block', minHeight: 40, lineHeight: '20px' }}
-                  >
-                    {c.t}
-                  </span>
-                }
-                value={c.v ?? 0}
-                {...separadoresBR}
-                loading={isLoading}
-                valueStyle={c.cor ? { color: c.cor } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+          { t: '8D abertos', v: cont.oitoDsAbertos, cor: COR.critico },
+          { t: '8D concluídos', v: cont.oitoDsConcluidos, cor: COR.sucesso },
+        ]}
+      />
 
       {/* ICAQ — como esta o programa de controle autonomo no periodo. Os dois
           rankings saem da PIOR nota para a melhor: quem precisa de atencao
           aparece primeiro. */}
       <Card title="ICAQ — Controle Autônomo da Qualidade">
-        <Row gutter={[16, 16]}>
-          {[
+        <FaixaContadores
+          carregando={isLoading}
+          itens={[
             { t: 'Auditorias no período', v: icaq.auditorias },
             {
               t: 'Nota média',
@@ -247,34 +184,20 @@ export default function PainelManufatura() {
               v: icaq.pctConforme,
               sufixo: '%',
               casas: 1,
-              cor: '#3f8600',
+              cor: COR.sucesso,
             },
             {
               t: 'Fora do padrão',
               v: icaq.pctForaDoPadrao,
               sufixo: '%',
               casas: 1,
-              cor: '#cf1322',
+              cor: COR.critico,
             },
-            { t: 'Conformes', v: icaq.conformes, cor: '#3f8600' },
-            { t: 'Em atenção', v: icaq.atencao, cor: '#D37119' },
-            { t: 'Não conformes', v: icaq.naoConformes, cor: '#cf1322' },
-          ].map((c) => (
-            <Col xs={12} sm={8} lg={6} key={c.t}>
-              <Card size="small" style={{ height: '100%' }}>
-                <Statistic
-                  title={c.t}
-                  value={c.v ?? 0}
-                  {...separadoresBR}
-                  suffix={c.sufixo}
-                  precision={c.casas}
-                  loading={isLoading}
-                  valueStyle={c.cor ? { color: c.cor } : undefined}
-                />
-              </Card>
-            </Col>
-          ))}
-        </Row>
+            { t: 'Conformes', v: icaq.conformes, cor: COR.sucesso },
+            { t: 'Em atenção', v: icaq.atencao, cor: MARCA.laranja },
+            { t: 'Não conformes', v: icaq.naoConformes, cor: COR.critico },
+          ]}
+        />
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           {[
@@ -304,14 +227,16 @@ export default function PainelManufatura() {
                       dataIndex: 'notaMedia',
                       width: 110,
                       align: 'right',
-                      render: (v: number) => <strong>{(v ?? 0).toFixed(1)}%</strong>,
+                      render: (v: number) => (
+                        <strong>{numeroBR(v, 1)}%</strong>
+                      ),
                     },
                     {
                       title: 'Conforme',
                       dataIndex: 'pctConforme',
                       width: 110,
                       align: 'right',
-                      render: (v: number) => `${(v ?? 0).toFixed(1)}%`,
+                      render: (v: number) => `${numeroBR(v, 1)}%`,
                     },
                   ]}
                 />
@@ -331,7 +256,7 @@ export default function PainelManufatura() {
           scroll={{ x: 'max-content' }}
           locale={{ emptyText: 'Nenhum defeito lançado no período' }}
           columns={[
-            { title: 'Descrição do Defeito', dataIndex: 'nome' },
+            { title: 'Descrição do defeito', dataIndex: 'nome' },
             {
               title: 'Quantidade',
               dataIndex: 'qtd',
@@ -390,7 +315,7 @@ export default function PainelManufatura() {
               dataIndex: 'ppm',
               width: 120,
               align: 'right',
-              render: (v: number) => <strong>{(v ?? 0).toLocaleString('pt-BR')}</strong>,
+              render: (v: number) => <strong>{numeroBR(v)}</strong>,
             },
           ]}
         />
@@ -452,7 +377,7 @@ export default function PainelManufatura() {
               dataIndex: 'ppm',
               width: 100,
               align: 'right',
-              render: (v: number) => (v ?? 0).toLocaleString('pt-BR'),
+              render: (v: number) => numeroBR(v),
             },
             {
               title: 'CNQ (R$)',

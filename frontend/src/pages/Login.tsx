@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, Typography, message } from 'antd';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { MARCA } from '../design/tokens';
 
 export default function Login() {
   const { login } = useAuth();
@@ -30,7 +31,7 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #2B2622 0%, #B85F12 100%)',
+        background: `linear-gradient(135deg, ${MARCA.grafite} 0%, ${MARCA.laranjaEscuro} 100%)`,
       }}
     >
       <Card style={{ width: 380, boxShadow: '0 8px 30px rgba(0,0,0,0.25)' }}>
@@ -40,7 +41,7 @@ export default function Login() {
             alt="Big Dutchman"
             style={{ height: 40, objectFit: 'contain', marginBottom: 12 }}
           />
-          <Typography.Title level={3} style={{ marginBottom: 0, color: '#D37119' }}>
+          <Typography.Title level={3} style={{ marginBottom: 0, color: MARCA.laranja }}>
             Sistema de Qualidade
           </Typography.Title>
           <Typography.Text type="secondary">Big Dutchman Brasil</Typography.Text>

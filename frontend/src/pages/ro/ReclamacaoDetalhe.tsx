@@ -27,6 +27,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
 import { dataBR, dataInput } from '../../formatos';
+import { moeda } from '../../moeda';
 import DocumentoReferenciado from '../../components/DocumentoReferenciado';
 import { CamposItem } from '../../components/CamposItem';
 import {
@@ -443,7 +444,7 @@ export default function ReclamacaoDetalhe() {
               />
             </Col>
             <Col xs={12} sm={12} lg={4}>
-              <Form.Item name="quantidadeAfetada" label="Quantidade afetada">
+              <Form.Item name="quantidadeAfetada" label="Qtd. afetada">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -566,10 +567,7 @@ export default function ReclamacaoDetalhe() {
                   value={
                     custoTotal == null
                       ? 'Quantidade × valor unitário'
-                      : custoTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })
+                      : moeda(custoTotal)
                   }
                 />
               </Form.Item>

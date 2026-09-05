@@ -21,7 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { abrirPdfEmNovaAba, api } from '../../api';
-import { dataInput } from '../../formatos';
+import { dataInput, numeroBR } from '../../formatos';
 import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 import { SelectItem } from '../../components/CamposItem';
 import {
@@ -39,6 +39,7 @@ import {
   TURNOS_ICAQ,
   VerificacaoIcaq,
 } from '../../icaq';
+import { COR } from '../../design/tokens';
 
 // ICAQ — Auditoria do Controle Autonomo da Qualidade.
 // A auditoria e lancada e fechada de uma vez: o cabecalho e as dez linhas do
@@ -308,7 +309,7 @@ export default function ControleAutonomoDetalhe() {
               title="Linhas respondidas"
               value={marcadas}
               suffix={`/ ${linhas.length}`}
-              valueStyle={completo ? { color: '#3f8600' } : undefined}
+              valueStyle={completo ? { color: COR.sucesso } : undefined}
             />
           </Card>
         </Col>
@@ -336,15 +337,18 @@ export default function ControleAutonomoDetalhe() {
                     <span>{l.verificacao}</span>
                     <Tag>{l.dimensao}</Tag>
                     <Tag color="blue">
-                      Peso {(l.peso * 100).toFixed(0)}% · vale{' '}
-                      {(pontosDaLinha(linhas, l.dimensao, 'CONFORME') * 100).toFixed(2)}{' '}
+                      Peso {numeroBR(l.peso * 100)}% · vale{' '}
+                      {numeroBR(
+                        pontosDaLinha(linhas, l.dimensao, 'CONFORME') * 100,
+                        2,
+                      )}{' '}
                       pts
                     </Tag>
                   </Space>
                 }
                 extra={
                   <Tag color={r.resultado === 'CONFORME' ? 'green' : undefined}>
-                    {(pontos * 100).toFixed(2)} pts
+                    {numeroBR(pontos * 100, 2)} pts
                   </Tag>
                 }
               >

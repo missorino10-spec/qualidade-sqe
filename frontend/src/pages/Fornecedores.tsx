@@ -17,13 +17,7 @@ import {
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
 import Tabela, { filtrosDe } from '../components/Tabela';
-
-const corClasse: Record<string, string> = {
-  A: 'green',
-  B: 'blue',
-  C: 'orange',
-  D: 'red',
-};
+import { corClasse } from '../fornecedor';
 
 export default function Fornecedores() {
   const qc = useQueryClient();
@@ -49,7 +43,7 @@ export default function Fornecedores() {
       return api.post('/fornecedores', payload);
     },
     onSuccess: () => {
-      message.success('Fornecedor salvo com sucesso.');
+      message.success('Fornecedor salvo.');
       qc.invalidateQueries({ queryKey: ['fornecedores'] });
       fechar();
     },

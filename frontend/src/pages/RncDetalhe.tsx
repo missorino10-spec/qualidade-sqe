@@ -50,6 +50,7 @@ import {
   useValorTotal,
 } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
+import { COR, TEXTO } from '../design/tokens';
 
 const CAMPOS_VALOR = {
   quantidade: 'quantidadePecas',
@@ -354,7 +355,7 @@ export default function RncDetalhe() {
   function confirmarExclusao() {
     Modal.confirm({
       title: `Excluir a RNC ${rnc.numero}?`,
-      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content: inspecaoVinculada ? (
         <div>
           <p>Esta RNC foi gerada por uma inspeção {tipoInspVinc} (#
@@ -797,7 +798,7 @@ export default function RncDetalhe() {
                 children: (
                   <div>
                     <strong>{eventoHistorico(h.statusNovo).titulo}</strong>
-                    <div style={{ fontSize: 12, color: '#888' }}>
+                    <div style={{ fontSize: 12, color: TEXTO.suave }}>
                       {dayjs(h.createdAt).format('DD/MM/YYYY HH:mm')}
                       {h.usuario ? ` · ${h.usuario.nome}` : ''}
                     </div>

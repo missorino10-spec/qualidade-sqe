@@ -22,8 +22,9 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
-import { dataInput, separadoresBR } from '../../formatos';
+import { dataInput, numeroBR, separadoresBR } from '../../formatos';
 import Tabela from '../../components/Tabela';
+import { COR, MARCA } from '../../design/tokens';
 
 // Lancamento da producao (qtd produzida e qtd com defeito) e o PPM resultante,
 // como na planilha. PPM = (pecas com defeito / pecas produzidas) * 1.000.000.
@@ -39,8 +40,6 @@ function valorCelula(editado: any, salvo: any, campo: string) {
   if (editado && campo in editado) return editado[campo];
   return salvo?.[campo] ?? null;
 }
-
-const numeroBR = (v: number) => Number(v ?? 0).toLocaleString('pt-BR');
 
 export default function ProducaoDiaria() {
   const qc = useQueryClient();
@@ -188,7 +187,7 @@ export default function ProducaoDiaria() {
             value={fonte?.pecasComDefeito ?? 0}
             {...separadoresBR}
             loading={carregando}
-            valueStyle={{ color: '#cf1322' }}
+            valueStyle={{ color: COR.critico }}
           />
         </Card>
       </Col>
@@ -199,7 +198,7 @@ export default function ProducaoDiaria() {
             value={fonte?.ppm ?? 0}
             {...separadoresBR}
             loading={carregando}
-            valueStyle={{ color: '#D37119' }}
+            valueStyle={{ color: MARCA.laranja }}
           />
         </Card>
       </Col>
@@ -250,14 +249,16 @@ export default function ProducaoDiaria() {
                 dataIndex: 'pecasProduzidas',
                 width: 120,
                 align: 'right',
-                render: numeroBR,
+                // Sempre com a seta: o render da tabela recebe (valor, linha,
+                // indice) e a linha cairia no parametro de casas decimais.
+                render: (v: number) => numeroBR(v),
               },
               {
                 title: 'Com defeito',
                 dataIndex: 'pecasComDefeito',
                 width: 120,
                 align: 'right',
-                render: numeroBR,
+                render: (v: number) => numeroBR(v),
               },
               {
                 title: 'PPM',
@@ -373,9 +374,11 @@ export default function ProducaoDiaria() {
               align: 'right',
               render: (_: any, r: any) =>
                 r.qtdProduzida
-                  ? Math.round(
-                      ((r.qtdDefeito ?? 0) / r.qtdProduzida) * 1_000_000,
-                    ).toLocaleString('pt-BR')
+                  ? numeroBR(
+                      Math.round(
+                        ((r.qtdDefeito ?? 0) / r.qtdProduzida) * 1_000_000,
+                      ),
+                    )
                   : '-',
             },
             {

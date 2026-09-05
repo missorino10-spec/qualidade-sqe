@@ -31,6 +31,7 @@ import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
 import { ORIGENS_INSPECAO } from './FormularioDimensional';
 import { CamposVisual } from './FormularioVisual';
 import NomeAssinatura from '../../components/NomeAssinatura';
+import { COR } from '../../design/tokens';
 
 // Detalhe da INSPECAO VISUAL da Manufatura: documento proprio, sem cotas e sem
 // reinspecao - o que o inspetor observou naquele momento, com as fotos.
@@ -133,7 +134,7 @@ export default function InspecaoVisualDetalhe() {
   function descartarRascunho() {
     Modal.confirm({
       title: `Descartar o rascunho ${data.numero}?`,
-      icon: <DeleteOutlined style={{ color: '#cf1322' }} />,
+      icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content:
         'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, nada muda em lugar nenhum.',
       okText: 'Descartar',

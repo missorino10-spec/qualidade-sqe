@@ -31,6 +31,7 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
+import { COR } from '../design/tokens';
 
 // Registro de Entrada - a chegada da carga, ponto de partida do SQE.
 //
@@ -232,7 +233,7 @@ export default function RegistrosEntrada() {
           {
             titulo: 'Inspeção pendente',
             valor: totais.pendentes,
-            cor: totais.pendentes ? '#cf1322' : undefined,
+            cor: totais.pendentes ? COR.critico : undefined,
           },
         ].map((c) => (
           <Col xs={12} lg={6} key={c.titulo}>
@@ -465,7 +466,7 @@ export default function RegistrosEntrada() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="qtdTotal" label="Quantidade recebida">
+              <Form.Item name="qtdTotal" label="Qtd. recebida">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>

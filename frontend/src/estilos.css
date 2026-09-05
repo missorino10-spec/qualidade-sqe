@@ -1,3 +1,111 @@
+/* ===========================================================================
+   Design System — camada global.
+
+   As cores e medidas ficam em src/design/tokens.ts e descem pelo tema do Ant
+   Design (src/main.tsx). Aqui ficam so os ajustes que o tema nao alcanca:
+   comportamento de tabela, algarismos, foco e rolagem.
+   =========================================================================== */
+
+:root {
+  --borda-suave: #f0f0f0;
+  --borda-padrao: #e4e1de;
+  --superficie-sutil: #fafafa;
+  --texto-suave: #7a736d;
+  --marca: #d37119;
+}
+
+/* Algarismos de largura fixa. Sem isso o "1" e mais estreito que o "8" e uma
+   coluna de valores fica com as casas decimais desalinhadas de linha para
+   linha - o defeito que mais entrega planilha improvisada num sistema. */
+.ant-table,
+.ant-statistic-content,
+.ant-descriptions-item-content,
+.ant-input-number-input {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Cabecalho de tabela: o peso e o espacamento separam o rotulo do dado sem
+   precisar de borda pesada nem de caixa alta. */
+.ant-table-thead > tr > th {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Coluna numerica alinhada a direita ja vem do align="right"; o que faltava
+   era a mesma folga do cabecalho, para o numero nao encostar na divisoria. */
+.ant-table-tbody > tr > td.ant-table-cell {
+  transition: background-color 0.15s ease;
+}
+
+/* Linha clicavel: varias listagens navegam para o detalhe no clique da linha.
+   O cursor ja avisa; o realce no hover confirma que a linha inteira e o alvo. */
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #fbf3ea;
+}
+
+/* Cartao: contorno definido em vez de sombra difusa. Sistema corporativo
+   ganha solidez por borda e alinhamento, nao por profundidade. */
+.ant-card {
+  border-color: var(--borda-padrao);
+}
+
+.ant-card-head {
+  border-bottom-color: var(--borda-suave);
+}
+
+/* Titulo de secao do Divider: e um rotulo de agrupamento, entao fica menor,
+   em maiuscula discreta e apagado - abaixo do titulo da tela na hierarquia. */
+.ant-divider-horizontal.ant-divider-with-text {
+  margin: 4px 0 0;
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Foco visivel em todo controle navegavel por teclado. Acessibilidade e, na
+   pratica, tambem o que permite lancar um formulario inteiro sem tirar a mao
+   do teclado. */
+.ant-btn:focus-visible,
+.ant-input:focus-visible,
+.ant-select-selector:focus-visible,
+.ant-picker:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--marca);
+  outline-offset: 1px;
+}
+
+/* Barra de rolagem discreta: a nativa do Windows e larga e cinza-escuro, e
+   aparece dentro de cada tabela com transbordo. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cfcac5 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cfcac5;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #b3aca5;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Ajustes globais de layout — o sistema e usado tambem em tablet no chao de
    fabrica, entao nenhuma tela pode empurrar a pagina para os lados. */
 
