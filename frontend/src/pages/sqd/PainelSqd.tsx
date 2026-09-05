@@ -8,17 +8,15 @@ import {
   Space,
   Statistic,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import {
   CheckCircleOutlined,
-  ClockCircleOutlined,
-  DollarOutlined,
+  ExclamationCircleOutlined,
   FieldTimeOutlined,
-  HourglassOutlined,
   RetweetOutlined,
-  TrophyOutlined,
-  WarningOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Dayjs } from 'dayjs';
@@ -42,10 +40,70 @@ import Tabela from '../../components/Tabela';
 
 const { RangePicker } = DatePicker;
 
-// Painel do SQD. Os indicadores sao os mesmos da aba "KPI's" do
-// BDBR.QUA.FMR.029.01 (% de aprovacao, lead time medio e % dentro do prazo),
-// mais os dois relogios do fluxo: o tempo de resposta do fornecedor e o tempo
-// total ate o fechamento da homologacao.
+const numero = (v: number) => (v ?? 0).toLocaleString('pt-BR');
+
+// Linha pequena embaixo do cartao com os numeros crus. 100% de uma homologacao
+// so e muito diferente de 100% de trinta, e o percentual sozinho nao conta isso.
+function Base({ texto }: { texto: string }) {
+  return (
+    <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+      {texto}
+    </Typography.Text>
+  );
+}
+
+type Indicador = {
+  titulo: string;
+  metrica: string;
+  valor: number;
+  sufixo?: string;
+  casas: number;
+  icone: JSX.Element;
+  cor?: string;
+  rodape: string;
+};
+
+// Cartao de indicador: o titulo carrega a formula no tooltip e o rodape mostra
+// de onde saiu o percentual, sem obrigar ninguem a abrir relatorio.
+function CartaoIndicador({
+  i,
+  carregando,
+}: {
+  i: Indicador;
+  carregando: boolean;
+}) {
+  return (
+    <Card>
+      <Statistic
+        title={
+          <Tooltip title={i.metrica}>
+            <span
+              style={{ display: 'block', minHeight: 44, lineHeight: '22px' }}
+            >
+              {i.titulo}
+            </span>
+          </Tooltip>
+        }
+        value={i.valor}
+        formatter={(v) =>
+          Number(v).toLocaleString('pt-BR', {
+            minimumFractionDigits: i.casas,
+            maximumFractionDigits: i.casas,
+          })
+        }
+        suffix={i.sufixo}
+        loading={carregando}
+        prefix={i.icone}
+        valueStyle={i.cor ? { color: i.cor } : undefined}
+      />
+      <Base texto={i.rodape} />
+    </Card>
+  );
+}
+
+// Painel do SQD. Os indicadores sao os seis que o usuario definiu: aprovacao de
+// itens e de fornecedores, aprovacao condicional, mediana do tempo de
+// homologacao, aprovacao de itens de primeira e a distribuicao A/B/C/D da base.
 export default function PainelSqd() {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState<[Dayjs, Dayjs] | null>(null);
@@ -92,10 +150,68 @@ export default function PainelSqd() {
     queryFn: async () => (await api.get('/sqd/painel/auditorias/ultimas')).data,
   });
 
-  const sla = kpis?.slaDias ?? 3;
-  const slaResposta = kpis?.slaRespostaDias ?? 3;
-  const slaItem = kpisItens?.slaDias ?? 3;
-  const slaRespostaItem = kpisItens?.slaRespostaDias ?? 3;
+  // Os indicadores de fornecedores, na ordem que o usuario definiu.
+  const indFornecedores: Indicador[] = [
+    {
+      titulo: 'Aprovação de fornecedores homologados',
+      metrica:
+        'Fornecedores aprovados (incluindo os condicionais) / fornecedores avaliados x 100',
+      valor: kpis?.pctAprovacao ?? 0,
+      sufixo: '%',
+      casas: 1,
+      icone: <CheckCircleOutlined />,
+      cor: '#3f8600',
+      rodape: `${numero((kpis?.aprovados ?? 0) + (kpis?.condicionais ?? 0))} de ${numero(kpis?.avaliadas ?? 0)} avaliados`,
+    },
+    {
+      titulo: 'Aprovação Condicional de fornecedores',
+      metrica:
+        'Fornecedores aprovados condicionalmente / fornecedores avaliados x 100',
+      valor: kpis?.pctAprovacaoCondicional ?? 0,
+      sufixo: '%',
+      casas: 1,
+      icone: <ExclamationCircleOutlined />,
+      cor: '#d46b08',
+      rodape: `${numero(kpis?.condicionais ?? 0)} de ${numero(kpis?.avaliadas ?? 0)} avaliados`,
+    },
+    {
+      titulo: 'Tempo de homologação de fornecedores',
+      metrica:
+        'Mediana de dias úteis entre a abertura e a conclusão da homologação',
+      valor: kpis?.medianaCicloDiasUteis ?? 0,
+      // Espaco inseparavel: o HTML come o espaco comum e imprime "5,5dias".
+      sufixo: '\u00a0dias úteis',
+      casas: 1,
+      icone: <FieldTimeOutlined />,
+      rodape: `mediana de ${numero(kpis?.ciclosMedidos ?? 0)} homologações concluídas`,
+    },
+  ];
+
+  const indItens: Indicador[] = [
+    {
+      titulo: 'Aprovação de itens homologados',
+      metrica: 'Itens aprovados / itens com veredito x 100',
+      valor: kpisItens?.pctAprovacao ?? 0,
+      sufixo: '%',
+      casas: 1,
+      icone: <CheckCircleOutlined />,
+      cor: '#3f8600',
+      rodape: `${numero(kpisItens?.aprovados ?? 0)} de ${numero(kpisItens?.analisados ?? 0)} com veredito`,
+    },
+    {
+      titulo: 'Aprovação de itens na primeira submissão',
+      metrica:
+        'Itens aprovados com uma única submissão / itens com veredito x 100',
+      valor: kpisItens?.pctPrimeiraSubmissao ?? 0,
+      sufixo: '%',
+      casas: 1,
+      icone: <RetweetOutlined />,
+      cor: '#D37119',
+      rodape: `${numero(kpisItens?.aprovadosPrimeiraSubmissao ?? 0)} de ${numero(kpisItens?.analisados ?? 0)} com veredito`,
+    },
+  ];
+
+  const classes: any[] = kpis?.distribuicaoClasses ?? [];
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -114,101 +230,55 @@ export default function PainelSqd() {
         Homologação de Fornecedores — Doc. BDBR.QUA.FMR.029.01
       </Divider>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
+      <Row gutter={[16, 16]} align="stretch">
+        {indFornecedores.map((i) => (
+          <Col xs={24} sm={12} lg={6} key={i.titulo}>
+            <CartaoIndicador i={i} carregando={isLoading} />
+          </Col>
+        ))}
+        {/* A distribuicao A/B/C/D e um retrato da base ativa de hoje: o filtro
+            de periodo la em cima nao mexe nela. */}
+        <Col xs={24} sm={24} lg={6}>
           <Card>
             <Statistic
-              title="Aprovação de fornecedores"
-              value={kpis?.pctAprovacao ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
+              title={
+                <Tooltip title="Fornecedores ativos por classe de fornecimento (A, B, C e D) — quantidade e % da base">
+                  <span
+                    style={{
+                      display: 'block',
+                      minHeight: 44,
+                      lineHeight: '22px',
+                    }}
+                  >
+                    Distribuição da classificação de fornecedores
+                  </span>
+                </Tooltip>
+              }
+              value={kpis?.fornecedoresAtivos ?? 0}
+              formatter={(v) => numero(Number(v))}
               loading={isLoading}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
+              prefix={<TagsOutlined />}
             />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Nota média das autoavaliações"
-              value={kpis?.notaMedia ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={isLoading}
-              prefix={<TrophyOutlined />}
-              valueStyle={{ color: '#D37119' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Lead time médio (dias úteis)"
-              value={kpis?.leadTimeMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={isLoading}
-              prefix={<FieldTimeOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title={`Dentro do prazo (até ${sla} dias úteis)`}
-              value={kpis?.pctNoPrazo ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Os relogios do fluxo: quanto o fornecedor demora para devolver o
-          formulario e quanto demora o ciclo inteiro ate o fechamento. */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={8}>
-          <Card>
-            <Statistic
-              title="Resposta do fornecedor (dias úteis)"
-              value={kpis?.tempoRespostaMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={isLoading}
-              prefix={<FieldTimeOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <Card>
-            <Statistic
-              title={`Fornecedores no prazo (até ${slaResposta} dias úteis)`}
-              value={kpis?.pctRespostaNoPrazo ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={isLoading}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <Card>
-            <Statistic
-              title="Tempo total do ciclo (dias úteis)"
-              value={kpis?.tempoTotalMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={isLoading}
-              prefix={<HourglassOutlined />}
-            />
+            <Base texto="fornecedores ativos na base" />
+            <Row gutter={8} style={{ marginTop: 8 }}>
+              {classes.map((c) => (
+                <Col span={6} key={c.classe} style={{ textAlign: 'center' }}>
+                  <Typography.Text strong style={{ display: 'block' }}>
+                    {c.classe}
+                  </Typography.Text>
+                  <Typography.Text style={{ display: 'block' }}>
+                    {numero(c.qtd)}
+                  </Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {c.pct.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                    %
+                  </Typography.Text>
+                </Col>
+              ))}
+            </Row>
           </Card>
         </Col>
       </Row>
@@ -318,117 +388,12 @@ export default function PainelSqd() {
         Homologação de Itens — Doc. BDBR.QUA.FMR.025.01
       </Divider>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Aprovação de itens"
-              value={kpisItens?.pctAprovacao ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={loadingItens}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Aprovados na 1ª tentativa"
-              value={kpisItens?.pctPrimeiraTentativa ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={loadingItens}
-              prefix={<RetweetOutlined />}
-              valueStyle={{ color: '#D37119' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Lead time médio (dias úteis)"
-              value={kpisItens?.leadTimeMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={loadingItens}
-              prefix={<FieldTimeOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title={`Dentro do prazo (até ${slaItem} dias úteis)`}
-              value={kpisItens?.pctNoPrazo ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={loadingItens}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Resposta do fornecedor (dias úteis)"
-              value={kpisItens?.tempoRespostaMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={loadingItens}
-              prefix={<FieldTimeOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title={`Amostras no prazo (até ${slaRespostaItem} dias úteis)`}
-              value={kpisItens?.pctRespostaNoPrazo ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={loadingItens}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Tempo total do ciclo (dias úteis)"
-              value={kpisItens?.tempoTotalMedio ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={loadingItens}
-              prefix={<HourglassOutlined />}
-            />
-          </Card>
-        </Col>
-        {/* Savings do FMR.025.01: so conta o que ja foi validado, ou seja, as
-            homologacoes com o ciclo encerrado. */}
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Savings (homologações finalizadas)"
-              value={kpisItens?.savings ?? 0}
-              {...separadoresBR}
-              precision={2}
-              prefix={<DollarOutlined />}
-              loading={loadingItens}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
+      <Row gutter={[16, 16]} align="stretch">
+        {indItens.map((i) => (
+          <Col xs={24} sm={12} lg={6} key={i.titulo}>
+            <CartaoIndicador i={i} carregando={loadingItens} />
+          </Col>
+        ))}
       </Row>
 
       <Row gutter={[16, 16]} align="stretch">
@@ -537,62 +502,9 @@ export default function PainelSqd() {
         Auditoria de Fornecedores — Checklist de Auditoria
       </Divider>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Aprovação em auditoria"
-              value={kpisAud?.pctAprovacao ?? 0}
-              {...separadoresBR}
-              suffix="%"
-              precision={1}
-              loading={loadingAud}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Nota média das auditorias"
-              value={kpisAud?.notaMedia ?? 0}
-              {...separadoresBR}
-              precision={1}
-              loading={loadingAud}
-              prefix={<TrophyOutlined />}
-              valueStyle={{ color: '#D37119' }}
-            />
-          </Card>
-        </Col>
-        {/* O semaforo do prazo: vermelho ja venceu, amarelo esta nos ultimos
-            15 dias. */}
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Reavaliações vencidas"
-              value={kpisAud?.reavaliacoesVencidas ?? 0}
-              {...separadoresBR}
-              loading={loadingAud}
-              prefix={<WarningOutlined />}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Reavaliações a vencer (15 dias)"
-              value={kpisAud?.reavaliacoesAVencer ?? 0}
-              {...separadoresBR}
-              loading={loadingAud}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#d4b106' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
+      {/* A auditoria nao tem cartao de indicador nesta fase, mas o semaforo do
+          prazo de reavaliacao e alarme operacional e nao pode sumir: desceu
+          para os contadores, em vermelho (venceu) e amarelo (ultimos 15 dias). */}
       <Row gutter={[16, 16]} align="stretch">
         {[
           { t: 'Auditorias registradas', v: kpisAud?.total },
@@ -609,6 +521,16 @@ export default function PainelSqd() {
             cor: '#d46b08',
           },
           { t: 'Reprovados', v: kpisAud?.reprovados, cor: '#cf1322' },
+          {
+            t: 'Reavaliações vencidas',
+            v: kpisAud?.reavaliacoesVencidas,
+            cor: '#cf1322',
+          },
+          {
+            t: 'Reavaliações a vencer (15 dias)',
+            v: kpisAud?.reavaliacoesAVencer,
+            cor: '#d4b106',
+          },
           {
             t: 'No loop de reavaliação',
             v: kpisAud?.emReavaliacao,

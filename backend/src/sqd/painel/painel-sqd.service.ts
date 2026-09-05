@@ -1,23 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  SLA_HOMOLOGACAO_DIAS,
-  SLA_RESPOSTA_FORNECEDOR_DIAS,
-} from '../sqd-utils';
-import {
-  SLA_HOMOLOGACAO_ITEM_DIAS,
-  SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
-} from '../homologacoes-itens/itens-utils';
 
-// Media com uma casa decimal; devolve 0 quando nao ha o que medir.
-function media(valores: number[]) {
+// Mediana, nao media: uma homologacao que travou seis meses esperando o
+// fornecedor puxaria a media para cima e faria o processo inteiro parecer
+// lento. A mediana mostra o ciclo tipico.
+function mediana(valores: number[]) {
   if (!valores.length) return 0;
-  return Math.round((valores.reduce((s, v) => s + v, 0) / valores.length) * 10) / 10;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(ordenados.length / 2);
+  const valor =
+    ordenados.length % 2
+      ? ordenados[meio]
+      : (ordenados[meio - 1] + ordenados[meio]) / 2;
+  return Math.round(valor * 10) / 10;
 }
 
 function percentual(parte: number, total: number) {
   return total ? Math.round((parte / total) * 1000) / 10 : 0;
 }
+
+const CLASSES = ['A', 'B', 'C', 'D'] as const;
 
 @Injectable()
 export class PainelSqdService {
@@ -37,18 +39,27 @@ export class PainelSqdService {
           }
         : {};
 
-    const homologacoes = await this.prisma.homologacaoFornecedor.findMany({
-      where,
-      select: {
-        resultado: true,
-        statusHomologacao: true,
-        statusPlanoAcao: true,
-        nota: true,
-        leadTimeDiasUteis: true,
-        tempoRespostaDiasUteis: true,
-        tempoTotalDiasUteis: true,
-      },
-    });
+    // A distribuicao A/B/C/D e um retrato da base ativa de HOJE, nao uma fatia
+    // do periodo: o filtro de datas em cima do painel nao mexe nela. A classe
+    // sai do cadastro do fornecedor (a que a Qualidade define e que manda na
+    // periodicidade de inspecao), nao da apuracao trimestral.
+    const [homologacoes, porClasse, fornecedoresAtivos] = await Promise.all([
+      this.prisma.homologacaoFornecedor.findMany({
+        where,
+        select: {
+          resultado: true,
+          statusHomologacao: true,
+          statusPlanoAcao: true,
+          tempoTotalDiasUteis: true,
+        },
+      }),
+      this.prisma.fornecedor.groupBy({
+        by: ['classificacaoFornecimento'],
+        where: { ativo: true },
+        _count: { _all: true },
+      }),
+      this.prisma.fornecedor.count({ where: { ativo: true } }),
+    ]);
 
     const total = homologacoes.length;
     // So entram na conta de aprovacao as que ja foram avaliadas.
@@ -61,24 +72,15 @@ export class PainelSqdService {
       (h) => h.resultado === 'REPROVADO',
     ).length;
 
-    // Lead time da planilha: da solicitacao ate o envio do relatorio.
-    const leadTimes = homologacoes
-      .map((h) => h.leadTimeDiasUteis)
-      .filter((v): v is number => v != null);
-    const noPrazo = leadTimes.filter((v) => v <= SLA_HOMOLOGACAO_DIAS).length;
-
-    // Resposta do fornecedor: da abertura do registro ate o retorno.
-    const respostas = homologacoes
-      .map((h) => h.tempoRespostaDiasUteis)
-      .filter((v): v is number => v != null);
-    const respondeuNoPrazo = respostas.filter(
-      (v) => v <= SLA_RESPOSTA_FORNECEDOR_DIAS,
-    ).length;
-
-    // Ciclo completo: da abertura ate o fechamento da homologacao.
+    // Ciclo completo: da abertura ate o fechamento da homologacao, em dias
+    // uteis (o calendario de feriados ja entra no calculo que gravou o campo).
     const totais = homologacoes
       .map((h) => h.tempoTotalDiasUteis)
       .filter((v): v is number => v != null);
+
+    const contaPorClasse = new Map(
+      porClasse.map((c) => [c.classificacaoFornecimento, c._count._all]),
+    );
 
     return {
       total,
@@ -89,16 +91,21 @@ export class PainelSqdService {
       aprovados,
       condicionais,
       reprovados,
-      // A planilha conta "Aprovado" + "Aprovado Condicionalmente" como aprovacao.
+      // 02 - Aprovacao de fornecedores homologados. "Aprovado" + "Aprovado
+      // Condicionalmente", como na planilha: os dois passaram.
       pctAprovacao: percentual(aprovados + condicionais, avaliadas.length),
-      notaMedia: media(avaliadas.map((h) => h.nota ?? 0)),
-      leadTimeMedio: media(leadTimes),
-      pctNoPrazo: percentual(noPrazo, leadTimes.length),
-      slaDias: SLA_HOMOLOGACAO_DIAS,
-      tempoRespostaMedio: media(respostas),
-      pctRespostaNoPrazo: percentual(respondeuNoPrazo, respostas.length),
-      slaRespostaDias: SLA_RESPOSTA_FORNECEDOR_DIAS,
-      tempoTotalMedio: media(totais),
+      // Aprovacao Condicional de fornecedores: quanto da aprovacao acima veio
+      // com ressalva, ou seja, devendo plano de acao.
+      pctAprovacaoCondicional: percentual(condicionais, avaliadas.length),
+      // 03 - Tempo de homologacao de fornecedores, em dias uteis.
+      medianaCicloDiasUteis: mediana(totais),
+      ciclosMedidos: totais.length,
+      // 05 - Distribuicao da classificacao de fornecedores.
+      fornecedoresAtivos,
+      distribuicaoClasses: CLASSES.map((classe) => {
+        const qtd = contaPorClasse.get(classe) ?? 0;
+        return { classe, qtd, pct: percentual(qtd, fornecedoresAtivos) };
+      }),
       emAndamento: homologacoes.filter(
         (h) => h.statusHomologacao === 'EM_ANDAMENTO',
       ).length,
@@ -151,10 +158,6 @@ export class PainelSqdService {
         resultado: true,
         statusHomologacao: true,
         statusPlanoAcao: true,
-        custoEvitado: true,
-        leadTimeDiasUteis: true,
-        tempoRespostaDiasUteis: true,
-        tempoTotalDiasUteis: true,
         // Rascunho nao conta como tentativa no indicador: o relatorio pela
         // metade nao e uma rodada de amostras que o fornecedor perdeu.
         _count: { select: { relatorios: { where: { rascunho: false } } } },
@@ -169,33 +172,12 @@ export class PainelSqdService {
     const aprovados = analisados.filter((h) => h.resultado === 'APROVADO');
     const reprovados = analisados.filter((h) => h.resultado === 'REPROVADO');
 
-    const leadTimes = registros
-      .map((h) => h.leadTimeDiasUteis)
-      .filter((v): v is number => v != null);
-    const noPrazo = leadTimes.filter(
-      (v) => v <= SLA_HOMOLOGACAO_ITEM_DIAS,
-    ).length;
-
-    const respostas = registros
-      .map((h) => h.tempoRespostaDiasUteis)
-      .filter((v): v is number => v != null);
-    const respondeuNoPrazo = respostas.filter(
-      (v) => v <= SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
-    ).length;
-
-    const totais = registros
-      .map((h) => h.tempoTotalDiasUteis)
-      .filter((v): v is number => v != null);
-
-    // Robustez do processo: aprovado com um unico relatorio de inspecao.
-    const primeiraTentativa = aprovados.filter(
+    // Robustez do processo: aprovado com um unico relatorio de inspecao. O
+    // denominador e o item SUBMETIDO, nao o aprovado: item que reprovou e
+    // nunca voltou tambem nao passou de primeira, e precisa pesar contra.
+    const primeiraSubmissao = aprovados.filter(
       (h) => h._count.relatorios <= 1,
     ).length;
-
-    // Savings: so conta o que ja foi validado, ou seja, o ciclo encerrado.
-    const savings = registros
-      .filter((h) => h.statusHomologacao === 'FINALIZADO')
-      .reduce((s, h) => s + (h.custoEvitado ?? 0), 0);
 
     return {
       total,
@@ -205,16 +187,11 @@ export class PainelSqdService {
       ).length,
       aprovados: aprovados.length,
       reprovados: reprovados.length,
+      // 01 - Aprovacao de itens homologados.
       pctAprovacao: percentual(aprovados.length, analisados.length),
-      pctPrimeiraTentativa: percentual(primeiraTentativa, aprovados.length),
-      leadTimeMedio: media(leadTimes),
-      pctNoPrazo: percentual(noPrazo, leadTimes.length),
-      slaDias: SLA_HOMOLOGACAO_ITEM_DIAS,
-      tempoRespostaMedio: media(respostas),
-      pctRespostaNoPrazo: percentual(respondeuNoPrazo, respostas.length),
-      slaRespostaDias: SLA_RESPOSTA_FORNECEDOR_ITEM_DIAS,
-      tempoTotalMedio: media(totais),
-      savings: Math.round(savings * 100) / 100,
+      // 04 - Aprovacao de itens na primeira submissao.
+      pctPrimeiraSubmissao: percentual(primeiraSubmissao, analisados.length),
+      aprovadosPrimeiraSubmissao: primeiraSubmissao,
       emAndamento: registros.filter(
         (h) => h.statusHomologacao === 'EM_ANDAMENTO',
       ).length,
@@ -265,7 +242,6 @@ export class PainelSqdService {
     const registros = await this.prisma.auditoriaFornecedor.findMany({
       where,
       select: {
-        nota: true,
         resultado: true,
         statusAuditoria: true,
         dataLimiteReavaliacao: true,
@@ -316,9 +292,6 @@ export class PainelSqdService {
       aprovados,
       condicionais,
       reprovados,
-      // A auditoria so e aprovacao plena a partir de 90 pontos.
-      pctAprovacao: percentual(aprovados, avaliadas.length),
-      notaMedia: media(avaliadas.map((a) => a.nota ?? 0)),
       // Quantas precisaram de mais de uma rodada para chegar ao resultado.
       reavaliadas: registros.filter((a) => a._count.rodadas > 1).length,
       emReavaliacao: emReavaliacao.length,
