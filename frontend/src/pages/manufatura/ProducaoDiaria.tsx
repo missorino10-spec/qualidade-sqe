@@ -5,7 +5,6 @@ import {
   Card,
   Col,
   InputNumber,
-  Popconfirm,
   Row,
   Space,
   Statistic,
@@ -25,6 +24,7 @@ import { api } from '../../api';
 import { dataInput, numeroBR, separadoresBR } from '../../formatos';
 import Tabela from '../../components/Tabela';
 import { COR, MARCA } from '../../design/tokens';
+import { BotaoExcluir } from '../../design/acoes';
 
 // Lancamento da producao (qtd produzida e qtd com defeito) e o PPM resultante,
 // como na planilha. PPM = (pecas com defeito / pecas produzidas) * 1.000.000.
@@ -392,16 +392,13 @@ export default function ProducaoDiaria() {
               align: 'right',
               render: (_: any, r: any) =>
                 r.producaoId ? (
-                  <Popconfirm
-                    title={`Excluir o apontamento de ${r.dia.format('DD/MM')}?`}
-                    okText="Excluir"
-                    cancelText="Cancelar"
+                  <BotaoExcluir
+                    emTabela
+                    motivo="Excluir o apontamento do dia"
+                    titulo={`Excluir o apontamento de ${r.dia.format('DD/MM')}?`}
+                    descricao="O dia sai da conta do PPM do mês. A exclusão é definitiva."
                     onConfirm={() => excluirDia(r)}
-                  >
-                    <Button size="small" danger>
-                      Excluir
-                    </Button>
-                  </Popconfirm>
+                  />
                 ) : null,
             },
           ]}

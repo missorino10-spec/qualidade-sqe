@@ -13,6 +13,7 @@ import {
   Space,
   Switch,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
@@ -21,7 +22,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
 import Tabela from '../../components/Tabela';
-import { MODULOS, ROTULO_MODULO } from '../../permissoes';
+import {
+  MODULOS,
+  ROTULO_MODULO,
+  ROTULO_MODULO_CURTO,
+} from '../../permissoes';
 import type { Acesso, Modulo, Nivel } from '../../permissoes';
 
 /**
@@ -174,19 +179,29 @@ export default function Colaboradores() {
     {
       title: 'Acessos',
       dataIndex: 'acessos',
-      width: 320,
+      width: 260,
+      /* Etiqueta curta na linha, rotulo por extenso no passar do mouse. Com o
+         nome inteiro ("QUALIDADE - MANUFATURA", "Cadastros › Fornecedores")
+         cada colaborador ocupava quatro linhas de altura na tabela. */
       render: (lista: Acesso[], r: Colaborador) =>
         r.papel === 'ADMIN' ? (
-          <Tag color="gold">Administrador — acesso total</Tag>
+          <Tag color="gold">Administrador</Tag>
         ) : lista.length === 0 ? (
           <Typography.Text type="secondary">Nenhum</Typography.Text>
         ) : (
           <Space size={[4, 4]} wrap>
             {lista.map((a) => (
-              <Tag key={a.modulo} color={a.nivel === 'EDITAR' ? 'blue' : 'default'}>
-                {ROTULO_MODULO[a.modulo]}
-                {a.nivel === 'VISUALIZAR' ? ' (ver)' : ''}
-              </Tag>
+              <Tooltip
+                key={a.modulo}
+                title={`${ROTULO_MODULO[a.modulo]} — ${
+                  a.nivel === 'EDITAR' ? 'pode lançar' : 'só visualiza'
+                }`}
+              >
+                <Tag color={a.nivel === 'EDITAR' ? 'blue' : 'default'}>
+                  {ROTULO_MODULO_CURTO[a.modulo]}
+                  {a.nivel === 'VISUALIZAR' ? ' · ver' : ''}
+                </Tag>
+              </Tooltip>
             ))}
           </Space>
         ),

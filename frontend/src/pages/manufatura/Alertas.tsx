@@ -8,21 +8,18 @@ import {
   Form,
   Input,
   Modal,
-  Popconfirm,
   Row,
   Select,
   Space,
   Statistic,
   Tag,
   Timeline,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
 import {
   CheckCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  FilePdfOutlined,
   PlusOutlined,
   ReloadOutlined,
   WarningOutlined,
@@ -48,6 +45,7 @@ import {
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
 import { COR } from '../../design/tokens';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 
 // ALERTA DA QUALIDADE — espelha o formulario .docx da empresa: titulo + data,
 // "Descricao do problema", texto da acao obrigatoria e os dois paineis de foto
@@ -334,59 +332,60 @@ export default function Alertas() {
               width: 190,
               render: (_: any, r: any) => (
                 <Space size={0}>
-                  <Button
-                    type="text"
-                    icon={<FilePdfOutlined />}
-                    title="Abrir o alerta em PDF"
+                  <BotaoPdf
+                    emTabela
+                    texto="Abrir o alerta em PDF"
                     onClick={() =>
                       abrirPdfEmNovaAba(`/manufatura/alertas/${r.id}/pdf`)
                     }
                   />
                   {alertaEmAberto(r.status) ? (
                     <>
-                      <Button
-                        type="text"
-                        icon={<ReloadOutlined />}
-                        title="Renovar o prazo"
-                        onClick={() => {
-                          formRenovacao.resetFields();
-                          setRenovando(r);
-                        }}
-                      />
-                      <Button
-                        type="text"
-                        icon={<CheckCircleOutlined />}
-                        title="Encerrar o alerta"
-                        onClick={() => {
-                          formEncerramento.resetFields();
-                          formEncerramento.setFieldsValue({
-                            data: dayjs().format('YYYY-MM-DD'),
-                          });
-                          setEncerrando(r);
-                        }}
-                      />
-                      <Button
-                        type="text"
-                        icon={<EditOutlined />}
+                      <Tooltip title="Renovar o prazo">
+                        <Button
+                          type="text"
+                          icon={<ReloadOutlined />}
+                          onClick={() => {
+                            formRenovacao.resetFields();
+                            setRenovando(r);
+                          }}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Encerrar o alerta">
+                        <Button
+                          type="text"
+                          icon={<CheckCircleOutlined />}
+                          onClick={() => {
+                            formEncerramento.resetFields();
+                            formEncerramento.setFieldsValue({
+                              data: dayjs().format('YYYY-MM-DD'),
+                            });
+                            setEncerrando(r);
+                          }}
+                        />
+                      </Tooltip>
+                      <BotaoEditar
+                        emTabela
+                        motivo="Corrigir o alerta"
                         onClick={() => abrir(r)}
                       />
                     </>
                   ) : (
-                    <Button
-                      type="text"
-                      icon={<ReloadOutlined />}
-                      title="Reabrir o alerta"
-                      onClick={() => reabrir(r.id)}
-                    />
+                    <Tooltip title="Reabrir o alerta">
+                      <Button
+                        type="text"
+                        icon={<ReloadOutlined />}
+                        onClick={() => reabrir(r.id)}
+                      />
+                    </Tooltip>
                   )}
-                  <Popconfirm
-                    title="Excluir este alerta?"
-                    okText="Excluir"
-                    cancelText="Cancelar"
+                  <BotaoExcluir
+                    emTabela
+                    motivo="Excluir o alerta"
+                    titulo={`Excluir o alerta ${r.numero}?`}
+                    descricao="A exclusão é definitiva e não pode ser desfeita."
                     onConfirm={() => remover(r.id)}
-                  >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>
+                  />
                 </Space>
               ),
             },
@@ -581,14 +580,11 @@ export default function Alertas() {
         width={860}
         footer={
           <Space>
-            <Button
-              icon={<FilePdfOutlined />}
+            <BotaoPdf
               onClick={() =>
                 abrirPdfEmNovaAba(`/manufatura/alertas/${detalhe.id}/pdf`)
               }
-            >
-              Abrir PDF
-            </Button>
+            />
             <Button onClick={() => setDetalhe(null)}>Fechar</Button>
           </Space>
         }

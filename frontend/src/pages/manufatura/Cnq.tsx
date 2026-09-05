@@ -8,21 +8,15 @@ import {
   Input,
   InputNumber,
   Modal,
-  Popconfirm,
   Row,
   Select,
   Space,
   Statistic,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  FileTextOutlined,
-  FilePdfOutlined,
-  PlusOutlined,
-} from '@ant-design/icons';
+import { FileTextOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +31,7 @@ import {
   useValorTotal,
 } from '../../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 
 // Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da planilha.
 // Total = quantidade x valor unitario, mas pode ser digitado a mao quando o
@@ -218,7 +213,7 @@ export default function Cnq() {
               onChange={(e) => trocarData('ate', e.target.value)}
             />
           </Col>
-          <Col xs={24} sm={12} lg={7}>
+          <Col xs={24} sm={12} lg={11}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Máquina / linha
             </Typography.Text>
@@ -235,23 +230,6 @@ export default function Cnq() {
                 label: `${m.codigo} — ${m.nome}`,
               }))}
             />
-          </Col>
-          <Col xs={24} lg={4}>
-            <Button
-              block
-              icon={<FilePdfOutlined />}
-              onClick={() =>
-                abrirPdfEmNovaAba(
-                  `/manufatura/cnq/pdf?${new URLSearchParams(
-                    Object.entries(filtro)
-                      .filter(([, v]) => v !== undefined && v !== '')
-                      .map(([k, v]) => [k, String(v)]),
-                  ).toString()}`,
-                )
-              }
-            >
-              Exportar PDF
-            </Button>
           </Col>
         </Row>
       </Card>
@@ -276,10 +254,30 @@ export default function Cnq() {
 
       <Card
         title="Custo da Não Qualidade (CNQ)"
+        /* O PDF sai do filtro e vem para as acoes da tela, onde ele fica em
+           todos os outros modulos. O que ele exporta continua sendo o que o
+           filtro acima esta mostrando. */
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-            Novo lançamento
-          </Button>
+          <Space wrap>
+            <BotaoPdf
+              onClick={() =>
+                abrirPdfEmNovaAba(
+                  `/manufatura/cnq/pdf?${new URLSearchParams(
+                    Object.entries(filtro)
+                      .filter(([, v]) => v !== undefined && v !== '')
+                      .map(([k, v]) => [k, String(v)]),
+                  ).toString()}`,
+                )
+              }
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => abrir()}
+            >
+              Novo lançamento
+            </Button>
+          </Space>
         }
       >
         <Tabela
@@ -376,25 +374,22 @@ export default function Cnq() {
                         navigate(`/manufatura/8d?cnqId=${r.id}&tipo=${key}`),
                     }}
                   >
-                    <Button
-                      type="text"
-                      icon={<FileTextOutlined />}
-                      title="Abrir 8D ou 5G a partir deste CNQ"
-                    />
+                    <Tooltip title="Abrir 8D ou 5G a partir deste CNQ">
+                      <Button type="text" icon={<FileTextOutlined />} />
+                    </Tooltip>
                   </Dropdown>
-                  <Button
-                    type="text"
-                    icon={<EditOutlined />}
+                  <BotaoEditar
+                    emTabela
+                    motivo="Corrigir este lançamento"
                     onClick={() => abrir(r)}
                   />
-                  <Popconfirm
-                    title="Excluir este lançamento?"
-                    okText="Excluir"
-                    cancelText="Cancelar"
+                  <BotaoExcluir
+                    emTabela
+                    motivo="Excluir este lançamento"
+                    titulo={`Excluir o lançamento ${r.numero}?`}
+                    descricao="O valor sai do CNQ do período. A exclusão é definitiva."
                     onConfirm={() => remover(r.id)}
-                  >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>
+                  />
                 </Space>
               ),
             },

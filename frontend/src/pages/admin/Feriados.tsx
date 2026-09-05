@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
 import Tabela from '../../components/Tabela';
+import { BotaoExcluir } from '../../design/acoes';
 
 /**
  * Calendário de feriados — o relógio de dias úteis do sistema inteiro.
@@ -114,23 +115,11 @@ export default function Feriados() {
   const excluir = useMutation({
     mutationFn: async (f: Feriado) => api.delete(`/feriados/${f.id}`),
     onSuccess: () => {
-      message.success('Feriado removido.');
+      message.success('Feriado excluído.');
       invalidar();
     },
-    onError: () => message.error('Não foi possível remover o feriado.'),
+    onError: () => message.error('Não foi possível excluir o feriado.'),
   });
-
-  function confirmarExclusao(f: Feriado) {
-    Modal.confirm({
-      title: `Remover ${dataBR(f.data)} — ${f.descricao}?`,
-      content:
-        'O dia volta a contar como dia útil nos prazos calculados daqui para a frente. Registros já gravados não mudam.',
-      okText: 'Remover',
-      okButtonProps: { danger: true },
-      cancelText: 'Cancelar',
-      onOk: () => excluir.mutateAsync(f),
-    });
-  }
 
   const lista = data ?? [];
   // Feriado que cai no fim de semana não tira dia útil de ninguém: fica na
@@ -236,9 +225,13 @@ export default function Feriados() {
             title: 'Ações',
             width: 100,
             render: (_: any, f: Feriado) => (
-              <Button size="small" danger onClick={() => confirmarExclusao(f)}>
-                Remover
-              </Button>
+              <BotaoExcluir
+                emTabela
+                motivo="Excluir este dia do calendário"
+                titulo={`Excluir ${dataBR(f.data)} — ${f.descricao}?`}
+                descricao="O dia volta a contar como dia útil nos prazos calculados daqui para a frente. Registros já gravados não mudam."
+                onConfirm={() => excluir.mutateAsync(f)}
+              />
             ),
           },
         ]}

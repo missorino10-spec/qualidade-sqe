@@ -44,6 +44,29 @@ export const COR = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Etiquetas de situacao — a mesma cor para o mesmo estagio, no sistema inteiro.
+//
+// Cada modulo nasceu com o seu proprio mapa de cores: "Em andamento" era azul
+// no 8D, laranja na RNC e processing no R.O. Quem le tres telas seguidas
+// aprende tres codigos de cor diferentes. Aqui existe um so: o modulo escolhe
+// em qual ESTAGIO o seu status se encaixa, nunca a cor direto.
+// ---------------------------------------------------------------------------
+export const TAG = {
+  /** Ainda nao comecou, cancelado, nao se aplica. Sem carga de julgamento. */
+  neutro: 'default',
+  /** Em andamento, em analise, aguardando terceiro. Esta correndo. */
+  andamento: 'blue',
+  /** Concluido, finalizado, aprovado, encerrado no prazo. */
+  sucesso: 'green',
+  /** Aprovado com ressalva, renovado, parcial. Passou, mas com observacao. */
+  ressalva: 'gold',
+  /** Pendente de acao nossa, prazo se aproximando. Cobra atitude. */
+  pendencia: 'orange',
+  /** Reprovado, atrasado, vencido, reaberto. */
+  critico: 'red',
+} as const;
+
+// ---------------------------------------------------------------------------
 // Texto — hierarquia de leitura. Tres niveis bastam.
 // ---------------------------------------------------------------------------
 export const TEXTO = {

@@ -40,6 +40,23 @@ export const ROTULO_MODULO: Record<Modulo, string> = {
   CAD_INSTRUMENTOS: 'Cadastros › Instrumentos',
 };
 
+/**
+ * O mesmo modulo, dito em uma palavra. E o que cabe numa linha de tabela:
+ * "QUALIDADE - MANUFATURA" e "Cadastros › Fornecedores" empilhados quebravam
+ * a coluna de acessos em quatro linhas por colaborador. O rotulo por extenso
+ * continua valendo dentro da ficha, onde ha espaco para ele.
+ */
+export const ROTULO_MODULO_CURTO: Record<Modulo, string> = {
+  SQE: 'SQE',
+  MANUFATURA: 'Manufatura',
+  SQD: 'SQD',
+  RO: 'R.O',
+  CAD_FORNECEDORES: 'Fornecedores',
+  CAD_ITENS: 'Itens',
+  CAD_MAQUINAS: 'Máquinas',
+  CAD_INSTRUMENTOS: 'Instrumentos',
+};
+
 // Ordem em que a tela de acessos e o menu mostram os modulos.
 export const MODULOS: Modulo[] = [
   'SQE',

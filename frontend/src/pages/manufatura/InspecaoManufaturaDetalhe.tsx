@@ -6,7 +6,6 @@ import {
   Dropdown,
   Form,
   Modal,
-  Popconfirm,
   Space,
   Spin,
   Tag,
@@ -14,10 +13,7 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   DeleteOutlined,
-  EditOutlined,
-  FilePdfOutlined,
   FileTextOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
@@ -49,6 +45,8 @@ import {
 } from './FormularioDimensional';
 import Tabela from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 import { COR } from '../../design/tokens';
 
 // Detalhe da inspecao da Manufatura: mostra TODAS as tentativas (1a inspecao e
@@ -107,9 +105,10 @@ function Tentativa({
               Descartar rascunho
             </Button>
           )}
-          <Button icon={<EditOutlined />} onClick={() => onCorrigir(rel)}>
-            {rel.rascunho ? 'Continuar rascunho' : 'Corrigir'}
-          </Button>
+          <BotaoEditar
+            onClick={() => onCorrigir(rel)}
+            texto={rel.rascunho ? 'Continuar rascunho' : 'Corrigir'}
+          />
         </Space>
       }
     >
@@ -506,33 +505,21 @@ export default function InspecaoManufaturaDetalhe() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card
-        title={
-          <Space wrap>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {data.tipo === 'SETUP' ? 'Inspeção de setup' : 'Inspeção de produção'}{' '}
-              {data.numero}
-            </Typography.Title>
-            <Tag color={corStatusInspecao[data.status]}>
-              {labelStatusInspecao[data.status] ?? data.status}
-            </Tag>
-          </Space>
+      <CabecalhoDetalhe
+        voltar={() => navigate(rotaLista)}
+        titulo={`${
+          data.tipo === 'SETUP' ? 'Inspeção de setup' : 'Inspeção de produção'
+        } ${data.numero}`}
+        etiqueta={
+          <Tag color={corStatusInspecao[data.status]}>
+            {labelStatusInspecao[data.status] ?? data.status}
+          </Tag>
         }
-        extra={
-          <Space wrap>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(rotaLista)}>
-              Voltar
-            </Button>
-            {podeReinspecionar && (
-              <Button
-                type="primary"
-                danger
-                icon={<ReloadOutlined />}
-                onClick={abrirReinspecao}
-              >
-                Nova reinspeção
-              </Button>
-            )}
+        acoes={
+          <>
+            <BotaoPdf
+              onClick={() => abrirPdfEmNovaAba(`/manufatura/inspecoes/${id}/pdf`)}
+            />
             {/* Nem toda reprovacao vira 8D: a maioria e resolvida com o 5G. */}
             <Dropdown
               trigger={['click']}
@@ -547,27 +534,26 @@ export default function InspecaoManufaturaDetalhe() {
             >
               <Button icon={<FileTextOutlined />}>Abrir 8D / 5G</Button>
             </Dropdown>
-            <Popconfirm
-              title="Excluir esta inspeção?"
-              description="As reinspeções também serão excluídas."
-              okText="Excluir"
-              cancelText="Cancelar"
-              onConfirm={remover}
-            >
-              <Button danger icon={<DeleteOutlined />}>
-                Excluir
+            {podeReinspecionar && (
+              <Button
+                type="primary"
+                danger
+                icon={<ReloadOutlined />}
+                onClick={abrirReinspecao}
+              >
+                Nova reinspeção
               </Button>
-            </Popconfirm>
-            <Button
-              type="primary"
-              icon={<FilePdfOutlined />}
-              onClick={() => abrirPdfEmNovaAba(`/manufatura/inspecoes/${id}/pdf`)}
-            >
-              Exportar PDF
-            </Button>
-          </Space>
+            )}
+            <BotaoExcluir
+              titulo={`Excluir a inspeção ${data.numero}?`}
+              descricao="As reinspeções presas a ela também serão excluídas. A exclusão é definitiva."
+              onConfirm={remover}
+            />
+          </>
         }
-      >
+      />
+
+      <Card>
         <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }}>
           <Descriptions.Item label="Máquina" span={2}>
             {data.maquina

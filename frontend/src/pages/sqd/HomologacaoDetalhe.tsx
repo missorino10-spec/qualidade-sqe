@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   Descriptions,
+  Dropdown,
   Form,
   Input,
   Modal,
@@ -19,10 +20,7 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
   FileTextOutlined,
   FilePdfOutlined,
   FormOutlined,
@@ -55,6 +53,8 @@ import {
 } from './comum';
 import Tabela from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 
 const TIPO_RELATORIO = 'HOMOLOGACAO_RELATORIO';
 const TIPO_PLANO = 'HOMOLOGACAO_PLANO_ACAO';
@@ -298,114 +298,110 @@ export default function HomologacaoDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Space wrap>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/sqd/homologacoes')}
-          >
-            Voltar
-          </Button>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            Homologação {h.numero}
-          </Typography.Title>
-          {avaliado ? (
-            <Tag color={corResultado[h.resultado]}>
-              {labelResultado[h.resultado]}
-            </Tag>
-          ) : (
-            aguardando && <Tag>Aguardando retorno do fornecedor</Tag>
-          )}
-          <Tag color={corStatusHomologacao[h.statusHomologacao]}>
-            {labelStatusHomologacao[h.statusHomologacao]}
-          </Tag>
-        </Space>
-        <Space wrap>
-          <Button
-            icon={<FilePdfOutlined />}
-            onClick={() => abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/pdf`)}
-          >
-            PDF do registro
-          </Button>
-          {avaliado && (
-            <Button
-              icon={<FilePdfOutlined />}
-              onClick={() =>
-                abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/autoavaliacao/pdf`)
-              }
-            >
-              PDF da autoavaliação
-            </Button>
-          )}
-          {podeEditar && (
-            <>
-            <Button
-              type={avaliado ? 'default' : 'primary'}
-              icon={<FormOutlined />}
-              onClick={abrirAvaliacao}
-            >
-              {avaliado
-                ? 'Editar autoavaliação'
-                : 'Lançar autoavaliação do fornecedor'}
-            </Button>
-            <Button
-              icon={<EditOutlined />}
-              onClick={abrirRegistro}
-            >
-              Editar registro
-            </Button>
-            {/* A trava do ciclo: salvar o registro nunca e bloqueado, mas
-                encerrar so passa com tudo o que a planilha pede. */}
-            {finalizado ? (
-              <Button
-                icon={<UndoOutlined />}
-                loading={reabrir.isPending}
-                onClick={() =>
-                  Modal.confirm({
-                    title: `Reabrir a homologação ${h.numero}?`,
-                    content:
-                      'A data de finalização e o tempo total do ciclo serão apagados, e o registro volta para "Em andamento".',
-                    okText: 'Reabrir',
-                    cancelText: 'Cancelar',
-                    onOk: () => reabrir.mutateAsync(),
-                  })
-                }
-              >
-                Reabrir homologação
-              </Button>
+      <CabecalhoDetalhe
+        voltar={() => navigate('/sqd/homologacoes')}
+        titulo={`Homologação ${h.numero}`}
+        etiqueta={
+          <>
+            {avaliado ? (
+              <Tag color={corResultado[h.resultado]}>
+                {labelResultado[h.resultado]}
+              </Tag>
             ) : (
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                loading={finalizar.isPending}
-                disabled={h.statusHomologacao === 'CANCELADO'}
-                onClick={() => finalizar.mutate()}
-              >
-                Finalizar homologação
-              </Button>
+              aguardando && <Tag>Aguardando retorno do fornecedor</Tag>
             )}
-            <Button
-              icon={<DeleteOutlined />}
-              danger
-              loading={remover.isPending}
-              onClick={() =>
-                Modal.confirm({
-                  title: `Excluir a homologação ${h.numero}?`,
-                  content:
-                    'A autoavaliação, o resultado e os anexos serão apagados.',
-                  okText: 'Excluir',
-                  okButtonProps: { danger: true },
-                  cancelText: 'Cancelar',
-                  onOk: () => remover.mutateAsync(),
-                })
-              }
-            >
-              Excluir
-            </Button>
-            </>
-          )}
-        </Space>
-      </Row>
+            <Tag color={corStatusHomologacao[h.statusHomologacao]}>
+              {labelStatusHomologacao[h.statusHomologacao]}
+            </Tag>
+          </>
+        }
+        acoes={
+          <>
+            {/* Sao dois documentos diferentes; um menu so evita dois botoes de
+                PDF disputando espaco no cabecalho. */}
+            {avaliado ? (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    {
+                      key: 'registro',
+                      label: 'Registro da homologação',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/pdf`),
+                    },
+                    {
+                      key: 'autoavaliacao',
+                      label: 'Autoavaliação do fornecedor',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(
+                          `/sqd/homologacoes/${id}/autoavaliacao/pdf`,
+                        ),
+                    },
+                  ],
+                }}
+              >
+                <Button icon={<FilePdfOutlined />}>Exportar PDF</Button>
+              </Dropdown>
+            ) : (
+              <BotaoPdf
+                onClick={() => abrirPdfEmNovaAba(`/sqd/homologacoes/${id}/pdf`)}
+              />
+            )}
+            {podeEditar && (
+              <>
+                <BotaoEditar onClick={abrirRegistro} texto="Editar registro" />
+                {/* Preencher formulario em branco e outro gesto: continua com o
+                    icone de formulario, nao com o lapis de correcao. */}
+                <Button
+                  type={avaliado ? 'default' : 'primary'}
+                  icon={<FormOutlined />}
+                  onClick={abrirAvaliacao}
+                >
+                  {avaliado
+                    ? 'Editar autoavaliação'
+                    : 'Lançar autoavaliação do fornecedor'}
+                </Button>
+                {/* A trava do ciclo: salvar o registro nunca e bloqueado, mas
+                    encerrar so passa com tudo o que a planilha pede. */}
+                {finalizado ? (
+                  <Button
+                    icon={<UndoOutlined />}
+                    loading={reabrir.isPending}
+                    onClick={() =>
+                      Modal.confirm({
+                        title: `Reabrir a homologação ${h.numero}?`,
+                        content:
+                          'A data de finalização e o tempo total do ciclo serão apagados, e o registro volta para "Em andamento".',
+                        okText: 'Reabrir',
+                        cancelText: 'Cancelar',
+                        onOk: () => reabrir.mutateAsync(),
+                      })
+                    }
+                  >
+                    Reabrir homologação
+                  </Button>
+                ) : (
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    loading={finalizar.isPending}
+                    disabled={h.statusHomologacao === 'CANCELADO'}
+                    onClick={() => finalizar.mutate()}
+                  >
+                    Finalizar homologação
+                  </Button>
+                )}
+                <BotaoExcluir
+                  titulo={`Excluir a homologação ${h.numero}?`}
+                  descricao="A autoavaliação, o resultado e os anexos serão apagados."
+                  onConfirm={() => remover.mutateAsync()}
+                />
+              </>
+            )}
+          </>
+        }
+      />
 
       {aguardando && (
         <Alert

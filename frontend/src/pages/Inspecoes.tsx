@@ -61,17 +61,17 @@ import Tabela from '../components/Tabela';
 import { CamposItem } from '../components/CamposItem';
 import { TIPOS_DESVIO } from '../tipo-desvio';
 import { numeroBR } from '../formatos';
-import { COR } from '../design/tokens';
+import { COR, TAG } from '../design/tokens';
 
 type StatusItem = 'APROVADO' | 'REPROVADO' | 'NAO_APLICAVEL';
 
 // Desvio encerrado sem RNC nao tem status proprio: o recebimento passou, entao
 // a linha sai como Aprovado. O desvio esta registrado dentro do relatorio.
 const corResultado: Record<string, string> = {
-  APROVADO: 'green',
-  REPROVADO: 'red',
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
   // Rascunho nao e veredito: e trabalho pela metade esperando alguem terminar.
-  RASCUNHO: 'orange',
+  RASCUNHO: TAG.pendencia,
 };
 
 const labelResultado: Record<string, string> = {
@@ -929,7 +929,7 @@ export default function Inspecoes() {
       title: `Excluir a inspeção ${r.numeroInspecao ?? ''}?`,
       icon: <DeleteOutlined style={{ color: COR.critico }} />,
       content:
-        'Todos os formulários desta inspeção serão removidos. A remoção é permanente e não pode ser desfeita.',
+        'Todos os formulários desta inspeção serão apagados. A exclusão é permanente e não pode ser desfeita.',
       okText: 'Excluir',
       okButtonProps: { danger: true },
       cancelText: 'Cancelar',

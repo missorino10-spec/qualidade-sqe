@@ -3,10 +3,14 @@
 // Espelho de backend/src/comum/alerta.ts: mudou aqui, muda la.
 // ---------------------------------------------------------------------------
 
+import { TAG } from './design/tokens';
+
+// As cores saem da escala unica do sistema (design/tokens): aberto e um alerta
+// correndo, renovado passou com ressalva e encerrado e o fim de linha.
 export const STATUS_ALERTA = [
-  { value: 'ABERTO', label: 'Aberto', cor: 'blue' },
-  { value: 'RENOVADO', label: 'Renovado', cor: 'gold' },
-  { value: 'ENCERRADO', label: 'Encerrado', cor: 'green' },
+  { value: 'ABERTO', label: 'Aberto', cor: TAG.andamento },
+  { value: 'RENOVADO', label: 'Renovado', cor: TAG.ressalva },
+  { value: 'ENCERRADO', label: 'Encerrado', cor: TAG.sucesso },
 ] as const;
 
 export const labelStatusAlerta: Record<string, string> = Object.fromEntries(
@@ -56,11 +60,11 @@ export function situacaoAlerta(alerta: {
   status?: string | null;
   prazo?: string | Date | null;
 }): { texto: string; cor: string } {
-  if (alertaVencido(alerta)) return { texto: 'Vencido', cor: 'red' };
+  if (alertaVencido(alerta)) return { texto: 'Vencido', cor: TAG.critico };
   const status = alerta.status ?? 'ABERTO';
   return {
     texto: labelStatusAlerta[status] ?? status,
-    cor: corStatusAlerta[status] ?? 'default',
+    cor: corStatusAlerta[status] ?? TAG.neutro,
   };
 }
 

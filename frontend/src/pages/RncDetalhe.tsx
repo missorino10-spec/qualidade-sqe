@@ -6,6 +6,7 @@ import {
   Col,
   DatePicker,
   Descriptions,
+  Dropdown,
   Form,
   Image,
   Input,
@@ -23,12 +24,11 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   AuditOutlined,
   CheckCircleOutlined,
+  EllipsisOutlined,
   FilePdfOutlined,
   UploadOutlined,
-  EditOutlined,
   StopOutlined,
   DeleteOutlined,
   ReloadOutlined,
@@ -50,7 +50,9 @@ import {
   useValorTotal,
 } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
-import { COR, TEXTO } from '../design/tokens';
+import { CabecalhoDetalhe } from '../design/painel';
+import { BotaoEditar, BotaoPdf, confirmarExclusao } from '../design/acoes';
+import { COR, TAG, TEXTO } from '../design/tokens';
 
 const CAMPOS_VALOR = {
   quantidade: 'quantidadePecas',
@@ -67,10 +69,10 @@ const labelEficacia: Record<string, string> = {
   NAO_APLICAVEL: 'Não se aplica',
 };
 const corEficacia: Record<string, string> = {
-  PENDENTE: 'default',
-  APROVADO: 'green',
-  REPROVADO: 'red',
-  NAO_APLICAVEL: 'default',
+  PENDENTE: TAG.pendencia,
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
+  NAO_APLICAVEL: TAG.neutro,
 };
 // Usadas no modal de edicao e no da verificacao de eficacia - a eficacia pode
 // ser registrada nos dois lugares, entao as opcoes precisam ser as mesmas.
@@ -352,11 +354,10 @@ export default function RncDetalhe() {
     Array.isArray(rnc.inspecaoLote?.cotas) ? rnc.inspecaoLote.cotas : []
   ).filter((c: any) => c?.conforme === false);
 
-  function confirmarExclusao() {
-    Modal.confirm({
-      title: `Excluir a RNC ${rnc.numero}?`,
-      icon: <DeleteOutlined style={{ color: COR.critico }} />,
-      content: inspecaoVinculada ? (
+  function pedirExclusao() {
+    confirmarExclusao({
+      titulo: `Excluir a RNC ${rnc.numero}?`,
+      descricao: inspecaoVinculada ? (
         <div>
           <p>Esta RNC foi gerada por uma inspeção {tipoInspVinc} (#
           {inspecaoVinculada.id}). A exclusão remove <strong>apenas a RNC</strong>
@@ -367,11 +368,8 @@ export default function RncDetalhe() {
           </p>
         </div>
       ) : (
-        'A remoção é permanente e não pode ser desfeita.'
+        'A exclusão é permanente e não pode ser desfeita.'
       ),
-      okText: 'Excluir RNC',
-      okButtonProps: { danger: true },
-      cancelText: 'Cancelar',
       onOk: () => remover.mutateAsync(),
     });
   }
@@ -416,68 +414,31 @@ export default function RncDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/rnc')}>
-            Voltar
-          </Button>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            RNC {rnc.numero}
-          </Typography.Title>
+      {/* Sete botoes lado a lado nao cabiam: o cabecalho quebrava de linha e os
+          botoes colavam no titulo. Ficam a vista as tres acoes do dia a dia -
+          PDF, Editar e a acao principal do momento; o resto vai para o menu,
+          que e onde se procura o que se usa uma vez por RNC. */}
+      <CabecalhoDetalhe
+        voltar={() => navigate('/rnc')}
+        titulo={rnc.numero}
+        etiqueta={
           <Tag color={corStatusRnc[rnc.status]}>
             {labelStatusRnc[rnc.status]}
           </Tag>
-        </Space>
-        <Space wrap>
-          <Button
-            icon={<FilePdfOutlined />}
-            onClick={() => abrirPdfEmNovaAba(`/rnc/${id}/pdf`)}
-          >
-            Exportar PDF
-          </Button>
-          <Button icon={<EditOutlined />} onClick={abrirEdicao}>
-            Editar
-          </Button>
-          {/* A verificacao de eficacia tem botao proprio: ela costuma vir
-              depois do encerramento, no lote seguinte. */}
-          {!cancelada && (
-            <Button
-              icon={<AuditOutlined />}
-              onClick={() => {
-                formEficacia.setFieldsValue({
-                  verificacaoEficacia: rnc.verificacaoEficacia ?? 'PENDENTE',
-                  dataVerificacao: rnc.dataVerificacao
-                    ? dayjs(rnc.dataVerificacao)
-                    : undefined,
-                  evidencias: rnc.evidencias ?? undefined,
-                  comentario: undefined,
-                });
-                setEficaciaOpen(true);
-              }}
-            >
-              Verificar eficácia
-            </Button>
-          )}
-          {finalizada || cancelada ? (
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => reabrir.mutate()}
-              loading={reabrir.isPending}
-            >
-              Reabrir
-            </Button>
-          ) : (
-            <>
+        }
+        acoes={
+          <>
+            <BotaoPdf onClick={() => abrirPdfEmNovaAba(`/rnc/${id}/pdf`)} />
+            <BotaoEditar onClick={abrirEdicao} />
+            {finalizada || cancelada ? (
               <Button
-                icon={<StopOutlined />}
-                danger
-                onClick={() => {
-                  formCancelar.resetFields();
-                  setCancelarOpen(true);
-                }}
+                icon={<ReloadOutlined />}
+                onClick={() => reabrir.mutate()}
+                loading={reabrir.isPending}
               >
-                Cancelar RNC
+                Reabrir
               </Button>
+            ) : (
               <Button
                 type="primary"
                 icon={<CheckCircleOutlined />}
@@ -495,20 +456,68 @@ export default function RncDetalhe() {
               >
                 Encerrar RNC
               </Button>
-            </>
-          )}
-          {isAdmin && (
-            <Button
-              icon={<DeleteOutlined />}
-              danger
-              onClick={confirmarExclusao}
-              loading={remover.isPending}
+            )}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  // A verificacao de eficacia costuma vir depois do
+                  // encerramento, no lote seguinte - por isso sobrevive ao
+                  // encerramento e so some quando a RNC e cancelada.
+                  ...(cancelada
+                    ? []
+                    : [
+                        {
+                          key: 'eficacia',
+                          icon: <AuditOutlined />,
+                          label: 'Verificar eficácia',
+                          onClick: () => {
+                            formEficacia.setFieldsValue({
+                              verificacaoEficacia:
+                                rnc.verificacaoEficacia ?? 'PENDENTE',
+                              dataVerificacao: rnc.dataVerificacao
+                                ? dayjs(rnc.dataVerificacao)
+                                : undefined,
+                              evidencias: rnc.evidencias ?? undefined,
+                              comentario: undefined,
+                            });
+                            setEficaciaOpen(true);
+                          },
+                        },
+                      ]),
+                  ...(finalizada || cancelada
+                    ? []
+                    : [
+                        {
+                          key: 'cancelar',
+                          icon: <StopOutlined />,
+                          danger: true,
+                          label: 'Cancelar RNC',
+                          onClick: () => {
+                            formCancelar.resetFields();
+                            setCancelarOpen(true);
+                          },
+                        },
+                      ]),
+                  ...(isAdmin
+                    ? [
+                        {
+                          key: 'excluir',
+                          icon: <DeleteOutlined />,
+                          danger: true,
+                          label: 'Excluir',
+                          onClick: pedirExclusao,
+                        },
+                      ]
+                    : []),
+                ],
+              }}
             >
-              Excluir
-            </Button>
-          )}
-        </Space>
-      </Row>
+              <Button icon={<EllipsisOutlined />}>Mais ações</Button>
+            </Dropdown>
+          </>
+        }
+      />
 
       {cancelada && rnc.motivoCancelamento && (
         <Alert

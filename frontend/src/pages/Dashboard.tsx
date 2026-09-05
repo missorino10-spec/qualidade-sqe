@@ -97,7 +97,7 @@ export default function Dashboard() {
   const podeAdmin =
     usuario?.papel === 'ADMIN' || usuario?.papel === 'QUALIDADE';
 
-  // Os nove indicadores do painel, na ordem e com os nomes definidos pela
+  // Os indicadores do painel, na ordem e com os nomes definidos pela
   // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
   const indicadores: Indicador[] = [
     {
@@ -128,14 +128,6 @@ export default function Dashboard() {
       casas: 2,
       cor: MARCA.laranja,
       rodape: `${base.rncsTotal ?? 0} bloqueio(s) no período`,
-    },
-    {
-      titulo: 'Abertura tempestiva de RNCs',
-      metrica: `RNCs abertas dentro do prazo ÷ desvios que exigem RNC × 100. Prazo: ${prazos.aberturaRncDiasUteis ?? 1} dia útil da identificação do desvio.`,
-      valor: ind.pctAberturaTempestiva,
-      sufixo: '%',
-      icone: <FieldTimeOutlined />,
-      rodape: `${base.aberturasNoPrazo ?? 0} de ${base.cargasComDesvio ?? 0} desvios`,
     },
     {
       titulo: 'Planos de ação de RNC no prazo',

@@ -16,7 +16,9 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, FilePdfOutlined, SaveOutlined } from '@ant-design/icons';
+import { SaveOutlined } from '@ant-design/icons';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoPdf } from '../../design/acoes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -166,33 +168,17 @@ export default function ControleAutonomoDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle" gutter={[12, 12]}>
-        <Col>
-          <Space>
-            <Button
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/manufatura/controle-autonomo')}
-            >
-              Voltar
-            </Button>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {novo
-                ? 'Nova auditoria ICAQ'
-                : `ICAQ ${reg?.numero ?? ''}`}
-            </Typography.Title>
-          </Space>
-        </Col>
-        <Col>
-          <Space>
+      <CabecalhoDetalhe
+        voltar={() => navigate('/manufatura/controle-autonomo')}
+        titulo={novo ? 'Nova auditoria ICAQ' : `ICAQ ${reg?.numero ?? ''}`}
+        acoes={
+          <>
             {!novo && (
-              <Button
-                icon={<FilePdfOutlined />}
+              <BotaoPdf
                 onClick={() =>
                   abrirPdfEmNovaAba(`/manufatura/controle-autonomo/${id}/pdf`)
                 }
-              >
-                PDF
-              </Button>
+              />
             )}
             <Button
               type="primary"
@@ -202,9 +188,9 @@ export default function ControleAutonomoDetalhe() {
             >
               {novo ? 'Lançar auditoria' : 'Salvar'}
             </Button>
-          </Space>
-        </Col>
-      </Row>
+          </>
+        }
+      />
 
       <Card title="Identificação">
         <AssinaturaDoLogin rotulo="Auditor da Qualidade" />

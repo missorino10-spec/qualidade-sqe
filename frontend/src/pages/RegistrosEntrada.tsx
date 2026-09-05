@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Col,
+  DatePicker,
   Descriptions,
   Form,
   Input,
@@ -19,11 +20,11 @@ import {
 } from 'antd';
 import { PlusOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
-import { dataBR } from '../formatos';
+import { dataBR, numeroBR } from '../formatos';
 import { semanaAno } from '../semana';
 import Tabela from '../components/Tabela';
 import { SelectItem } from '../components/CamposItem';
@@ -31,7 +32,9 @@ import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
-import { COR } from '../design/tokens';
+import { CabecalhoPagina } from '../design/painel';
+import { BotaoEditar, BotaoExcluir } from '../design/acoes';
+import { COR, TAG } from '../design/tokens';
 
 // Registro de Entrada - a chegada da carga, ponto de partida do SQE.
 //
@@ -50,11 +53,25 @@ const labelSituacao: Record<string, string> = {
 };
 
 const corSituacao: Record<string, string> = {
-  FORA_DO_CICLO: 'default',
-  INSPECAO_PENDENTE: 'orange',
-  INSPECAO_REALIZADA: 'blue',
-  INSPECAO_EXTRA: 'volcano',
+  FORA_DO_CICLO: TAG.neutro,
+  INSPECAO_PENDENTE: TAG.pendencia,
+  INSPECAO_REALIZADA: TAG.sucesso,
+  // Aconteceu, mas fora do plano: e uma ressalva, nao um curso normal.
+  INSPECAO_EXTRA: TAG.ressalva,
 };
+
+// A exclusao mexe no contador do ciclo do fornecedor. A confirmacao diz isso
+// em portugues antes de o inspetor clicar, em vez de um "tem certeza?" seco.
+function descricaoExclusao(r: any) {
+  return (
+    <>
+      Entrada de <strong>{r.fornecedor?.nome}</strong> em{' '}
+      {dataBR(r.dataEntrega)}
+      {r.notaFiscal ? ` (NF ${r.notaFiscal})` : ''}. O contador de entregas do
+      fornecedor volta atrás, como se esta carga nunca tivesse chegado.
+    </>
+  );
+}
 
 export default function RegistrosEntrada() {
   const qc = useQueryClient();
@@ -63,6 +80,13 @@ export default function RegistrosEntrada() {
   const [open, setOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [fornecedorFiltro, setFornecedorFiltro] = useState<number | undefined>();
+
+  // Ficha da entrada ja registrada: abre no clique da linha para conferir o que
+  // foi digitado, e e de la que saem a correcao e a exclusao.
+  const [ficha, setFicha] = useState<any | null>(null);
+  const [formEditar] = Form.useForm();
+  const [editando, setEditando] = useState<any | null>(null);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   // Cadastro pontual do fornecedor que ainda nao esta na base.
   const [openFornecedor, setOpenFornecedor] = useState(false);
@@ -162,6 +186,61 @@ export default function RegistrosEntrada() {
     }
   }
 
+  function abrirEdicao(r: any) {
+    setEditando(r);
+    formEditar.setFieldsValue({
+      dataEntrega: r.dataEntrega ? dayjs(r.dataEntrega) : undefined,
+      itemId: r.item?.id,
+      qtdTotal: r.quantidade,
+      notaFiscal: r.notaFiscal,
+      po: r.po,
+    });
+  }
+
+  // Corrige o que foi digitado na chegada. O fornecedor nao entra: foi ele que
+  // decidiu se esta entrega seria inspecionada, e essa decisao ja esta tomada.
+  async function salvarEdicao(v: any) {
+    setSalvandoEdicao(true);
+    try {
+      await api.patch(`/registros-entrada/${editando.id}`, {
+        itemId: v.itemId ?? null,
+        qtdTotal: v.qtdTotal ?? null,
+        notaFiscal: v.notaFiscal ?? null,
+        po: v.po ?? null,
+        dataEntrega: (v.dataEntrega as Dayjs | undefined)?.toISOString(),
+      });
+      setEditando(null);
+      setFicha(null);
+      qc.invalidateQueries({ queryKey: ['registros-entrada'] });
+      qc.invalidateQueries({ queryKey: ['kpis'] });
+      message.success('Entrada corrigida.');
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível corrigir a entrada.',
+      );
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  }
+
+  // O servidor devolve 409 com o motivo quando a entrada tem inspecao ou RNC
+  // presa nela - a mensagem dele e melhor do que qualquer texto generico daqui.
+  async function excluir(r: any) {
+    try {
+      await api.delete(`/registros-entrada/${r.id}`);
+      setFicha(null);
+      qc.invalidateQueries({ queryKey: ['registros-entrada'] });
+      qc.invalidateQueries({ queryKey: ['avaliar'] });
+      qc.invalidateQueries({ queryKey: ['fornecedores'] });
+      qc.invalidateQueries({ queryKey: ['kpis'] });
+      message.success('Entrada excluída e contador do ciclo estornado.');
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message ?? 'Não foi possível excluir a entrada.',
+      );
+    }
+  }
+
   // Nasce eventual: fica fora do plano de periodicidade, mas com o cadastro
   // completo, pronto para quando for classificado.
   async function salvarFornecedorPontual(v: any) {
@@ -188,22 +267,15 @@ export default function RegistrosEntrada() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle" gutter={[12, 12]}>
-        <Col>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            Registro de Entrada
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            A chegada da carga. Fora do ciclo, encerra aqui; dentro do ciclo,
-            segue para a inspeção.
-          </Typography.Text>
-        </Col>
-        <Col>
+      <CabecalhoPagina
+        titulo="Registro de Entrada"
+        descricao="A chegada da carga. Fora do ciclo, encerra aqui; dentro do ciclo, segue para a inspeção."
+        acoes={
           <Button type="primary" icon={<PlusOutlined />} onClick={novoRegistro}>
             Nova entrada
           </Button>
-        </Col>
-      </Row>
+        }
+      />
 
       <Card size="small">
         <Form layout="vertical" style={{ marginBottom: -16 }}>
@@ -254,6 +326,10 @@ export default function RegistrosEntrada() {
         dataSource={lista}
         scroll={{ x: 'max-content' }}
         locale={{ emptyText: 'Nenhuma entrada registrada' }}
+        onRow={(r: any) => ({
+          style: { cursor: 'pointer' },
+          onClick: () => setFicha(r),
+        })}
         columns={[
           {
             title: 'Data',
@@ -304,7 +380,10 @@ export default function RegistrosEntrada() {
                   type="link"
                   size="small"
                   style={{ padding: 0 }}
-                  onClick={() => navigate(`/inspecoes/${r.id}`)}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    navigate(`/inspecoes/${r.id}`);
+                  }}
                 >
                   {v}
                 </Button>
@@ -313,7 +392,10 @@ export default function RegistrosEntrada() {
                   type="link"
                   size="small"
                   style={{ padding: 0 }}
-                  onClick={() => navigate(`/inspecoes?entrada=${r.id}`)}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    navigate(`/inspecoes?entrada=${r.id}`);
+                  }}
                 >
                   Inspecionar
                 </Button>
@@ -325,6 +407,38 @@ export default function RegistrosEntrada() {
             title: 'Registrado por',
             dataIndex: ['registradoPor', 'nome'],
             width: 160,
+          },
+          {
+            title: 'Ações',
+            key: 'acoes',
+            width: 96,
+            align: 'center',
+            fixed: 'right',
+            render: (_: any, r: any) => (
+              <Space
+                size={0}
+                onClick={(ev) => ev.stopPropagation()}
+                role="presentation"
+              >
+                <BotaoEditar
+                  emTabela
+                  motivo="Corrigir esta entrada"
+                  onClick={() => abrirEdicao(r)}
+                />
+                <BotaoExcluir
+                  emTabela
+                  disabled={!!r.numeroInspecao}
+                  motivo={
+                    r.numeroInspecao
+                      ? `A inspeção ${r.numeroInspecao} está presa nesta entrada`
+                      : 'Excluir esta entrada'
+                  }
+                  titulo="Excluir este registro de entrada?"
+                  descricao={descricaoExclusao(r)}
+                  onConfirm={() => excluir(r)}
+                />
+              </Space>
+            ),
           },
         ]}
       />
@@ -463,6 +577,212 @@ export default function RegistrosEntrada() {
             <Col span={12}>
               <Form.Item name="itemId" label="Item">
                 <SelectItem allowClear placeholder="Opcional" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="qtdTotal" label="Qtd. recebida">
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="notaFiscal" label="Nota Fiscal">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="po" label="PO">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Ficha da entrada: o que foi digitado na chegada, em leitura, com as
+          duas acoes possiveis no rodape. */}
+      <Modal
+        open={!!ficha}
+        title={
+          ficha ? (
+            <Space wrap>
+              <span>Entrada de {dataBR(ficha.dataEntrega)}</span>
+              <Tag color={corSituacao[ficha.situacao]}>
+                {labelSituacao[ficha.situacao] ?? ficha.situacao}
+              </Tag>
+            </Space>
+          ) : (
+            'Entrada'
+          )
+        }
+        onCancel={() => setFicha(null)}
+        width={720}
+        footer={
+          ficha && [
+            <BotaoExcluir
+              key="excluir"
+              disabled={!!ficha.numeroInspecao}
+              motivo={
+                ficha.numeroInspecao
+                  ? `A inspeção ${ficha.numeroInspecao} está presa nesta entrada`
+                  : undefined
+              }
+              titulo="Excluir este registro de entrada?"
+              descricao={descricaoExclusao(ficha)}
+              onConfirm={() => excluir(ficha)}
+            />,
+            <BotaoEditar
+              key="editar"
+              texto="Corrigir"
+              onClick={() => abrirEdicao(ficha)}
+            />,
+            <Button key="fechar" type="primary" onClick={() => setFicha(null)}>
+              Fechar
+            </Button>,
+          ]
+        }
+      >
+        {ficha && (
+          <Descriptions
+            size="small"
+            bordered
+            column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }}
+          >
+            <Descriptions.Item label="Fornecedor" span={2}>
+              <Space size={4} wrap>
+                <span>{ficha.fornecedor?.nome}</span>
+                {ficha.fornecedor?.eventual ? (
+                  <Tag>Eventual</Tag>
+                ) : (
+                  <Tag color="blue">
+                    {ficha.fornecedor?.classificacaoFornecimento}
+                  </Tag>
+                )}
+              </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="Data da entrada">
+              {dataBR(ficha.dataEntrega)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Semana">
+              {ficha.semana}/{ficha.ano}
+            </Descriptions.Item>
+            <Descriptions.Item label="Item" span={2}>
+              {ficha.item
+                ? `${ficha.item.codigo} — ${ficha.item.descricao}`
+                : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Qtd. recebida">
+              {ficha.quantidade != null ? numeroBR(ficha.quantidade) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Entrega no ciclo">
+              {ficha.numeroEntregaAcumulado ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Nota Fiscal">
+              {ficha.notaFiscal || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="PO">{ficha.po || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Inspeção">
+              {ficha.numeroInspecao ? (
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: 0 }}
+                  onClick={() => navigate(`/inspecoes/${ficha.id}`)}
+                >
+                  {ficha.numeroInspecao}
+                </Button>
+              ) : ficha.situacao === 'INSPECAO_PENDENTE' ? (
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: 0 }}
+                  onClick={() => navigate(`/inspecoes?entrada=${ficha.id}`)}
+                >
+                  Inspecionar
+                </Button>
+              ) : (
+                '-'
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Resultado">
+              {ficha.resultado ? (
+                <Tag
+                  color={
+                    ficha.resultado === 'REPROVADO' ? TAG.critico : TAG.sucesso
+                  }
+                >
+                  {ficha.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
+                </Tag>
+              ) : (
+                '-'
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Registrado por" span={2}>
+              {ficha.registradoPor?.nome ?? '-'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* Correcao. Sem o fornecedor: trocar o fornecedor reescreveria a decisao
+          de inspecao que ja foi tomada na chegada. */}
+      <Modal
+        open={!!editando}
+        title="Corrigir entrada"
+        onCancel={() => setEditando(null)}
+        onOk={() => formEditar.submit()}
+        confirmLoading={salvandoEdicao}
+        okText="Salvar"
+        cancelText="Cancelar"
+        width={720}
+      >
+        <Form form={formEditar} layout="vertical" onFinish={salvarEdicao}>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="Fornecedor">
+                <Input
+                  value={editando?.fornecedor?.nome ?? ''}
+                  disabled
+                  suffix={
+                    <Typography.Text type="secondary">
+                      não editável
+                    </Typography.Text>
+                  }
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="dataEntrega"
+                label="Data da entrada"
+                extra="A semana e o ano do acompanhamento acompanham a data."
+              >
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  allowClear={false}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="itemId" label="Item">
+                {/* Sem o "atual" o campo mostraria o id cru: a busca comeca
+                    vazia e o item ja gravado nao esta na lista. */}
+                <SelectItem
+                  allowClear
+                  placeholder="Opcional"
+                  atual={
+                    editando?.item
+                      ? {
+                          value: editando.item.id,
+                          label: `${editando.item.codigo} — ${editando.item.descricao}`,
+                        }
+                      : undefined
+                  }
+                />
               </Form.Item>
             </Col>
             <Col span={12}>

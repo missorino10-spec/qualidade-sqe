@@ -10,11 +10,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import {
-  ArrowLeftOutlined,
-  FileTextOutlined,
-  FilePdfOutlined,
-} from '@ant-design/icons';
+import { FileTextOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -30,14 +26,16 @@ import {
   textoDesenho,
   textoRevisao,
 } from '../inspecao';
+import { CabecalhoDetalhe } from '../design/painel';
+import { TAG } from '../design/tokens';
 
 // Detalhe da inspecao: mostra os formularios COMO FORAM PREENCHIDOS, item a
 // item, aprovada ou reprovada. E o mesmo conteudo exportado no PDF.
 
 const corStatusItem: Record<string, string> = {
-  APROVADO: 'green',
-  REPROVADO: 'red',
-  NAO_APLICAVEL: 'default',
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
+  NAO_APLICAVEL: TAG.neutro,
 };
 
 const labelStatusItem: Record<string, string> = {
@@ -176,37 +174,32 @@ export default function InspecaoDetalhe() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card
-        title={
-          <Space>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              Inspeção {data.numeroInspecao ?? '(sem número)'}
-            </Typography.Title>
-            <Tag color={data.resultado === 'REPROVADO' ? 'red' : 'green'}>
+      <CabecalhoDetalhe
+        voltar={() => navigate('/inspecoes')}
+        titulo={`Inspeção ${data.numeroInspecao ?? '(sem número)'}`}
+        etiqueta={
+          <>
+            <Tag
+              color={data.resultado === 'REPROVADO' ? TAG.critico : TAG.sucesso}
+            >
               {data.resultado === 'REPROVADO' ? 'Reprovado' : 'Aprovado'}
             </Tag>
-            {data.inspecaoExtra && <Tag color="orange">Extra</Tag>}
-          </Space>
+            {data.inspecaoExtra && <Tag color={TAG.ressalva}>Extra</Tag>}
+          </>
         }
-        extra={
-          <Space>
-            <Button
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/inspecoes')}
-            >
-              Voltar
-            </Button>
-            <Button
-              type="primary"
-              icon={<FilePdfOutlined />}
-              disabled={semFormularios}
-              onClick={() => abrirPdfEmNovaAba(`/inspecoes/${id}/pdf`)}
-            >
-              Exportar PDF
-            </Button>
-          </Space>
+        acoes={
+          <Button
+            type="primary"
+            icon={<FilePdfOutlined />}
+            disabled={semFormularios}
+            onClick={() => abrirPdfEmNovaAba(`/inspecoes/${id}/pdf`)}
+          >
+            Exportar PDF
+          </Button>
         }
-      >
+      />
+
+      <Card>
         <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 3 }}>
           <Descriptions.Item label="Data">
             {data.dataInspecao

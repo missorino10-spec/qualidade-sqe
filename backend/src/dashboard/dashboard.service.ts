@@ -16,7 +16,6 @@ function pct(parte: number, total: number): number {
 // Prazos dos indicadores de tempestividade, todos em DIAS UTEIS (o calendario
 // de feriados entra na conta). Ficam aqui, num lugar so, porque sao numeros de
 // politica da Qualidade - mudar o prazo e mudar estas tres linhas.
-const PRAZO_ABERTURA_RNC_DIAS = 1; // da identificacao do desvio ate abrir a RNC
 const PRAZO_PLANO_RNC_DIAS = 5; // do recebimento da notificacao pelo fornecedor
 const PRAZO_ENCERRAMENTO_RNC_DIAS = 7; // da abertura ate encerrar
 
@@ -161,26 +160,6 @@ export class DashboardService {
     // Uma RNC e um bloqueio: o valor evitado e o Valor Total do lote bloqueado.
     const savings = rncs.reduce((acc, r) => acc + (r.valorTotal ?? 0), 0);
 
-    // 06 - Abertura tempestiva de RNCs
-    // Desvio que exige RNC = carga reprovada. O relogio comeca na data da
-    // inspecao que reprovou (a mais antiga, quando Visual e Lote reprovaram) e
-    // a RNC tem 1 dia util para ser aberta. Carga reprovada sem RNC conta como
-    // fora do prazo.
-    const cargasComDesvio = cargasInspecionadas.filter(foiReprovada);
-    const aberturasNoPrazo = cargasComDesvio.filter((e: any) => {
-      const identificacao = formularios(e)
-        .filter((i: any) => i.resultado === 'REPROVADO')
-        .map((i: any) => i.dataInspecao as Date)
-        .sort((a, b) => a.getTime() - b.getTime())[0];
-      const rnc = e.rncs[0];
-      return dentroDoPrazo(
-        identificacao ?? null,
-        rnc?.dataAbertura ?? null,
-        PRAZO_ABERTURA_RNC_DIAS,
-        feriados,
-      );
-    }).length;
-
     // 07 - Planos de acao de RNC no prazo
     // O relogio comeca quando o fornecedor recebe a notificacao (data de envio
     // do documento) e ele tem 5 dias uteis para devolver o plano. RNC sem envio
@@ -234,7 +213,6 @@ export class DashboardService {
     return {
       periodo: { de: de ?? null, ate: ate ?? null },
       prazos: {
-        aberturaRncDiasUteis: PRAZO_ABERTURA_RNC_DIAS,
         planoRncDiasUteis: PRAZO_PLANO_RNC_DIAS,
         encerramentoRncDiasUteis: PRAZO_ENCERRAMENTO_RNC_DIAS,
       },
@@ -242,7 +220,6 @@ export class DashboardService {
         pctAprovacaoLotes: pct(lotesAprovados, lotesInspecionados),
         medianaRespostaRncDias: medianaResposta,
         savingsBloqueioReais: Math.round(savings * 100) / 100,
-        pctAberturaTempestiva: pct(aberturasNoPrazo, cargasComDesvio.length),
         pctPlanosNoPrazo: pct(planosNoPrazo, totalRnc),
         pctEncerramentoNoPrazo: pct(encerramentosNoPrazo, encerradas.length),
         pctEficaciaAcoes: pct(eficazes, verificadas.length),
@@ -257,8 +234,6 @@ export class DashboardService {
         lotesAprovados,
         rncsComResposta: temposResposta.length,
         rncsTotal: totalRnc,
-        cargasComDesvio: cargasComDesvio.length,
-        aberturasNoPrazo,
         planosNoPrazo,
         rncsEncerradasPeriodo: encerradas.length,
         encerramentosNoPrazo,

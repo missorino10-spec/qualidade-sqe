@@ -26,6 +26,7 @@ import { CamposItem } from '../components/CamposItem';
 import { CampoValorTotal, useValorTotal } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { numeroBR } from '../formatos';
+import { TAG } from '../design/tokens';
 
 const CAMPOS_VALOR = {
   quantidade: 'quantidadePecas',
@@ -34,9 +35,9 @@ const CAMPOS_VALOR = {
 import { TIPOS_DESVIO, rotuloTipoDesvio } from '../tipo-desvio';
 
 export const corStatusRnc: Record<string, string> = {
-  EM_ANDAMENTO: 'orange',
-  FINALIZADA: 'green',
-  CANCELADA: 'default',
+  EM_ANDAMENTO: TAG.andamento,
+  FINALIZADA: TAG.sucesso,
+  CANCELADA: TAG.neutro,
 };
 
 export const labelStatusRnc: Record<string, string> = {
@@ -46,10 +47,10 @@ export const labelStatusRnc: Record<string, string> = {
 };
 
 const corEficacia: Record<string, string> = {
-  PENDENTE: 'default',
-  APROVADO: 'green',
-  REPROVADO: 'red',
-  NAO_APLICAVEL: 'default',
+  PENDENTE: TAG.pendencia,
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
+  NAO_APLICAVEL: TAG.neutro,
 };
 
 const labelEficacia: Record<string, string> = {

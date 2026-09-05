@@ -5,19 +5,13 @@ import {
   Descriptions,
   Form,
   Modal,
-  Popconfirm,
   Space,
   Spin,
   Tag,
   Typography,
   message,
 } from 'antd';
-import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  FilePdfOutlined,
-} from '@ant-design/icons';
+import { DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -31,7 +25,9 @@ import { EVID, textoDesenho, textoRevisao } from '../../inspecao';
 import { ORIGENS_INSPECAO } from './FormularioDimensional';
 import { CamposVisual } from './FormularioVisual';
 import NomeAssinatura from '../../components/NomeAssinatura';
-import { COR } from '../../design/tokens';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
+import { COR, TAG } from '../../design/tokens';
 
 // Detalhe da INSPECAO VISUAL da Manufatura: documento proprio, sem cotas e sem
 // reinspecao - o que o inspetor observou naquele momento, com as fotos.
@@ -179,32 +175,34 @@ export default function InspecaoVisualDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Card
-        title={
-          <Space wrap>
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={() =>
-                navigate(
-                  data.tipo === 'SETUP'
-                    ? '/manufatura/inspecoes/setup'
-                    : '/manufatura/inspecoes/producao',
-                )
-              }
-            />
-            <span>Inspeção visual {data.numero}</span>
-            <Tag color="orange">
+      <CabecalhoDetalhe
+        voltar={() =>
+          navigate(
+            data.tipo === 'SETUP'
+              ? '/manufatura/inspecoes/setup'
+              : '/manufatura/inspecoes/producao',
+          )
+        }
+        titulo={`Inspeção visual ${data.numero}`}
+        etiqueta={
+          <>
+            <Tag color={TAG.andamento}>
               {data.tipo === 'SETUP' ? 'Setup' : 'Produção'}
             </Tag>
-            {data.rascunho && <Tag color="orange">Rascunho</Tag>}
-          </Space>
+            {data.rascunho && <Tag color={TAG.pendencia}>Rascunho</Tag>}
+          </>
         }
-        extra={
-          <Space>
-            <Button icon={<EditOutlined />} onClick={abrirCorrecao}>
-              {data.rascunho ? 'Continuar rascunho' : 'Corrigir'}
-            </Button>
+        acoes={
+          <>
+            <BotaoPdf
+              onClick={() =>
+                abrirPdfEmNovaAba(`/manufatura/inspecoes-visuais/${id}/pdf`)
+              }
+            />
+            <BotaoEditar
+              onClick={abrirCorrecao}
+              texto={data.rascunho ? 'Continuar rascunho' : 'Corrigir'}
+            />
             {/* Descartar rascunho e de qualquer um do modulo; excluir
                 documento ja lancado continua no botao ao lado. */}
             {data.rascunho && (
@@ -212,28 +210,16 @@ export default function InspecaoVisualDetalhe() {
                 Descartar rascunho
               </Button>
             )}
-            <Popconfirm
-              title="Excluir esta inspeção visual?"
-              okText="Excluir"
-              cancelText="Cancelar"
+            <BotaoExcluir
+              titulo={`Excluir a inspeção visual ${data.numero}?`}
+              descricao="A exclusão é definitiva e não pode ser desfeita."
               onConfirm={remover}
-            >
-              <Button danger icon={<DeleteOutlined />}>
-                Excluir
-              </Button>
-            </Popconfirm>
-            <Button
-              type="primary"
-              icon={<FilePdfOutlined />}
-              onClick={() =>
-                abrirPdfEmNovaAba(`/manufatura/inspecoes-visuais/${id}/pdf`)
-              }
-            >
-              Exportar PDF
-            </Button>
-          </Space>
+            />
+          </>
         }
-      >
+      />
+
+      <Card>
         <Descriptions
           size="small"
           bordered

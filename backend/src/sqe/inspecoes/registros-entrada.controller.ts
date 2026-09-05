@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -35,6 +37,17 @@ class RegistroEntradaDto {
   @IsOptional() @IsBoolean() extra?: boolean;
 }
 
+// Na correcao nao entra fornecedorId: trocar o fornecedor mudaria a decisao de
+// inspecao que ja foi tomada na chegada. O ValidationPipe roda com whitelist,
+// entao um fornecedorId enviado por engano e descartado antes do servico.
+class EditarRegistroEntradaDto {
+  @IsOptional() @Type(() => Number) @IsInt() itemId?: number;
+  @IsOptional() @IsString() dataEntrega?: string;
+  @IsOptional() @IsString() notaFiscal?: string;
+  @IsOptional() @IsString() po?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() qtdTotal?: number;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQE)
 @Controller('registros-entrada')
@@ -57,5 +70,20 @@ export class RegistrosEntradaController {
   @Post()
   criar(@Body() dto: RegistroEntradaDto, @CurrentUser() user: AuthUser) {
     return this.service.registrarRecebimento(dto, user.id);
+  }
+
+  @Roles('QUALIDADE', 'ADMIN')
+  @Patch(':id')
+  atualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EditarRegistroEntradaDto,
+  ) {
+    return this.service.atualizarEntrada(id, dto);
+  }
+
+  @Roles('QUALIDADE', 'ADMIN')
+  @Delete(':id')
+  excluir(@Param('id', ParseIntPipe) id: number) {
+    return this.service.excluirEntrada(id);
   }
 }

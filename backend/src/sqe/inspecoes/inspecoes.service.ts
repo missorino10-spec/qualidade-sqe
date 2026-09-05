@@ -356,6 +356,103 @@ export class InspecoesService {
     });
   }
 
+  // Correcao do que foi digitado na chegada: nota fiscal trocada, PO errada,
+  // data ou quantidade equivocada.
+  //
+  // O FORNECEDOR NAO SE EDITA. Ele decide a classificacao, a classificacao
+  // decide a periodicidade e a periodicidade ja decidiu, no momento do
+  // registro, se esta entrega seria inspecionada. Trocar o fornecedor depois
+  // reescreveria essa decisao e desencontraria o contador do ciclo. Para
+  // corrigir fornecedor, exclui-se a entrada e lanca-se de novo.
+  async atualizarEntrada(id: number, dto: any) {
+    const atual = await this.prisma.entregaPortaria.findUnique({
+      where: { id },
+    });
+    if (!atual)
+      throw new NotFoundException('Registro de entrada não encontrado');
+
+    const dados: any = {
+      notaFiscal: dto.notaFiscal ?? null,
+      po: dto.po ?? null,
+      quantidade: dto.qtdTotal ?? dto.quantidade ?? null,
+      itemId: dto.itemId ?? null,
+    };
+
+    // A semana e o ano sao derivados da data: se a data muda, eles mudam
+    // junto, senao a entrada aparece na semana errada do acompanhamento.
+    if (dto.dataEntrega) {
+      const data = new Date(dto.dataEntrega);
+      const { semana, ano } = semanaAno(data);
+      dados.dataEntrega = data;
+      dados.semana = semana;
+      dados.ano = ano;
+      dados.semanaReferencia = semanaReferencia(data);
+    }
+
+    await this.prisma.entregaPortaria.update({ where: { id }, data: dados });
+    return this.entrada(id);
+  }
+
+  // Exclusao da entrada lancada por engano.
+  //
+  // Duas travas: entrada com inspecao gravada nao sai (levaria embora a
+  // inspecao, a RNC e os indicadores), e o contador do ciclo do fornecedor
+  // volta atras - senao a proxima entrega dispararia inspecao na hora errada.
+  async excluirEntrada(id: number) {
+    const e = await this.prisma.entregaPortaria.findUnique({
+      where: { id },
+      include: {
+        inspecoesVisual: { select: { id: true } },
+        inspecoesLote: { select: { id: true } },
+        rncs: { select: { id: true, numero: true } },
+      },
+    });
+    if (!e) throw new NotFoundException('Registro de entrada não encontrado');
+
+    if (e.inspecoesVisual.length || e.inspecoesLote.length)
+      throw new ConflictException(
+        `Esta entrada já tem inspeção registrada (${e.numeroInspecao ?? 'em andamento'}). Exclua a inspeção antes de excluir a entrada.`,
+      );
+    if (e.rncs.length)
+      throw new ConflictException(
+        `Esta entrada tem a RNC ${e.rncs[0].numero} presa nela. Cancele ou exclua a RNC antes.`,
+      );
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.entregaPortaria.delete({ where: { id } });
+
+      // O contador nao volta "menos um": ele volta para o que a ultima entrada
+      // que sobrou deixou. Se aquela entrada fechou o ciclo (foi a inspecionada
+      // do plano), o contador la ficou zerado e e para zero que ele volta.
+      const ultima = await tx.entregaPortaria.findFirst({
+        where: { fornecedorId: e.fornecedorId },
+        orderBy: { id: 'desc' },
+        select: {
+          numeroEntregaAcumulado: true,
+          passivelInspecao: true,
+          inspecaoExtra: true,
+        },
+      });
+      const fechouCiclo =
+        !!ultima?.passivelInspecao && !ultima?.inspecaoExtra;
+      const contador = !ultima
+        ? 0
+        : fechouCiclo
+          ? 0
+          : (ultima.numeroEntregaAcumulado ?? 0);
+
+      await tx.fornecedor.update({
+        where: { id: e.fornecedorId },
+        data: {
+          totalEntregas: { decrement: 1 },
+          contadorEntregas: contador,
+        },
+      });
+    });
+
+    return { ok: true };
+  }
+
   // Entrada aberta na tela de inspecao: o cabecalho ja vem preenchido com o
   // que foi informado na chegada, e o inspetor nao redigita nada.
   async entrada(id: number) {

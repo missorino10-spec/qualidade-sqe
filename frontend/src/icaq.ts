@@ -8,6 +8,8 @@
 //
 // ESPELHO de backend/src/manufatura/controle-autonomo/icaq-utils.ts.
 
+import { TAG } from './design/tokens';
+
 export type VerificacaoIcaq = {
   numero: number;
   dimensao: string;
@@ -40,9 +42,9 @@ export const labelClassificacaoIcaq: Record<string, string> = {
 };
 
 export const corClassificacaoIcaq: Record<string, string> = {
-  CONFORME: 'green',
-  ATENCAO: 'orange',
-  NAO_CONFORME: 'red',
+  CONFORME: TAG.sucesso,
+  ATENCAO: TAG.pendencia,
+  NAO_CONFORME: TAG.critico,
 };
 
 // Pontos de uma linha: o peso da dimensao dividido pelo numero de perguntas

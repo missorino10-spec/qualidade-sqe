@@ -22,6 +22,7 @@ import { UploadFotosEvidencia } from '../../components/FotosEvidencia';
 import Tabela from '../../components/Tabela';
 import { CamposItem } from '../../components/CamposItem';
 import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
+import { TAG } from '../../design/tokens';
 
 // Relatorio de Inspecao Dimensional — Doc BDBR.QUA.FMR.011.06 (rev. 06).
 // Os campos e a ordem seguem o formulario em papel, sem acrescimos.
@@ -32,9 +33,9 @@ import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 export { ORIGENS_INSPECAO };
 
 export const corResultadoManufatura: Record<string, string> = {
-  APROVADO: 'green',
-  APROVADO_COM_OBSERVACAO: 'gold',
-  REPROVADO: 'red',
+  APROVADO: TAG.sucesso,
+  APROVADO_COM_OBSERVACAO: TAG.ressalva,
+  REPROVADO: TAG.critico,
 };
 
 export const labelResultadoManufatura: Record<string, string> = {
@@ -44,10 +45,10 @@ export const labelResultadoManufatura: Record<string, string> = {
 };
 
 export const corStatusInspecao: Record<string, string> = {
-  PENDENTE: 'orange',
-  APROVADA: 'green',
-  APROVADA_COM_OBSERVACAO: 'gold',
-  REPROVADA: 'red',
+  PENDENTE: TAG.pendencia,
+  APROVADA: TAG.sucesso,
+  APROVADA_COM_OBSERVACAO: TAG.ressalva,
+  REPROVADA: TAG.critico,
 };
 
 export const labelStatusInspecao: Record<string, string> = {

@@ -6,6 +6,7 @@ import {
   Col,
   Descriptions,
   Divider,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -14,15 +15,14 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   DeleteOutlined,
-  EditOutlined,
   FileTextOutlined,
   FilePdfOutlined,
   FormOutlined,
@@ -48,6 +48,8 @@ import {
   resultadoVisual,
 } from './FormularioInspecaoItem';
 import { BlocoDesenhos, CotasPorDesenho } from '../../components/TabelaCotas';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 import {
   CardDesvioQualidade,
   TIPO_DESVIO,
@@ -488,122 +490,119 @@ export default function HomologacaoItemDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Space wrap>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/sqd/homologacoes-itens')}
-          >
-            Voltar
-          </Button>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            Homologação {h.numero}
-          </Typography.Title>
-          <Tag>Rev. {h.revisao}</Tag>
-          {inspecionado ? (
-            <Tag color={corResultadoItem[h.resultado]}>
-              {labelResultadoItem[h.resultado]}
+      <CabecalhoDetalhe
+        voltar={() => navigate('/sqd/homologacoes-itens')}
+        titulo={`Homologação ${h.numero}`}
+        etiqueta={
+          <>
+            <Tag>Rev. {h.revisao}</Tag>
+            {inspecionado ? (
+              <Tag color={corResultadoItem[h.resultado]}>
+                {labelResultadoItem[h.resultado]}
+              </Tag>
+            ) : (
+              aguardando && <Tag>Aguardando amostras do fornecedor</Tag>
+            )}
+            <Tag color={corStatusHomologacao[h.statusHomologacao]}>
+              {labelStatusHomologacao[h.statusHomologacao]}
             </Tag>
-          ) : (
-            aguardando && <Tag>Aguardando amostras do fornecedor</Tag>
-          )}
-          <Tag color={corStatusHomologacao[h.statusHomologacao]}>
-            {labelStatusHomologacao[h.statusHomologacao]}
-          </Tag>
-        </Space>
-        <Space wrap>
-          <Button
-            icon={<FilePdfOutlined />}
-            onClick={() => abrirPdfEmNovaAba(`/sqd/homologacoes-itens/${id}/pdf`)}
-          >
-            PDF do registro
-          </Button>
-          {relatorios.length > 0 && (
-            <Button
-              icon={<FilePdfOutlined />}
-              onClick={() =>
-                abrirPdfEmNovaAba(
-                  `/sqd/homologacoes-itens/${id}/relatorio/pdf`,
-                )
-              }
-            >
-              PDF do relatório de inspeção
-            </Button>
-          )}
-          {podeEditar && (
-            <>
-              {/* Rascunho aberto segura a tentativa nova: seriam duas rodadas
-                  em aberto na mesma homologacao, nenhuma com resultado. */}
-              <Button
-                type={inspecionado ? 'default' : 'primary'}
-                icon={<FormOutlined />}
-                disabled={cancelado || temRascunho}
-                title={
-                  temRascunho
-                    ? 'Existe um rascunho em aberto. Lance ou descarte esse rascunho antes de abrir uma tentativa nova.'
-                    : undefined
-                }
-                onClick={() => abrirInspecao()}
+          </>
+        }
+        acoes={
+          <>
+            {/* Sao dois documentos diferentes; um menu so evita dois botoes de
+                PDF disputando espaco no cabecalho. */}
+            {relatorios.length > 0 ? (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    {
+                      key: 'registro',
+                      label: 'Registro da homologação',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(`/sqd/homologacoes-itens/${id}/pdf`),
+                    },
+                    {
+                      key: 'relatorio',
+                      label: 'Relatório de inspeção',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(
+                          `/sqd/homologacoes-itens/${id}/relatorio/pdf`,
+                        ),
+                    },
+                  ],
+                }}
               >
-                {relatorios.length
-                  ? 'Nova tentativa de inspeção'
-                  : 'Lançar relatório de inspeção'}
-              </Button>
-              <Button icon={<EditOutlined />} onClick={abrirRegistro}>
-                Editar registro
-              </Button>
-              {/* A trava do ciclo: salvar o registro nunca e bloqueado, mas
-                  encerrar so passa com tudo o que a planilha pede. */}
-              {finalizado ? (
-                <Button
-                  icon={<UndoOutlined />}
-                  loading={reabrir.isPending}
-                  onClick={() =>
-                    Modal.confirm({
-                      title: `Reabrir a homologação ${h.numero}?`,
-                      content:
-                        'A data de finalização e o tempo total do ciclo serão apagados, e o registro volta para "Em andamento".',
-                      okText: 'Reabrir',
-                      cancelText: 'Cancelar',
-                      onOk: () => reabrir.mutateAsync(),
-                    })
-                  }
-                >
-                  Reabrir homologação
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  loading={finalizar.isPending}
-                  disabled={cancelado}
-                  onClick={() => finalizar.mutate()}
-                >
-                  Finalizar homologação
-                </Button>
-              )}
-              <Button
-                icon={<DeleteOutlined />}
-                danger
-                loading={remover.isPending}
+                <Button icon={<FilePdfOutlined />}>Exportar PDF</Button>
+              </Dropdown>
+            ) : (
+              <BotaoPdf
                 onClick={() =>
-                  Modal.confirm({
-                    title: `Excluir a homologação ${h.numero}?`,
-                    content:
-                      'Os relatórios de inspeção, o resultado e os anexos serão apagados.',
-                    okText: 'Excluir',
-                    okButtonProps: { danger: true },
-                    cancelText: 'Cancelar',
-                    onOk: () => remover.mutateAsync(),
-                  })
+                  abrirPdfEmNovaAba(`/sqd/homologacoes-itens/${id}/pdf`)
                 }
-              >
-                Excluir
-              </Button>
-            </>
-          )}
-        </Space>
-      </Row>
+              />
+            )}
+            {podeEditar && (
+              <>
+                {/* Rascunho aberto segura a tentativa nova: seriam duas rodadas
+                    em aberto na mesma homologacao, nenhuma com resultado. */}
+                <Button
+                  type={inspecionado ? 'default' : 'primary'}
+                  icon={<FormOutlined />}
+                  disabled={cancelado || temRascunho}
+                  title={
+                    temRascunho
+                      ? 'Existe um rascunho em aberto. Lance ou descarte esse rascunho antes de abrir uma tentativa nova.'
+                      : undefined
+                  }
+                  onClick={() => abrirInspecao()}
+                >
+                  {relatorios.length
+                    ? 'Nova tentativa de inspeção'
+                    : 'Lançar relatório de inspeção'}
+                </Button>
+                <BotaoEditar onClick={abrirRegistro} texto="Editar registro" />
+                {/* A trava do ciclo: salvar o registro nunca e bloqueado, mas
+                    encerrar so passa com tudo o que a planilha pede. */}
+                {finalizado ? (
+                  <Button
+                    icon={<UndoOutlined />}
+                    loading={reabrir.isPending}
+                    onClick={() =>
+                      Modal.confirm({
+                        title: `Reabrir a homologação ${h.numero}?`,
+                        content:
+                          'A data de finalização e o tempo total do ciclo serão apagados, e o registro volta para "Em andamento".',
+                        okText: 'Reabrir',
+                        cancelText: 'Cancelar',
+                        onOk: () => reabrir.mutateAsync(),
+                      })
+                    }
+                  >
+                    Reabrir homologação
+                  </Button>
+                ) : (
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    loading={finalizar.isPending}
+                    disabled={cancelado}
+                    onClick={() => finalizar.mutate()}
+                  >
+                    Finalizar homologação
+                  </Button>
+                )}
+                <BotaoExcluir
+                  titulo={`Excluir a homologação ${h.numero}?`}
+                  descricao="Os relatórios de inspeção, o resultado e os anexos serão apagados."
+                  onConfirm={() => remover.mutateAsync()}
+                />
+              </>
+            )}
+          </>
+        }
+      />
 
       {aguardando && (
         <Alert
@@ -746,9 +745,9 @@ export default function HomologacaoItemDetalhe() {
                       align: 'right',
                       render: (_: any, r: any) => (
                         <Space>
-                          <Button
-                            size="small"
-                            icon={<FilePdfOutlined />}
+                          <BotaoPdf
+                            emTabela
+                            texto="Exportar PDF desta tentativa"
                             onClick={() =>
                               abrirPdfEmNovaAba(
                                 `/sqd/homologacoes-itens/${id}/relatorio/pdf?tentativa=${r.tentativa}`,
@@ -757,55 +756,48 @@ export default function HomologacaoItemDetalhe() {
                           />
                           {/* Corrigir o que foi digitado errado nao depende da
                               Qualidade: quem enxerga o modulo conserta. */}
-                          <Button
-                            size="small"
-                            title={
+                          <BotaoEditar
+                            emTabela
+                            motivo={
                               r.rascunho
                                 ? 'Continuar este rascunho'
                                 : 'Corrigir esta tentativa'
                             }
-                            icon={<EditOutlined />}
                             onClick={() => abrirInspecao(r.tentativa)}
                           />
                           {/* Descartar rascunho nao desfaz nada: a tentativa
                               nunca apurou resultado. Por isso vale para todo
                               mundo do modulo, sem depender do podeEditar. */}
                           {r.rascunho ? (
-                            <Button
-                              size="small"
-                              danger
-                              title="Descartar rascunho"
-                              icon={<DeleteOutlined />}
-                              onClick={() =>
-                                Modal.confirm({
-                                  title: `Descartar o rascunho da ${r.revisao}?`,
-                                  content:
-                                    'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, o resultado do item não muda.',
-                                  okText: 'Descartar',
-                                  okButtonProps: { danger: true },
-                                  cancelText: 'Cancelar',
-                                  onOk: () =>
-                                    descartarRascunho.mutateAsync(r.tentativa),
-                                })
-                              }
-                            />
-                          ) : (
-                            podeEditar && (
+                            <Tooltip title="Descartar rascunho">
                               <Button
                                 size="small"
+                                type="text"
                                 danger
                                 icon={<DeleteOutlined />}
                                 onClick={() =>
                                   Modal.confirm({
-                                    title: `Excluir a tentativa ${r.revisao}?`,
+                                    title: `Descartar o rascunho da ${r.revisao}?`,
                                     content:
-                                      'As cotas e o checklist visual desta tentativa serão apagados, e o resultado volta a sair do relatório que sobrar.',
-                                    okText: 'Excluir',
+                                      'O que foi preenchido será perdido. Como o rascunho nunca foi lançado, o resultado do item não muda.',
+                                    okText: 'Descartar',
                                     okButtonProps: { danger: true },
                                     cancelText: 'Cancelar',
                                     onOk: () =>
-                                      removerRelatorio.mutateAsync(r.tentativa),
+                                      descartarRascunho.mutateAsync(r.tentativa),
                                   })
+                                }
+                              />
+                            </Tooltip>
+                          ) : (
+                            podeEditar && (
+                              <BotaoExcluir
+                                emTabela
+                                motivo="Excluir esta tentativa"
+                                titulo={`Excluir a tentativa ${r.revisao}?`}
+                                descricao="As cotas e o checklist visual desta tentativa serão apagados, e o resultado volta a sair do relatório que sobrar."
+                                onConfirm={() =>
+                                  removerRelatorio.mutateAsync(r.tentativa)
                                 }
                               />
                             )

@@ -21,7 +21,6 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   DeleteOutlined,
   FilePdfOutlined,
@@ -48,6 +47,8 @@ import {
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 import Tabela from '../../components/Tabela';
 import { nomeCurto } from '../../formatos';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoExcluir, BotaoPdf } from '../../design/acoes';
 import { BORDA } from '../../design/tokens';
 
 // Analise de Problemas da Qualidade / 8D — Doc BDBR.QUA.FMR.007.01.
@@ -518,35 +519,23 @@ export default function OitoDDetalhe() {
   return (
     <Form form={form} layout="vertical">
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
-        <Card
-          title={
-            <Space wrap>
-              <Typography.Title level={4} style={{ margin: 0 }}>
-                Análise de Problemas {data.numero}
-              </Typography.Title>
+        <CabecalhoDetalhe
+          voltar={() => navigate('/manufatura/8d')}
+          titulo={`Análise de Problemas ${data.numero}`}
+          etiqueta={
+            <>
               <Tag color={corStatus8D[data.status]}>
                 {labelStatus8D[data.status] ?? data.status}
               </Tag>
               {data.inspecao && <Tag>{data.inspecao.numero}</Tag>}
               {data.cnq && <Tag>{data.cnq.numero}</Tag>}
-            </Space>
+            </>
           }
-          extra={
-            <Space wrap>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/manufatura/8d')}
-              >
-                Voltar
-              </Button>
-              <Button
-                icon={<SaveOutlined />}
-                type="primary"
-                loading={salvando}
-                onClick={salvar}
-              >
-                Salvar
-              </Button>
+          acoes={
+            <>
+              <BotaoPdf
+                onClick={() => abrirPdfEmNovaAba(`/manufatura/8d/${id}/pdf`)}
+              />
               <Popconfirm
                 title="Aprovar este 8D pela Qualidade?"
                 okText="Aprovar"
@@ -561,25 +550,23 @@ export default function OitoDDetalhe() {
                 </Button>
               </Popconfirm>
               <Button
-                icon={<FilePdfOutlined />}
-                onClick={() => abrirPdfEmNovaAba(`/manufatura/8d/${id}/pdf`)}
+                icon={<SaveOutlined />}
+                type="primary"
+                loading={salvando}
+                onClick={salvar}
               >
-                Exportar PDF
+                Salvar
               </Button>
-              <Popconfirm
-                title="Excluir este 8D?"
-                description="A exclusão é definitiva."
-                okText="Excluir"
-                cancelText="Cancelar"
+              <BotaoExcluir
+                titulo={`Excluir a análise ${data.numero}?`}
+                descricao="A exclusão é definitiva e não pode ser desfeita."
                 onConfirm={remover}
-              >
-                <Button danger icon={<DeleteOutlined />}>
-                  Excluir
-                </Button>
-              </Popconfirm>
-            </Space>
+              />
+            </>
           }
-        >
+        />
+
+        <Card>
           {!podeFechar && (
             <Alert
               type="warning"

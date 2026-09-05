@@ -24,6 +24,7 @@ import { dataBR } from '../../formatos';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import { DOC_8D } from '../../oitod';
 import { DOC_5G } from '../../cincog';
+import { TAG } from '../../design/tokens';
 
 // Analise de Problemas da Qualidade — Doc BDBR.QUA.FMR.007.01.
 // A tela reune os dois documentos do formulario: o 8D (analise completa) e o
@@ -84,9 +85,9 @@ export const TURNOS_8D = [
 ];
 
 export const corStatus8D: Record<string, string> = {
-  AGUARDANDO: 'orange',
-  EM_ANDAMENTO: 'blue',
-  CONCLUIDO: 'green',
+  AGUARDANDO: TAG.pendencia,
+  EM_ANDAMENTO: TAG.andamento,
+  CONCLUIDO: TAG.sucesso,
 };
 
 export const labelStatus8D: Record<string, string> = {

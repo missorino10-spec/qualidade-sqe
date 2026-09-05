@@ -4,6 +4,7 @@
 
 import { dataBR, numeroBR } from '../../formatos';
 import { labelOrigemInspecao } from '../../inspecao';
+import { TAG } from '../../design/tokens';
 
 export const labelResultado: Record<string, string> = {
   APROVADO: 'Aprovado',
@@ -11,9 +12,9 @@ export const labelResultado: Record<string, string> = {
   REPROVADO: 'Reprovado',
 };
 export const corResultado: Record<string, string> = {
-  APROVADO: 'green',
-  APROVADO_CONDICIONALMENTE: 'orange',
-  REPROVADO: 'red',
+  APROVADO: TAG.sucesso,
+  APROVADO_CONDICIONALMENTE: TAG.ressalva,
+  REPROVADO: TAG.critico,
 };
 
 export const labelStatusHomologacao: Record<string, string> = {
@@ -22,9 +23,9 @@ export const labelStatusHomologacao: Record<string, string> = {
   CANCELADO: 'Cancelado',
 };
 export const corStatusHomologacao: Record<string, string> = {
-  EM_ANDAMENTO: 'blue',
-  FINALIZADO: 'green',
-  CANCELADO: 'default',
+  EM_ANDAMENTO: TAG.andamento,
+  FINALIZADO: TAG.sucesso,
+  CANCELADO: TAG.neutro,
 };
 
 export const labelStatusPlanoAcao: Record<string, string> = {
@@ -77,9 +78,9 @@ export const labelResultadoItem: Record<string, string> = {
   CANCELADO: 'Cancelado',
 };
 export const corResultadoItem: Record<string, string> = {
-  APROVADO: 'green',
-  REPROVADO: 'red',
-  CANCELADO: 'default',
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
+  CANCELADO: TAG.neutro,
 };
 
 export const labelMotivoItem: Record<string, string> = {
@@ -118,9 +119,9 @@ export const labelStatusVisual: Record<string, string> = {
   NAO_APLICAVEL: 'N/A',
 };
 export const corStatusVisual: Record<string, string> = {
-  APROVADO: 'green',
-  REPROVADO: 'red',
-  NAO_APLICAVEL: 'default',
+  APROVADO: TAG.sucesso,
+  REPROVADO: TAG.critico,
+  NAO_APLICAVEL: TAG.neutro,
 };
 
 // Os rotulos das origens vivem em src/inspecao.ts, junto com a lista que os
@@ -139,10 +140,10 @@ export const labelResultadoAuditoria: Record<string, string> = {
   CANCELADO: 'Cancelado',
 };
 export const corResultadoAuditoria: Record<string, string> = {
-  APROVADO: 'green',
-  APROVADO_CONDICIONALMENTE: 'orange',
-  REPROVADO: 'red',
-  CANCELADO: 'default',
+  APROVADO: TAG.sucesso,
+  APROVADO_CONDICIONALMENTE: TAG.ressalva,
+  REPROVADO: TAG.critico,
+  CANCELADO: TAG.neutro,
 };
 
 export const labelStatusAuditoria: Record<string, string> = {
@@ -151,9 +152,9 @@ export const labelStatusAuditoria: Record<string, string> = {
   CANCELADO: 'Cancelado',
 };
 export const corStatusAuditoria: Record<string, string> = {
-  EM_ANDAMENTO: 'blue',
-  FINALIZADO: 'green',
-  CANCELADO: 'default',
+  EM_ANDAMENTO: TAG.andamento,
+  FINALIZADO: TAG.sucesso,
+  CANCELADO: TAG.neutro,
 };
 
 // Legenda da aba "Resumo": Sim = 1,0 · Parcial = 0,5 · Não = 0,0 · N/A fora.
@@ -164,10 +165,10 @@ export const labelRespostaAuditoria: Record<string, string> = {
   NAO_APLICAVEL: 'N/A',
 };
 export const corRespostaAuditoria: Record<string, string> = {
-  SIM: 'green',
-  PARCIAL: 'orange',
-  NAO: 'red',
-  NAO_APLICAVEL: 'default',
+  SIM: TAG.sucesso,
+  PARCIAL: TAG.ressalva,
+  NAO: TAG.critico,
+  NAO_APLICAVEL: TAG.neutro,
 };
 
 // Regua por bloco da aba "Resumo", com o vocabulario do relatorio de auditoria.
@@ -177,16 +178,16 @@ export const labelClassificacaoBloco: Record<string, string> = {
   CRITICO: 'Crítico',
 };
 export const corClassificacaoBloco: Record<string, string> = {
-  SATISFATORIO: 'green',
-  ATENCAO: 'orange',
-  CRITICO: 'red',
+  SATISFATORIO: TAG.sucesso,
+  ATENCAO: TAG.pendencia,
+  CRITICO: TAG.critico,
 };
 
 // Semaforo do prazo de reavaliacao (dias corridos): amarelo nos ultimos 15.
 export const corSemaforoReavaliacao: Record<string, string> = {
-  VERDE: 'green',
-  AMARELO: 'gold',
-  VERMELHO: 'red',
+  VERDE: TAG.sucesso,
+  AMARELO: TAG.ressalva,
+  VERMELHO: TAG.critico,
 };
 
 // Leitura do prazo do jeito que a Qualidade lê: "Reavaliar até 07/11/2026 ·

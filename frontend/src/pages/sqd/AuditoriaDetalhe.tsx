@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   Descriptions,
+  Dropdown,
   Form,
   Input,
   Modal,
@@ -17,10 +18,7 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
   FileTextOutlined,
   FilePdfOutlined,
   FormOutlined,
@@ -56,6 +54,8 @@ import Tabela from '../../components/Tabela';
 import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
 import NomeAssinatura from '../../components/NomeAssinatura';
 import { nomeCurto } from '../../formatos';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
 
 const TIPO_RELATORIO = 'AUDITORIA_RELATORIO';
 const TIPO_PLANO = 'AUDITORIA_PLANO_ACAO';
@@ -302,119 +302,114 @@ export default function AuditoriaDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Space wrap>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/sqd/auditorias')}
-          >
-            Voltar
-          </Button>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            Auditoria {a.numero}
-          </Typography.Title>
-          <Tag>Rev. {a.revisao}</Tag>
-          {a.resultado ? (
-            <Tag color={corResultadoAuditoria[a.resultado]}>
-              {labelResultadoAuditoria[a.resultado]}
-              {avaliada ? ` · ${fmtNota(a.nota)}` : ''}
+      <CabecalhoDetalhe
+        voltar={() => navigate('/sqd/auditorias')}
+        titulo={`Auditoria ${a.numero}`}
+        etiqueta={
+          <>
+            <Tag>Rev. {a.revisao}</Tag>
+            {a.resultado ? (
+              <Tag color={corResultadoAuditoria[a.resultado]}>
+                {labelResultadoAuditoria[a.resultado]}
+                {avaliada ? ` · ${fmtNota(a.nota)}` : ''}
+              </Tag>
+            ) : (
+              aguardando && <Tag>Aguardando checklist</Tag>
+            )}
+            {/* O fornecedor esta no loop de reavaliacao: a tag anda junto com o
+                resultado, com o semaforo do prazo. */}
+            {r && (
+              <Tag color={corSemaforoReavaliacao[r.semaforo]}>
+                REAVALIAÇÃO · {textoReavaliacao(r)}
+              </Tag>
+            )}
+            <Tag color={corStatusAuditoria[a.statusAuditoria]}>
+              {labelStatusAuditoria[a.statusAuditoria]}
             </Tag>
-          ) : (
-            aguardando && <Tag>Aguardando checklist</Tag>
-          )}
-          {/* O fornecedor esta no loop de reavaliacao: a tag anda junto com o
-              resultado, com o semaforo do prazo. */}
-          {r && (
-            <Tag color={corSemaforoReavaliacao[r.semaforo]}>
-              REAVALIAÇÃO · {textoReavaliacao(r)}
-            </Tag>
-          )}
-          <Tag color={corStatusAuditoria[a.statusAuditoria]}>
-            {labelStatusAuditoria[a.statusAuditoria]}
-          </Tag>
-        </Space>
-        <Space wrap>
-          <Button
-            icon={<FilePdfOutlined />}
-            onClick={() => abrirPdfEmNovaAba(`/sqd/auditorias/${id}/pdf`)}
-          >
-            PDF do registro
-          </Button>
-          {rodadas.length > 0 && (
-            <Button
-              icon={<FilePdfOutlined />}
-              onClick={() =>
-                abrirPdfEmNovaAba(`/sqd/auditorias/${id}/checklist/pdf`)
-              }
-            >
-              PDF do checklist
-            </Button>
-          )}
-          {podeEditar && (
-            <>
-              <Button
-                type={avaliada ? 'default' : 'primary'}
-                icon={<FormOutlined />}
-                disabled={cancelado}
-                onClick={() => abrirChecklist()}
+          </>
+        }
+        acoes={
+          <>
+            {/* Sao dois documentos diferentes; um menu so evita dois botoes de
+                PDF disputando espaco no cabecalho. */}
+            {rodadas.length > 0 ? (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    {
+                      key: 'registro',
+                      label: 'Registro da auditoria',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(`/sqd/auditorias/${id}/pdf`),
+                    },
+                    {
+                      key: 'checklist',
+                      label: 'Checklist da auditoria',
+                      onClick: () =>
+                        abrirPdfEmNovaAba(`/sqd/auditorias/${id}/checklist/pdf`),
+                    },
+                  ],
+                }}
               >
-                {rodadas.length ? 'Nova reavaliação' : 'Lançar checklist'}
-              </Button>
-              <Button icon={<EditOutlined />} onClick={abrirRegistro}>
-                Editar registro
-              </Button>
-              {/* A auditoria nunca fecha sozinha: mesmo aprovada, e a Qualidade
-                  que encerra o ciclo. */}
-              {finalizado ? (
+                <Button icon={<FilePdfOutlined />}>Exportar PDF</Button>
+              </Dropdown>
+            ) : (
+              <BotaoPdf
+                onClick={() => abrirPdfEmNovaAba(`/sqd/auditorias/${id}/pdf`)}
+              />
+            )}
+            {podeEditar && (
+              <>
                 <Button
-                  icon={<UndoOutlined />}
-                  loading={reabrir.isPending}
-                  onClick={() =>
-                    Modal.confirm({
-                      title: `Reabrir a auditoria ${a.numero}?`,
-                      content:
-                        'A data de encerramento será apagada, o registro volta para "Em andamento" e o prazo de reavaliação volta a contar.',
-                      okText: 'Reabrir',
-                      cancelText: 'Cancelar',
-                      onOk: () => reabrir.mutateAsync(),
-                    })
-                  }
-                >
-                  Reabrir auditoria
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  loading={finalizar.isPending}
+                  type={avaliada ? 'default' : 'primary'}
+                  icon={<FormOutlined />}
                   disabled={cancelado}
-                  onClick={() => finalizar.mutate()}
+                  onClick={() => abrirChecklist()}
                 >
-                  Encerrar auditoria
+                  {rodadas.length ? 'Nova reavaliação' : 'Lançar checklist'}
                 </Button>
-              )}
-              <Button
-                icon={<DeleteOutlined />}
-                danger
-                loading={remover.isPending}
-                onClick={() =>
-                  Modal.confirm({
-                    title: `Excluir a auditoria ${a.numero}?`,
-                    content:
-                      'As rodadas do checklist, o resultado e os anexos serão apagados.',
-                    okText: 'Excluir',
-                    okButtonProps: { danger: true },
-                    cancelText: 'Cancelar',
-                    onOk: () => remover.mutateAsync(),
-                  })
-                }
-              >
-                Excluir
-              </Button>
-            </>
-          )}
-        </Space>
-      </Row>
+                <BotaoEditar onClick={abrirRegistro} texto="Editar registro" />
+                {/* A auditoria nunca fecha sozinha: mesmo aprovada, e a Qualidade
+                    que encerra o ciclo. */}
+                {finalizado ? (
+                  <Button
+                    icon={<UndoOutlined />}
+                    loading={reabrir.isPending}
+                    onClick={() =>
+                      Modal.confirm({
+                        title: `Reabrir a auditoria ${a.numero}?`,
+                        content:
+                          'A data de encerramento será apagada, o registro volta para "Em andamento" e o prazo de reavaliação volta a contar.',
+                        okText: 'Reabrir',
+                        cancelText: 'Cancelar',
+                        onOk: () => reabrir.mutateAsync(),
+                      })
+                    }
+                  >
+                    Reabrir auditoria
+                  </Button>
+                ) : (
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    loading={finalizar.isPending}
+                    disabled={cancelado}
+                    onClick={() => finalizar.mutate()}
+                  >
+                    Encerrar auditoria
+                  </Button>
+                )}
+                <BotaoExcluir
+                  titulo={`Excluir a auditoria ${a.numero}?`}
+                  descricao="As rodadas do checklist, o resultado e os anexos serão apagados."
+                  onConfirm={() => remover.mutateAsync()}
+                />
+              </>
+            )}
+          </>
+        }
+      />
 
       {aguardando && (
         <Alert
@@ -534,9 +529,9 @@ export default function AuditoriaDetalhe() {
                       align: 'right',
                       render: (_: any, rd: any) => (
                         <Space>
-                          <Button
-                            size="small"
-                            icon={<FilePdfOutlined />}
+                          <BotaoPdf
+                            emTabela
+                            texto="Exportar PDF desta rodada"
                             onClick={() =>
                               abrirPdfEmNovaAba(
                                 `/sqd/auditorias/${id}/checklist/pdf?rodada=${rd.rodada}`,
@@ -545,26 +540,18 @@ export default function AuditoriaDetalhe() {
                           />
                           {podeEditar && (
                             <>
-                              <Button
-                                size="small"
-                                icon={<EditOutlined />}
+                              <BotaoEditar
+                                emTabela
+                                motivo="Corrigir esta rodada"
                                 onClick={() => abrirChecklist(rd.rodada)}
                               />
-                              <Button
-                                size="small"
-                                danger
-                                icon={<DeleteOutlined />}
-                                onClick={() =>
-                                  Modal.confirm({
-                                    title: `Excluir a rodada ${rd.revisao}?`,
-                                    content:
-                                      'As respostas desta rodada serão apagadas, e o resultado volta a sair da rodada que sobrar.',
-                                    okText: 'Excluir',
-                                    okButtonProps: { danger: true },
-                                    cancelText: 'Cancelar',
-                                    onOk: () =>
-                                      removerRodada.mutateAsync(rd.rodada),
-                                  })
+                              <BotaoExcluir
+                                emTabela
+                                motivo="Excluir esta rodada"
+                                titulo={`Excluir a rodada ${rd.revisao}?`}
+                                descricao="As respostas desta rodada serão apagadas, e o resultado volta a sair da rodada que sobrar."
+                                onConfirm={() =>
+                                  removerRodada.mutateAsync(rd.rodada)
                                 }
                               />
                             </>

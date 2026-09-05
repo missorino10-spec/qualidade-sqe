@@ -17,9 +17,7 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   DeleteOutlined,
-  FilePdfOutlined,
   PlusOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
@@ -44,6 +42,8 @@ import {
   rotuloDe,
   TarefaRo,
 } from '../../ro';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoPdf } from '../../design/acoes';
 
 // R.O — Gestao de Reclamacoes da Qualidade.
 // Os quatro blocos da planilha, na mesma ordem. O flag de concluido de cada
@@ -342,31 +342,20 @@ export default function ReclamacaoDetalhe() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle" gutter={[12, 12]}>
-        <Col>
-          <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/ro')}>
-              Voltar
-            </Button>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {novo ? 'Novo R.O' : `R.O ${reg?.numero ?? ''}`}
-            </Typography.Title>
-          </Space>
-        </Col>
-        <Col>
-          <Space>
+      <CabecalhoDetalhe
+        voltar={() => navigate('/ro')}
+        titulo={novo ? 'Novo R.O' : `R.O ${reg?.numero ?? ''}`}
+        acoes={
+          <>
             {!novo && (
-              <Button
-                icon={<FilePdfOutlined />}
+              <BotaoPdf
                 onClick={() => abrirPdfEmNovaAba(`/ro/reclamacoes/${id}/pdf`)}
-              >
-                PDF
-              </Button>
+              />
             )}
             {botaoSalvar()}
-          </Space>
-        </Col>
-      </Row>
+          </>
+        }
+      />
 
       <Alert
         type="info"

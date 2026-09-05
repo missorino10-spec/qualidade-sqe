@@ -19,10 +19,8 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   DeleteOutlined,
-  FilePdfOutlined,
   SaveOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
@@ -46,6 +44,8 @@ import { SITUACOES_ACAO } from '../../oitod';
 import { ORIGENS_8D, TURNOS_8D, corStatus8D, labelStatus8D } from './OitoD';
 import Tabela from '../../components/Tabela';
 import { nomeCurto } from '../../formatos';
+import { CabecalhoDetalhe } from '../../design/painel';
+import { BotaoExcluir, BotaoPdf } from '../../design/acoes';
 
 // Metodo 5G — Doc BDBR.QUA.FMR.007.01.
 // Documento proprio (5G0001/2026): a maioria dos problemas nao vira 8D, e
@@ -276,35 +276,23 @@ export default function CincoGDetalhe() {
   return (
     <Form form={form} layout="vertical">
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
-        <Card
-          title={
-            <Space wrap>
-              <Typography.Title level={4} style={{ margin: 0 }}>
-                Método 5G {data.numero}
-              </Typography.Title>
+        <CabecalhoDetalhe
+          voltar={() => navigate('/manufatura/8d')}
+          titulo={`Método 5G ${data.numero}`}
+          etiqueta={
+            <>
               <Tag color={corStatus8D[data.status]}>
                 {labelStatus8D[data.status] ?? data.status}
               </Tag>
               {data.inspecao && <Tag>{data.inspecao.numero}</Tag>}
               {data.cnq && <Tag>{data.cnq.numero}</Tag>}
-            </Space>
+            </>
           }
-          extra={
-            <Space wrap>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/manufatura/8d')}
-              >
-                Voltar
-              </Button>
-              <Button
-                icon={<SaveOutlined />}
-                type="primary"
-                loading={salvando}
-                onClick={salvar}
-              >
-                Salvar
-              </Button>
+          acoes={
+            <>
+              <BotaoPdf
+                onClick={() => abrirPdfEmNovaAba(`/manufatura/5g/${id}/pdf`)}
+              />
               <Popconfirm
                 title="Aprovar este 5G pela Qualidade?"
                 okText="Aprovar"
@@ -319,25 +307,23 @@ export default function CincoGDetalhe() {
                 </Button>
               </Popconfirm>
               <Button
-                icon={<FilePdfOutlined />}
-                onClick={() => abrirPdfEmNovaAba(`/manufatura/5g/${id}/pdf`)}
+                icon={<SaveOutlined />}
+                type="primary"
+                loading={salvando}
+                onClick={salvar}
               >
-                Exportar PDF
+                Salvar
               </Button>
-              <Popconfirm
-                title="Excluir este 5G?"
-                description="A exclusão é definitiva."
-                okText="Excluir"
-                cancelText="Cancelar"
+              <BotaoExcluir
+                titulo={`Excluir o 5G ${data.numero}?`}
+                descricao="A exclusão é definitiva e não pode ser desfeita."
                 onConfirm={remover}
-              >
-                <Button danger icon={<DeleteOutlined />}>
-                  Excluir
-                </Button>
-              </Popconfirm>
-            </Space>
+              />
+            </>
           }
-        >
+        />
+
+        <Card>
           {!podeFechar && (
             <Alert
               type="warning"

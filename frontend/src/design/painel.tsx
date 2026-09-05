@@ -12,7 +12,8 @@
    =========================================================================== */
 
 import { ReactNode } from 'react';
-import { Card, Col, Row, Statistic, Tooltip, Typography } from 'antd';
+import { Button, Card, Col, Row, Space, Statistic, Tooltip, Typography } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { ESPACO, MARCA } from './tokens';
 import { numeroBR } from '../formatos';
 
@@ -180,6 +181,66 @@ export function CabecalhoPagina({
         )}
       </Col>
       {acoes && <Col flex="none">{acoes}</Col>}
+    </Row>
+  );
+}
+
+/**
+ * Cabecalho de tela de detalhe: Voltar, titulo, etiqueta de situacao e, do
+ * outro lado, as acoes do registro.
+ *
+ * Cada tela de detalhe tinha montado o seu proprio Row e a maioria esqueceu o
+ * gutter. Quando a fileira de acoes quebrava de linha - o que acontece assim
+ * que a janela encolhe ou o registro ganha mais um botao - os botoes colavam
+ * no titulo, sem nenhum respiro. Aqui a quebra ja vem com espaco.
+ */
+export function CabecalhoDetalhe({
+  voltar,
+  titulo,
+  etiqueta,
+  descricao,
+  acoes,
+}: {
+  voltar: () => void;
+  titulo: ReactNode;
+  /** Tag de situacao, ao lado do titulo. */
+  etiqueta?: ReactNode;
+  descricao?: ReactNode;
+  acoes?: ReactNode;
+}) {
+  return (
+    <Row
+      justify="space-between"
+      align="middle"
+      gutter={[ESPACO.lg, ESPACO.sm]}
+      wrap
+    >
+      <Col flex="auto" style={{ minWidth: 0 }}>
+        <Space align="center" size={ESPACO.md} wrap>
+          <Button icon={<ArrowLeftOutlined />} onClick={voltar}>
+            Voltar
+          </Button>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {titulo}
+          </Typography.Title>
+          {etiqueta}
+        </Space>
+        {descricao && (
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: 13, display: 'block', marginTop: ESPACO.xs }}
+          >
+            {descricao}
+          </Typography.Text>
+        )}
+      </Col>
+      {acoes && (
+        <Col flex="none">
+          <Space wrap size={ESPACO.sm}>
+            {acoes}
+          </Space>
+        </Col>
+      )}
     </Row>
   );
 }
