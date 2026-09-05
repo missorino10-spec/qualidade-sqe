@@ -248,7 +248,7 @@ export default function OitoD() {
               render: (d: string) => dataBR(d),
             },
             {
-              title: 'Produto / Item',
+              title: 'Produto / item',
               dataIndex: 'produtoItem',
               filters: filtrosDe((data ?? []).map((r: any) => r.produtoItem)),
               onFilter: (v: any, r: any) => r.produtoItem === v,
@@ -399,7 +399,7 @@ export default function OitoD() {
           </Row>
           <Row gutter={12}>
             <Col span={14}>
-              <Form.Item name="produtoItem" label="Produto / Item">
+              <Form.Item name="produtoItem" label="Produto / item">
                 <Input />
               </Form.Item>
             </Col>

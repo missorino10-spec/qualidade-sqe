@@ -657,7 +657,7 @@ export default function OitoDDetalhe() {
           </Row>
           <Row gutter={12}>
             <Col xs={24} md={10}>
-              <Form.Item name="produtoItem" label="Produto / Item">
+              <Form.Item name="produtoItem" label="Produto / item">
                 <Input />
               </Form.Item>
             </Col>

@@ -244,7 +244,7 @@ export default function ControleAutonomoDetalhe() {
           </Row>
           <Row gutter={12}>
             <Col xs={24} lg={10}>
-              <Form.Item name="itemId" label="Produto / Código">
+              <Form.Item name="itemId" label="Produto / código">
                 <SelectItem
                   allowClear
                   atual={

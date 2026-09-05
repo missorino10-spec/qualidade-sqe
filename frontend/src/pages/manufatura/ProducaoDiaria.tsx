@@ -236,7 +236,7 @@ export default function ProducaoDiaria() {
             })}
             columns={[
               { title: 'Código', dataIndex: 'codigo', width: 110 },
-              { title: 'Máquina / Linha', dataIndex: 'nome' },
+              { title: 'Máquina / linha', dataIndex: 'nome' },
               {
                 title: 'Área',
                 dataIndex: 'area',

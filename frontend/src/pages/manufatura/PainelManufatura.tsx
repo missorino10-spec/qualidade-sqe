@@ -283,7 +283,7 @@ export default function PainelManufatura() {
           pagination={false}
           scroll={{ x: 'max-content' }}
           columns={[
-            { title: 'Máquina / Linha', dataIndex: 'nome' },
+            { title: 'Máquina / linha', dataIndex: 'nome' },
             {
               title: 'Área',
               dataIndex: 'area',
@@ -353,7 +353,7 @@ export default function PainelManufatura() {
           scroll={{ x: 1100 }}
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 100 },
-            { title: 'Máquina / Linha', dataIndex: 'nome' },
+            { title: 'Máquina / linha', dataIndex: 'nome' },
             {
               title: 'Setups',
               dataIndex: 'setupsRealizados',

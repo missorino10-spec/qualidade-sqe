@@ -256,7 +256,7 @@ export default function ControleAutonomo() {
               render: (_: any, r: any) => r.maquina?.nome ?? '-',
             },
             {
-              title: 'Produto / Código',
+              title: 'Produto / código',
               render: (_: any, r: any) =>
                 r.item ? `${r.item.codigo} — ${r.item.descricao}` : '-',
             },
