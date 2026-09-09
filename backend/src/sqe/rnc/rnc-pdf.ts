@@ -163,7 +163,9 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       v: nomeCurto(rnc.criadoPor?.nome) || rnc.solicitante || 'Qualidade',
     },
     { w: 80, pt: 'Setor', en: 'Department', v: 'Qualidade / Quality' },
-    { w: 115, pt: 'Fornecedor', en: 'Vendor', v: rnc.fornecedor?.nome ?? '' },
+    // "Supplier", e nao "Vendor": e o termo que a casa usa nos formularios do
+    // SQD (Supplier Audit Record, Supplier Approval Record).
+    { w: 115, pt: 'Fornecedor', en: 'Supplier', v: rnc.fornecedor?.nome ?? '' },
     { w: 80, pt: 'Código', en: 'Code', v: rnc.fornecedor?.codigo ?? '' },
   ];
   let x = X0;
@@ -195,7 +197,9 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   cell(X0, y, 257, 30, 'Quantidade Afetada', 'Quantity Affected', String(rnc.quantidadePecas ?? ''), {
     labelFill: LARANJA,
   });
-  cell(X0 + 257, y, W - 257, 30, 'Reincidência?', 'Reincidence?', simNao(rnc.reincidencia), {
+  // "Recurrence", e nao "Reincidence": reincidence nao existe como termo da
+  // qualidade em ingles, e um decalque do portugues.
+  cell(X0 + 257, y, W - 257, 30, 'Reincidência?', 'Recurrence?', simNao(rnc.reincidencia), {
     labelFill: LARANJA,
   });
   y += 30;

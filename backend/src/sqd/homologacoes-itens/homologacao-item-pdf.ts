@@ -319,7 +319,7 @@ export function gerarPdfRelatorioInspecaoItem(
 
   t.cabecalho(
     'Relatório de Inspeção',
-    'Inspection Report — Amostras e Visual',
+    'Inspection Report — Samples and Visual',
     'BDBR.QUA.FMR.011.06 / FMR.06.07',
     r ? `${txt(h.numero)} — Rev. ${txt(r.revisao)}` : txt(h.numero),
   );
@@ -389,7 +389,7 @@ export function gerarPdfRelatorioInspecaoItem(
         label: 'TOLERÂNCIAS / TOLERANCES',
         valor: labelNorma(r.tolerancias),
       },
-      { w: 175, label: 'FORNECEDOR / VENDOR', valor: txt(h.fornecedorNome) },
+      { w: 175, label: 'FORNECEDOR / SUPPLIER', valor: txt(h.fornecedorNome) },
     ],
     40,
   );
@@ -412,7 +412,7 @@ export function gerarPdfRelatorioInspecaoItem(
   t.linha([
     {
       w: W / 2,
-      label: 'ELABORADO POR / ELABORATED BY',
+      label: 'ELABORADO POR / PREPARED BY',
       valor: nomeCurto(r.criadoPor?.nome) || txt(r.elaboradoPor),
     },
     {
