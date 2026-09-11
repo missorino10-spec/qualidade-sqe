@@ -8,13 +8,15 @@
 // Aqui elas viram UM componente. O ganho nao e visual: e que o usuario aprende
 // o gesto uma vez. Vermelho com confirmacao sempre apaga; o lapis sempre
 // corrige o que ja existe; o PDF fica sempre no mesmo canto.
-import type { ReactNode } from 'react';
-import { Button, Modal, Tooltip } from 'antd';
+import { useState, type ReactNode } from 'react';
+import { Button, message, Modal, Space, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   EditOutlined,
+  FileExcelOutlined,
   FilePdfOutlined,
 } from '@ant-design/icons';
+import { abrirPdfEmNovaAba, baixarArquivo } from '../api';
 
 // Exclusao de registro inteiro: sempre Modal.confirm, sempre com o nome do que
 // vai sumir no titulo, sempre com o botao vermelho escrito "Excluir".
@@ -139,5 +141,66 @@ export function BotaoPdf({
     <Button loading={carregando} icon={<FilePdfOutlined />} onClick={onClick}>
       {texto}
     </Button>
+  );
+}
+
+export function BotaoExcel({
+  onClick,
+  texto = 'Exportar Excel',
+  carregando,
+}: {
+  onClick: () => void;
+  texto?: string;
+  carregando?: boolean;
+}) {
+  return (
+    <Button loading={carregando} icon={<FileExcelOutlined />} onClick={onClick}>
+      {texto}
+    </Button>
+  );
+}
+
+// Par de botoes das telas de lista. Os dois batem no MESMO endpoint, com a
+// mesma query do filtro da tela: o que muda e so "formato". O PDF abre em aba
+// (e papel, para olhar e assinar); o Excel baixa (e para continuar a conta).
+export function ExportarLista({
+  url,
+  nome,
+  desabilitado,
+}: {
+  /** Rota do relatorio ja com a query do filtro, ex. "/rnc/relatorio?de=..." */
+  url: string;
+  /** Nome do arquivo, sem extensao, caso o servidor nao mande o dele. */
+  nome: string;
+  desabilitado?: boolean;
+}) {
+  const [baixando, setBaixando] = useState<'pdf' | 'excel' | null>(null);
+
+  async function exportar(formato: 'pdf' | 'excel') {
+    setBaixando(formato);
+    try {
+      const separador = url.includes('?') ? '&' : '?';
+      const destino = `${url}${separador}formato=${formato}`;
+      if (formato === 'pdf') await abrirPdfEmNovaAba(destino);
+      else await baixarArquivo(destino, `${nome}.xlsx`);
+    } catch {
+      message.error('Não foi possível gerar o arquivo.');
+    } finally {
+      setBaixando(null);
+    }
+  }
+
+  if (desabilitado) return null;
+  return (
+    <Space wrap>
+      <BotaoPdf
+        carregando={baixando === 'pdf'}
+        onClick={() => exportar('pdf')}
+      />
+      <BotaoExcel
+        carregando={baixando === 'excel'}
+        onClick={() => exportar('excel')}
+      />
+    </Space>
   );
 }

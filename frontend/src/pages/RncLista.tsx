@@ -11,13 +11,16 @@ import {
   Select,
   Space,
   Tag,
+  Typography,
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, queryDeFiltro } from '../api';
+import FiltroPeriodo, { usarPeriodo } from '../components/FiltroPeriodo';
+import { ExportarLista } from '../design/acoes';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
 import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
@@ -66,7 +69,18 @@ export default function RncLista() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [filtroStatus, setFiltroStatus] = useState<string | undefined>();
+  const [filtroFornecedor, setFiltroFornecedor] = useState<number | undefined>();
   const { data: fornecedores } = useFornecedores();
+
+  // O recorte vale para a lista e para a exportacao: o PDF e a planilha saem
+  // com exatamente o que esta na tela.
+  const periodo = usarPeriodo();
+  const filtro = {
+    de: periodo.de,
+    ate: periodo.ate,
+    status: filtroStatus,
+    fornecedorId: filtroFornecedor,
+  };
 
   const hoje = dayjs();
   const { semana: semanaHoje, ano: anoHoje } = semanaAno(hoje.toDate());
@@ -76,9 +90,14 @@ export default function RncLista() {
   const ctrlTotal = useValorTotal(form, CAMPOS_VALOR);
 
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['rnc', filtroStatus],
-    queryFn: async () =>
-      (await api.get('/rnc', { params: { status: filtroStatus } })).data,
+    queryKey: [
+      'rnc',
+      filtro.de,
+      filtro.ate,
+      filtro.status,
+      filtro.fornecedorId,
+    ],
+    queryFn: async () => (await api.get('/rnc', { params: filtro })).data,
   });
 
   const filtrosDe = (
@@ -109,14 +128,16 @@ export default function RncLista() {
   });
 
   return (
-    <Card
-      title="RNC — Registros de Não Conformidade"
-      extra={
-        <Space>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <FiltroPeriodo controle={periodo}>
+        <Col xs={24} sm={12} lg={11}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Status
+          </Typography.Text>
           <Select
             allowClear
-            placeholder="Filtrar por status"
-            style={{ width: 190 }}
+            placeholder="Todos"
+            style={{ width: '100%' }}
             value={filtroStatus}
             onChange={setFiltroStatus}
             options={Object.entries(labelStatusRnc).map(([v, l]) => ({
@@ -124,143 +145,170 @@ export default function RncLista() {
               label: l,
             }))}
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setOpen(true)}
-          >
-            Abrir RNC
-          </Button>
-        </Space>
-      }
-    >
-      <Tabela
-        busca="Buscar RNC (número, fornecedor, item, desvio...)"
-        rowKey="id"
-        loading={isLoading}
-        dataSource={data}
-        scroll={{ x: 'max-content' }}
-        onRow={(r) => ({
-          onClick: () => navigate(`/rnc/${r.id}`),
-          style: { cursor: 'pointer' },
-        })}
-        columns={[
-          { title: 'Número', dataIndex: 'numero', width: 100 },
-          {
-            title: 'Abertura',
-            dataIndex: 'dataAbertura',
-            width: 110,
-            defaultSortOrder: 'descend',
-            sorter: (a: any, b: any) =>
-              dayjs(a.dataAbertura).valueOf() - dayjs(b.dataAbertura).valueOf(),
-            render: (d: string) => dayjs(d).format('DD/MM/YYYY'),
-          },
-          { title: 'Semana', dataIndex: 'semana', width: 90, render: (v?: string) => v ?? '-' },
-          { title: 'Ano', dataIndex: 'ano', width: 80 },
-          {
-            title: 'Fornecedor',
-            filters: filtrosFornecedor,
-            onFilter: (v: any, r: any) => r.fornecedor?.nome === v,
-            render: (_: any, r: any) => r.fornecedor?.nome,
-          },
-          {
-            title: 'Item',
-            filters: filtrosItem,
-            onFilter: (v: any, r: any) => r.item?.descricao === v,
-            render: (_: any, r: any) => r.item?.descricao,
-          },
-          {
-            title: 'Tipo de desvio',
-            dataIndex: 'tipoDesvio',
-            width: 160,
-            filters: filtrosTipo,
-            onFilter: (v: any, r: any) => rotuloTipoDesvio(r.tipoDesvio) === v,
-            render: (v?: string) => rotuloTipoDesvio(v) || '-',
-          },
-          {
-            title: 'Reincidência',
-            dataIndex: 'reincidencia',
-            width: 110,
-            align: 'center',
-            filters: [
-              { text: 'Sim', value: true },
-              { text: 'Não', value: false },
-            ],
-            onFilter: (v: any, r: any) => r.reincidencia === v,
-            render: (v: boolean) =>
-              v ? <Tag color="red">Sim</Tag> : <Tag>Não</Tag>,
-          },
-          {
-            title: 'Desvio de qualidade',
-            dataIndex: 'desvioQualidade',
-            width: 150,
-            align: 'center',
-            filters: FILTROS_DESVIO,
-            onFilter: (v: any, r: any) => situacaoDesvio(r).valor === v,
-            render: (_: any, r: any) => {
-              const s = situacaoDesvio(r);
-              return <Tag color={s.cor}>{s.texto}</Tag>;
+        </Col>
+        <Col xs={24} sm={12} lg={13}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Fornecedor
+          </Typography.Text>
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Todos"
+            style={{ width: '100%' }}
+            value={filtroFornecedor}
+            onChange={setFiltroFornecedor}
+            options={opcoesFornecedor(fornecedores)}
+          />
+        </Col>
+      </FiltroPeriodo>
+
+      <Card
+        title="RNC — Registros de Não Conformidade"
+        extra={
+          <Space wrap>
+            <ExportarLista
+              url={`/rnc/relatorio${queryDeFiltro(filtro)}`}
+              nome="rnc"
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setOpen(true)}
+            >
+              Abrir RNC
+            </Button>
+          </Space>
+        }
+      >
+        <Tabela
+          busca="Buscar RNC (número, fornecedor, item, desvio...)"
+          rowKey="id"
+          loading={isLoading}
+          dataSource={data}
+          scroll={{ x: 'max-content' }}
+          onRow={(r) => ({
+            onClick: () => navigate(`/rnc/${r.id}`),
+            style: { cursor: 'pointer' },
+          })}
+          columns={[
+            { title: 'Número', dataIndex: 'numero', width: 100 },
+            {
+              title: 'Abertura',
+              dataIndex: 'dataAbertura',
+              width: 110,
+              defaultSortOrder: 'descend',
+              sorter: (a: any, b: any) =>
+                dayjs(a.dataAbertura).valueOf() - dayjs(b.dataAbertura).valueOf(),
+              render: (d: string) => dayjs(d).format('DD/MM/YYYY'),
             },
-          },
-          {
-            title: 'Valor (R$)',
-            dataIndex: 'valorTotal',
-            width: 120,
-            align: 'right',
-            sorter: (a: any, b: any) =>
-              (a.valorTotal ?? 0) - (b.valorTotal ?? 0),
-            render: (v?: number) => (v ? numeroBR(v, 2) : '-'),
-          },
-          {
-            title: 'Status',
-            dataIndex: 'status',
-            width: 130,
-            filters: Object.entries(labelStatusRnc).map(([value, text]) => ({
-              text,
-              value,
-            })),
-            onFilter: (v: any, r: any) => r.status === v,
-            render: (s: string) => (
-              <Tag color={corStatusRnc[s]}>{labelStatusRnc[s] ?? s}</Tag>
-            ),
-          },
-          {
-            title: 'Eficácia',
-            dataIndex: 'verificacaoEficacia',
-            width: 110,
-            filters: Object.entries(labelEficacia).map(([value, text]) => ({
-              text,
-              value,
-            })),
-            onFilter: (v: any, r: any) => r.verificacaoEficacia === v,
-            render: (e: string) => (
-              <Tag color={corEficacia[e]}>{labelEficacia[e] ?? e}</Tag>
-            ),
-          },
-          // Lead time INTERNO: da abertura ao envio do documento ao
-          // fornecedor. So existe na tela; nao entra no PDF da RNC.
-          {
-            title: 'Envio ao fornecedor',
-            dataIndex: 'enviadaFornecedor',
-            width: 150,
-            filters: [
-              { text: 'Enviada', value: true },
-              { text: 'Não enviada', value: false },
-            ],
-            onFilter: (v: any, r: any) => !!r.enviadaFornecedor === v,
-            render: (_: any, r: any) =>
-              r.enviadaFornecedor ? (
-                <Tag color="green">
-                  {r.leadTimeEnvioDias != null
-                    ? `Enviada — ${r.leadTimeEnvioDias} dia(s)`
-                    : 'Enviada'}
-                </Tag>
-              ) : (
-                <Tag color="orange">Não enviada</Tag>
+            { title: 'Semana', dataIndex: 'semana', width: 90, render: (v?: string) => v ?? '-' },
+            { title: 'Ano', dataIndex: 'ano', width: 80 },
+            {
+              title: 'Fornecedor',
+              filters: filtrosFornecedor,
+              onFilter: (v: any, r: any) => r.fornecedor?.nome === v,
+              render: (_: any, r: any) => r.fornecedor?.nome,
+            },
+            {
+              title: 'Item',
+              filters: filtrosItem,
+              onFilter: (v: any, r: any) => r.item?.descricao === v,
+              render: (_: any, r: any) => r.item?.descricao,
+            },
+            {
+              title: 'Tipo de desvio',
+              dataIndex: 'tipoDesvio',
+              width: 160,
+              filters: filtrosTipo,
+              onFilter: (v: any, r: any) => rotuloTipoDesvio(r.tipoDesvio) === v,
+              render: (v?: string) => rotuloTipoDesvio(v) || '-',
+            },
+            {
+              title: 'Reincidência',
+              dataIndex: 'reincidencia',
+              width: 110,
+              align: 'center',
+              filters: [
+                { text: 'Sim', value: true },
+                { text: 'Não', value: false },
+              ],
+              onFilter: (v: any, r: any) => r.reincidencia === v,
+              render: (v: boolean) =>
+                v ? <Tag color="red">Sim</Tag> : <Tag>Não</Tag>,
+            },
+            {
+              title: 'Desvio de qualidade',
+              dataIndex: 'desvioQualidade',
+              width: 150,
+              align: 'center',
+              filters: FILTROS_DESVIO,
+              onFilter: (v: any, r: any) => situacaoDesvio(r).valor === v,
+              render: (_: any, r: any) => {
+                const s = situacaoDesvio(r);
+                return <Tag color={s.cor}>{s.texto}</Tag>;
+              },
+            },
+            {
+              title: 'Valor (R$)',
+              dataIndex: 'valorTotal',
+              width: 120,
+              align: 'right',
+              sorter: (a: any, b: any) =>
+                (a.valorTotal ?? 0) - (b.valorTotal ?? 0),
+              render: (v?: number) => (v ? numeroBR(v, 2) : '-'),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'status',
+              width: 130,
+              filters: Object.entries(labelStatusRnc).map(([value, text]) => ({
+                text,
+                value,
+              })),
+              onFilter: (v: any, r: any) => r.status === v,
+              render: (s: string) => (
+                <Tag color={corStatusRnc[s]}>{labelStatusRnc[s] ?? s}</Tag>
               ),
-          },
-        ]}
-      />
+            },
+            {
+              title: 'Eficácia',
+              dataIndex: 'verificacaoEficacia',
+              width: 110,
+              filters: Object.entries(labelEficacia).map(([value, text]) => ({
+                text,
+                value,
+              })),
+              onFilter: (v: any, r: any) => r.verificacaoEficacia === v,
+              render: (e: string) => (
+                <Tag color={corEficacia[e]}>{labelEficacia[e] ?? e}</Tag>
+              ),
+            },
+            // Lead time INTERNO: da abertura ao envio do documento ao
+            // fornecedor. So existe na tela; nao entra no PDF da RNC.
+            {
+              title: 'Envio ao fornecedor',
+              dataIndex: 'enviadaFornecedor',
+              width: 150,
+              filters: [
+                { text: 'Enviada', value: true },
+                { text: 'Não enviada', value: false },
+              ],
+              onFilter: (v: any, r: any) => !!r.enviadaFornecedor === v,
+              render: (_: any, r: any) =>
+                r.enviadaFornecedor ? (
+                  <Tag color="green">
+                    {r.leadTimeEnvioDias != null
+                      ? `Enviada — ${r.leadTimeEnvioDias} dia(s)`
+                      : 'Enviada'}
+                  </Tag>
+                ) : (
+                  <Tag color="orange">Não enviada</Tag>
+                ),
+            },
+          ]}
+        />
+      </Card>
 
       <Modal
         title="Abrir RNC (Registro de Não Conformidade)"
@@ -377,6 +425,6 @@ export default function RncLista() {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </Space>
   );
 }

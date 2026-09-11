@@ -52,3 +52,31 @@ export async function abrirPdfEmNovaAba(url: string): Promise<void> {
   const objectUrl = await baixarBlobUrl(url);
   window.open(objectUrl, '_blank');
 }
+
+// Planilha nao abre em aba: tem que baixar. O nome do arquivo vem do servidor
+// (Content-Disposition); sem ele o navegador salva com o nome da rota.
+export async function baixarArquivo(url: string, nomePadrao: string) {
+  const resp = await api.get(url, { responseType: 'blob' });
+  const disposicao = String(resp.headers['content-disposition'] ?? '');
+  const nome = /filename="?([^";]+)"?/.exec(disposicao)?.[1] ?? nomePadrao;
+  const objectUrl = URL.createObjectURL(resp.data);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+// Monta a query string ignorando filtro vazio: "?de=&ate=" faria o servidor
+// receber string vazia em vez de "sem filtro".
+export function queryDeFiltro(filtro: Record<string, any>): string {
+  const params = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(filtro)) {
+    if (valor === undefined || valor === null || valor === '') continue;
+    params.set(chave, String(valor));
+  }
+  const texto = params.toString();
+  return texto ? `?${texto}` : '';
+}

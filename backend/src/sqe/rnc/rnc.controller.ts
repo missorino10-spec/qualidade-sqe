@@ -24,6 +24,10 @@ import { Type } from 'class-transformer';
 import type { Response } from 'express';
 import { RncService } from './rnc.service';
 import { gerarPdfRnc } from './rnc-pdf';
+import {
+  periodoTexto,
+  responderRelatorio,
+} from '../../comum/relatorio-lista';
 import { StorageService } from '../../anexos/storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -116,6 +120,21 @@ class EncerrarDesvioDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
+// O relatorio sai com as mesmas palavras da tela: quem exporta compara o papel
+// com a lista e os dois tem que dizer a mesma coisa.
+const ROTULO_STATUS: Record<string, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  FINALIZADA: 'Finalizada',
+  CANCELADA: 'Cancelada',
+};
+
+const ROTULO_NIVEL_PLANO: Record<string, string> = {
+  RUIM: 'Ruim',
+  SATISFATORIO: 'Satisfatório',
+  EXCELENTE: 'Excelente',
+  NAO_APLICAVEL: 'Não aplicável',
+};
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQE)
 @Controller('rnc')
@@ -139,6 +158,90 @@ export class RncController {
       de,
       ate,
     });
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('status') status?: string,
+    @Query('fornecedorId') fornecedorId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const id = fornecedorId ? Number(fornecedorId) : undefined;
+    const rncs = await this.service.findAll({ status, fornecedorId: id, de, ate });
+    const fornecedor = id
+      ? (rncs[0] as any)?.fornecedor?.nome
+      : undefined;
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Relatório de RNC',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Status',
+            valor: status ? (ROTULO_STATUS[status] ?? status) : 'Todos',
+          },
+          { rotulo: 'Fornecedor', valor: fornecedor ?? 'Todos' },
+        ],
+        totais: [
+          {
+            rotulo: 'Custo total',
+            valor: `R$ ${rncs
+              .reduce((t: number, r: any) => t + Number(r.valorTotal ?? 0), 0)
+              .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          },
+          {
+            rotulo: 'Em andamento',
+            valor: String(
+              rncs.filter((r: any) => r.status === 'EM_ANDAMENTO').length,
+            ),
+          },
+          {
+            rotulo: 'Finalizadas',
+            valor: String(
+              rncs.filter((r: any) => r.status === 'FINALIZADA').length,
+            ),
+          },
+        ],
+        colunas: [
+          { titulo: 'Número', peso: 50, valor: (r: any) => r.numero },
+          { titulo: 'Abertura', peso: 42, valor: (r: any) => r.dataAbertura, tipo: 'data' },
+          { titulo: 'Fornecedor', peso: 100, valor: (r: any) => r.fornecedor?.nome },
+          {
+            titulo: 'Item',
+            peso: 110,
+            valor: (r: any) =>
+              [r.item?.codigo, r.item?.descricao].filter(Boolean).join(' — '),
+          },
+          { titulo: 'Tipo de desvio', peso: 70, valor: (r: any) => r.tipoDesvio },
+          { titulo: 'Descrição do desvio', peso: 120, valor: (r: any) => r.descricaoDesvio },
+          { titulo: 'Qtd. peças', peso: 40, valor: (r: any) => r.quantidadePecas, tipo: 'numero' },
+          { titulo: 'Custo', peso: 55, valor: (r: any) => r.valorTotal, tipo: 'moeda', negrito: true },
+          {
+            titulo: 'Enviada em',
+            peso: 45,
+            valor: (r: any) => r.dataEnvioFornecedor,
+            tipo: 'data',
+          },
+          { titulo: 'Retorno', peso: 45, valor: (r: any) => r.dataRetorno, tipo: 'data' },
+          {
+            titulo: 'Plano de ação',
+            peso: 55,
+            valor: (r: any) => ROTULO_NIVEL_PLANO[r.nivelPlano] ?? '',
+          },
+          { titulo: 'Status', peso: 55, valor: (r: any) => ROTULO_STATUS[r.status] ?? r.status },
+        ],
+        linhas: rncs,
+      },
+      formato,
+    );
   }
 
   // Consulta antes de abrir a RNC: o mesmo fornecedor ja repetiu este modo de
