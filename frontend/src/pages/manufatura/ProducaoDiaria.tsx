@@ -24,7 +24,7 @@ import { api } from '../../api';
 import { dataInput, numeroBR, separadoresBR } from '../../formatos';
 import Tabela from '../../components/Tabela';
 import { COR, MARCA } from '../../design/tokens';
-import { BotaoExcluir } from '../../design/acoes';
+import { BotaoExcluir, ExportarLista } from '../../design/acoes';
 
 // Lancamento da producao (qtd produzida e qtd com defeito) e o PPM resultante,
 // como na planilha. PPM = (pecas com defeito / pecas produzidas) * 1.000.000.
@@ -218,7 +218,18 @@ export default function ProducaoDiaria() {
 
         {indicadores(resumo, carregandoResumo)}
 
-        <Card size="small" title={`Resumo por máquina — ${mes.format('MM/YYYY')}`}>
+        <Card
+          size="small"
+          title={`Resumo por máquina — ${mes.format('MM/YYYY')}`}
+          // O recorte desta tela e o mes inteiro, escolhido no seletor acima:
+          // o relatorio sai com o mesmo mes que esta na tabela.
+          extra={
+            <ExportarLista
+              url={`/maquinas/producao/relatorio?ano=${ano}&mes=${numeroMes}`}
+              nome={`producao-ppm-${mes.format('YYYY-MM')}`}
+            />
+          }
+        >
           <Tabela
             busca="Buscar máquina / linha"
             size="small"

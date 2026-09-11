@@ -34,8 +34,10 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, queryDeFiltro } from '../api';
 import { useAuth } from '../auth';
+import FiltroPeriodo, { usarPeriodo } from '../components/FiltroPeriodo';
+import { ExportarLista } from '../design/acoes';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
 import {
@@ -267,9 +269,14 @@ export default function Inspecoes() {
     queryFn: async () => (await api.get('/inspecoes/template-visual')).data,
   });
 
+  // O recorte da lista vale tambem para a exportacao: o PDF e a planilha saem
+  // com exatamente as inspecoes que estao na tela.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['inspecoes'],
-    queryFn: async () => (await api.get('/inspecoes')).data,
+    queryKey: ['inspecoes', filtro.de, filtro.ate],
+    queryFn: async () => (await api.get('/inspecoes', { params: filtro })).data,
   });
 
   // Avalia recebimento (classificacao + periodicidade + contador ciclico).
@@ -950,20 +957,29 @@ export default function Inspecoes() {
   const filtrosItem = filtrosDe((data ?? []).map((r) => r.item?.descricao));
 
   return (
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <FiltroPeriodo controle={periodo} />
+
     <Card
       title="Inspeções de recebimento"
       extra={
-        // Abre o formulario padrao em branco. O caminho contrario continua
-        // valendo: o registro de entrada leva direto para a inspecao, porque
-        // ali a carga ja chegou. Mas a inspecao pode ser aberta a qualquer
-        // hora, sem passar pelo registro.
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => novaInspecao()}
-        >
-          Nova inspeção
-        </Button>
+        <Space wrap>
+          <ExportarLista
+            url={`/inspecoes/relatorio${queryDeFiltro(filtro)}`}
+            nome="inspecoes"
+          />
+          {/* Abre o formulario padrao em branco. O caminho contrario continua
+              valendo: o registro de entrada leva direto para a inspecao,
+              porque ali a carga ja chegou. Mas a inspecao pode ser aberta a
+              qualquer hora, sem passar pelo registro. */}
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => novaInspecao()}
+          >
+            Nova inspeção
+          </Button>
+        </Space>
       }
     >
       <Tabela
@@ -1839,5 +1855,6 @@ export default function Inspecoes() {
         </Form>
       </Modal>
     </Card>
+    </Space>
   );
 }

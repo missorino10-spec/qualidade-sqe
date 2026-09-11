@@ -14,7 +14,9 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, queryDeFiltro } from '../../api';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
+import { ExportarLista } from '../../design/acoes';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
 import { DesenhoExtra, EVID } from '../../inspecao';
@@ -59,17 +61,23 @@ export default function InspecoesManufatura({
 
   const maquinaId = Form.useWatch('maquinaId', form);
 
+  // O mesmo recorte vale para as duas listas e para a exportacao. A aba fica
+  // controlada porque o botao de exportar precisa saber qual documento esta a
+  // vista: dimensional e visual sao rotas diferentes.
+  const periodo = usarPeriodo();
+  const [aba, setAba] = useState('dimensional');
+  const filtro = { tipo, de: periodo.de, ate: periodo.ate };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['manufatura-inspecoes', tipo],
+    queryKey: ['manufatura-inspecoes', tipo, periodo.de, periodo.ate],
     queryFn: async () =>
-      (await api.get('/manufatura/inspecoes', { params: { tipo } })).data,
+      (await api.get('/manufatura/inspecoes', { params: filtro })).data,
   });
 
   const { data: visuais, isLoading: carregandoVisuais } = useQuery<any[]>({
-    queryKey: ['manufatura-inspecoes-visuais', tipo],
+    queryKey: ['manufatura-inspecoes-visuais', tipo, periodo.de, periodo.ate],
     queryFn: async () =>
-      (await api.get('/manufatura/inspecoes-visuais', { params: { tipo } }))
-        .data,
+      (await api.get('/manufatura/inspecoes-visuais', { params: filtro })).data,
   });
 
   const { data: maquinas } = useQuery<any[]>({
@@ -259,10 +267,26 @@ export default function InspecoesManufatura({
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      {/* O filtro vale para as duas abas e para a exportacao. */}
+      <FiltroPeriodo controle={periodo} />
+
       <Card
         title={titulo}
         extra={
-          <Space>
+          <Space wrap>
+            {/* Exporta o documento da aba aberta, no mesmo recorte da tela. */}
+            <ExportarLista
+              url={
+                aba === 'visual'
+                  ? `/manufatura/inspecoes-visuais/relatorio${queryDeFiltro(filtro)}`
+                  : `/manufatura/inspecoes/relatorio${queryDeFiltro(filtro)}`
+              }
+              nome={
+                tipo === 'SETUP'
+                  ? `inspecoes-setup-${aba}`
+                  : `inspecoes-producao-${aba}`
+              }
+            />
             <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
               Inspeção dimensional
             </Button>
@@ -280,6 +304,8 @@ export default function InspecoesManufatura({
             numeracao propria. A dimensional tem cotas e resultado; a visual e
             um registro descritivo. */}
         <Tabs
+          activeKey={aba}
+          onChange={setAba}
           items={[
             {
               key: 'dimensional',

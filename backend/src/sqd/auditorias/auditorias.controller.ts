@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 import { AuditoriasService } from './auditorias.service';
 import {
   gerarPdfRegistroAuditoria,
@@ -69,6 +70,37 @@ class RodadaAuditoriaDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
+// O relatorio sai com as mesmas palavras da tela: quem exporta compara o papel
+// com a lista e os dois tem que dizer a mesma coisa.
+const ROTULO_STATUS_AUDITORIA: Record<string, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+};
+
+const ROTULO_RESULTADO_AUDITORIA: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  APROVADO_CONDICIONALMENTE: 'Aprovado Condicionalmente',
+  REPROVADO: 'Reprovado',
+  CANCELADO: 'Cancelado',
+};
+
+// Mesma leitura do semaforo da tela (pages/sqd/comum.ts): o papel precisa
+// dizer ate quando reavaliar e quanto falta, nao so a cor.
+function textoReavaliacao(r: any): string {
+  if (!r?.dataLimite) return '';
+  const limite = new Date(r.dataLimite).toLocaleDateString('pt-BR', {
+    timeZone: 'UTC',
+  });
+  const dias = Math.abs(r.diasRestantes);
+  const plural = dias === 1 ? '' : 's';
+  if (r.diasRestantes < 0) {
+    return `Reavaliar até ${limite} · vencida há ${dias} dia${plural}`;
+  }
+  if (r.diasRestantes === 0) return `Reavaliar até ${limite} · vence hoje`;
+  return `Reavaliar até ${limite} · faltam ${dias} dia${plural}`;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQD)
 @Controller('sqd/auditorias')
@@ -82,8 +114,83 @@ export class AuditoriasController {
   }
 
   @Get()
-  listar(@Query('ano') ano?: string) {
-    return this.service.listar(ano ? Number(ano) : undefined);
+  listar(
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listar(ano ? Number(ano) : undefined, de, ate);
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const registros = await this.service.listar(
+      ano ? Number(ano) : undefined,
+      de,
+      ate,
+    );
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Auditoria de Fornecedores',
+        emitidoPor: user.nome,
+        filtros: [{ rotulo: 'Período', valor: periodoTexto(de, ate) }],
+        colunas: [
+          { titulo: 'Número', peso: 60, valor: (a: any) => a.numero },
+          { titulo: 'Rev.', peso: 25, valor: (a: any) => a.revisao },
+          {
+            titulo: 'Auditoria',
+            peso: 45,
+            valor: (a: any) => a.dataAuditoria,
+            tipo: 'data',
+          },
+          { titulo: 'Semana', peso: 35, valor: (a: any) => a.semana },
+          {
+            titulo: 'Fornecedor',
+            peso: 120,
+            valor: (a: any) => a.fornecedorNome,
+          },
+          { titulo: 'Motivo', peso: 100, valor: (a: any) => a.motivo },
+          {
+            titulo: 'Nota',
+            peso: 35,
+            valor: (a: any) => a.nota,
+            tipo: 'numero',
+            negrito: true,
+          },
+          {
+            titulo: 'Resultado',
+            peso: 90,
+            valor: (a: any) =>
+              a.resultado
+                ? (ROTULO_RESULTADO_AUDITORIA[a.resultado] ?? a.resultado)
+                : 'Aguardando checklist',
+          },
+          {
+            titulo: 'Reavaliação',
+            peso: 130,
+            valor: (a: any) => textoReavaliacao(a.reavaliacao),
+          },
+          {
+            titulo: 'Status',
+            peso: 55,
+            valor: (a: any) =>
+              ROTULO_STATUS_AUDITORIA[a.statusAuditoria] ?? a.statusAuditoria,
+          },
+        ],
+        linhas: registros,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

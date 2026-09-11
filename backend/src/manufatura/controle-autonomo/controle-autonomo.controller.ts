@@ -25,7 +25,12 @@ import { StorageService } from '../../anexos/storage.service';
 import { FOTO_ICAQ } from '../../comum/icaq';
 import { ControleAutonomoService } from './controle-autonomo.service';
 import { gerarPdfControleAutonomo, FotosIcaq } from './controle-autonomo-pdf';
-import { VERIFICACOES_ICAQ } from './icaq-utils';
+import {
+  VERIFICACOES_ICAQ,
+  rotuloClassificacaoIcaq,
+  rotuloTurnoIcaq,
+} from './icaq-utils';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 
 // ICAQ - Auditoria do Controle Autonomo da Qualidade.
 // A auditoria e lancada e fechada de uma vez: as dez linhas chegam juntas.
@@ -88,6 +93,112 @@ export class ControleAutonomoController {
       de,
       ate,
       maquinaId ? Number(maquinaId) : undefined,
+    );
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+    @Query('maquinaId') maquinaId?: string,
+  ) {
+    const id = maquinaId ? Number(maquinaId) : undefined;
+    const auditorias = await this.service.listar(de, ate, id);
+    // O nome vem do cadastro: o recorte pode nao ter nenhuma auditoria e ainda
+    // assim precisa dizer qual equipamento foi escolhido.
+    const maquina = id
+      ? await this.prisma.maquina.findUnique({ where: { id } })
+      : null;
+
+    // Os mesmos numeros dos cartoes do topo da tela.
+    const soma = auditorias.reduce((t, a) => t + (a.nota ?? 0), 0);
+    const notaMedia = auditorias.length
+      ? Math.round((soma / auditorias.length) * 10) / 10
+      : 0;
+    const conformes = auditorias.filter(
+      (a) => a.classificacao === 'CONFORME',
+    ).length;
+    const pct = (parte: number) =>
+      auditorias.length
+        ? `${(Math.round((parte / auditorias.length) * 1000) / 10).toLocaleString(
+            'pt-BR',
+            { minimumFractionDigits: 1 },
+          )}%`
+        : '0,0%';
+
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'ICAQ — Controle Autônomo da Qualidade',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Equipamento',
+            valor: maquina ? `${maquina.codigo} — ${maquina.nome}` : 'Todos',
+          },
+        ],
+        totais: [
+          { rotulo: 'Auditorias', valor: String(auditorias.length) },
+          {
+            rotulo: 'Nota média',
+            valor: `${notaMedia.toLocaleString('pt-BR', {
+              minimumFractionDigits: 1,
+            })}%`,
+          },
+          { rotulo: 'Dentro do padrão', valor: pct(conformes) },
+          {
+            rotulo: 'Fora do padrão',
+            valor: pct(auditorias.length - conformes),
+          },
+        ],
+        colunas: [
+          { titulo: 'Número', peso: 60, valor: (a: any) => a.numero },
+          {
+            titulo: 'Data',
+            peso: 44,
+            valor: (a: any) => a.dataAuditoria,
+            tipo: 'data',
+          },
+          { titulo: 'Turno', peso: 44, valor: (a: any) => rotuloTurnoIcaq(a.turno) },
+          {
+            titulo: 'Equipamento',
+            peso: 90,
+            valor: (a: any) => a.maquina?.nome,
+          },
+          {
+            titulo: 'Produto / código',
+            peso: 110,
+            valor: (a: any) =>
+              a.item ? `${a.item.codigo} — ${a.item.descricao}` : '',
+          },
+          { titulo: 'Ordem / lote', peso: 60, valor: (a: any) => a.ordemLote },
+          {
+            titulo: 'Operador auditado',
+            peso: 80,
+            valor: (a: any) => a.operador,
+          },
+          {
+            titulo: 'Nota',
+            peso: 40,
+            valor: (a: any) => a.nota,
+            tipo: 'percentual',
+            negrito: true,
+          },
+          {
+            titulo: 'Classificação',
+            peso: 60,
+            valor: (a: any) => rotuloClassificacaoIcaq(a.classificacao),
+          },
+        ],
+        linhas: auditorias,
+      },
+      formato,
     );
   }
 

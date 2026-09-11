@@ -29,6 +29,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { gerarInventarioPdf } from './instrumentos-pdf';
+import { periodoTexto, responderRelatorio } from '../comum/relatorio-lista';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../auth/modulo.decorator';
 import { PermissaoGuard } from '../auth/permissao.guard';
@@ -75,20 +76,57 @@ function dataOuNulo(texto?: string | null) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Dias que faltam para a proxima calibracao, na mesma conta da tela: em dias
+// cheios e em UTC, porque a data vem gravada como meia-noite UTC e comparar no
+// fuso do servidor faria a calibracao de hoje aparecer como vencida ontem.
+function diasParaVencer(proxima?: Date | null): number | null {
+  if (!proxima) return null;
+  const dia = 24 * 60 * 60 * 1000;
+  const alvo = Date.UTC(
+    proxima.getUTCFullYear(),
+    proxima.getUTCMonth(),
+    proxima.getUTCDate(),
+  );
+  const agora = new Date();
+  const hoje = Date.UTC(
+    agora.getUTCFullYear(),
+    agora.getUTCMonth(),
+    agora.getUTCDate(),
+  );
+  return Math.round((alvo - hoje) / dia);
+}
+
+// Mesmo texto da etiqueta de Situação da tela.
+function situacaoTexto(i: any): string {
+  if (!i.ativo) return 'Inativo';
+  const dias = diasParaVencer(i.proximaCalibracao);
+  if (dias === null) return 'Sem data';
+  if (dias < 0) return `Vencida há ${Math.abs(dias)} dia(s)`;
+  if (dias <= 30) return `Vence em ${dias} dia(s)`;
+  return `${dias} dia(s)`;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.CAD_INSTRUMENTOS, { leituraLivre: true })
 @Controller('instrumentos')
 export class InstrumentosController {
   constructor(private prisma: PrismaService) {}
 
-  @Get()
-  listar(
-    @Query('busca') busca?: string,
-    @Query('incluirInativos') incluirInativos?: string,
-  ) {
-    const termo = (busca ?? '').trim();
+  // Uma consulta so para a tela e para o relatorio: se cada um montasse o seu
+  // where, o papel exportado poderia trazer linha que a lista nao mostra.
+  //
+  // O recorte por data cai sobre a PROXIMA CALIBRACAO. Instrumento nao tem data
+  // de lancamento - ele nao "acontece" num dia; o que tem prazo e a calibracao,
+  // e e por ela que se pergunta "o que vence neste mes".
+  private buscar(filtros: {
+    busca?: string;
+    incluirInativos?: string;
+    de?: string;
+    ate?: string;
+  }) {
+    const termo = (filtros.busca ?? '').trim();
     const where: Prisma.InstrumentoWhereInput = {};
-    if (incluirInativos !== 'true') where.ativo = true;
+    if (filtros.incluirInativos !== 'true') where.ativo = true;
     if (termo) {
       where.OR = [
         { codigo: { contains: termo, mode: 'insensitive' } },
@@ -99,12 +137,109 @@ export class InstrumentosController {
         { localizacao: { contains: termo, mode: 'insensitive' } },
       ];
     }
+    if (filtros.de || filtros.ate) {
+      where.proximaCalibracao = {
+        gte: filtros.de ? new Date(filtros.de) : undefined,
+        lte: filtros.ate ? new Date(`${filtros.ate}T23:59:59.999Z`) : undefined,
+      };
+    }
     // Mesma ordem da planilha impressa: pelo codigo, e as linhas sem codigo
     // ("-") no fim, agrupadas pelo equipamento.
     return this.prisma.instrumento.findMany({
       where,
       orderBy: [{ codigo: 'asc' }, { equipamento: 'asc' }],
     });
+  }
+
+  @Get()
+  listar(
+    @Query('busca') busca?: string,
+    @Query('incluirInativos') incluirInativos?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.buscar({ busca, incluirInativos, de, ate });
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  //
+  // Fora da leitura livre da classe, como o PDF do inventario: a lista continua
+  // aberta porque alimenta os combos dos lancamentos, mas o documento do
+  // cadastro so sai para quem tem Cadastros > Instrumentos.
+  @Modulo(ModuloSistema.CAD_INSTRUMENTOS)
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('busca') busca?: string,
+    @Query('incluirInativos') incluirInativos?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const lista = await this.buscar({ busca, incluirInativos, de, ate });
+    const dias = lista.map((i) => diasParaVencer(i.proximaCalibracao));
+    const vencidos = dias.filter((d) => d !== null && d < 0).length;
+    const aVencer = dias.filter((d) => d !== null && d >= 0 && d <= 30).length;
+
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Inventário de Instrumentos e Equipamentos',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Próxima calibração', valor: periodoTexto(de, ate) },
+          { rotulo: 'Busca', valor: (busca ?? '').trim() || 'Sem busca' },
+          {
+            rotulo: 'Inativos',
+            valor: incluirInativos === 'true' ? 'Incluídos' : 'Ocultos',
+          },
+        ],
+        totais: [
+          { rotulo: 'Instrumentos', valor: String(lista.length) },
+          { rotulo: 'Calibração vencida', valor: String(vencidos) },
+          { rotulo: 'Vence em até 30 dias', valor: String(aVencer) },
+        ],
+        colunas: [
+          { titulo: 'Código', peso: 45, valor: (i: any) => i.codigo },
+          {
+            titulo: 'Equipamento',
+            peso: 140,
+            valor: (i: any) => i.equipamento,
+          },
+          { titulo: 'Fabricante', peso: 60, valor: (i: any) => i.fabricante },
+          { titulo: 'Nº série', peso: 55, valor: (i: any) => i.numeroSerie },
+          {
+            titulo: 'Data de calibração',
+            peso: 55,
+            valor: (i: any) => i.dataCalibracao,
+            tipo: 'data',
+          },
+          {
+            titulo: 'Próxima calibração',
+            peso: 55,
+            valor: (i: any) => i.proximaCalibracao,
+            tipo: 'data',
+          },
+          { titulo: 'Situação', peso: 70, valor: situacaoTexto },
+          {
+            titulo: 'Nº certificado',
+            peso: 55,
+            valor: (i: any) => i.numeroCertificado,
+          },
+          {
+            titulo: 'Período (anos)',
+            peso: 40,
+            valor: (i: any) => i.periodoAnos,
+            tipo: 'numero',
+          },
+          { titulo: 'Localização', peso: 70, valor: (i: any) => i.localizacao },
+        ],
+        linhas: lista,
+      },
+      formato,
+    );
   }
 
   // PDF no layout do 004.01, para imprimir e afixar na metrologia.

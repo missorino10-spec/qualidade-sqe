@@ -83,9 +83,13 @@ export class RncService {
       where: {
         status: filtros.status ? (filtros.status as any) : undefined,
         fornecedorId: filtros.fornecedorId ?? undefined,
+        // "Ate" vale o dia inteiro. A RNC guarda hora; parar na meia-noite
+        // deixaria de fora tudo que foi aberto no ultimo dia do recorte.
         dataAbertura: {
           gte: filtros.de ? new Date(filtros.de) : undefined,
-          lte: filtros.ate ? new Date(filtros.ate) : undefined,
+          lte: filtros.ate
+            ? new Date(`${filtros.ate}T23:59:59.999Z`)
+            : undefined,
         },
       },
       include: includePadrao,

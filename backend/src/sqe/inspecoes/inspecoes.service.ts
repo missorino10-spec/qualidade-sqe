@@ -45,6 +45,22 @@ const includeInspecao = {
   rncs: { select: { id: true, numero: true, status: true } },
 };
 
+// "Ate" e o dia inteiro, e nao a meia-noite dele: as datas do SQE carregam
+// hora, entao lte no T00:00 jogaria fora tudo o que foi lancado no ultimo dia
+// do recorte.
+export function fimDoDia(ate: string) {
+  return new Date(`${ate}T23:59:59.999Z`);
+}
+
+function dentroDoPeriodo(data: any, de?: string, ate?: string) {
+  if (!de && !ate) return true;
+  if (!data) return false;
+  const d = data instanceof Date ? data : new Date(data);
+  if (de && d < new Date(de)) return false;
+  if (ate && d > fimDoDia(ate)) return false;
+  return true;
+}
+
 // So o necessario para saber se o recebimento fica sem formulario nenhum
 // depois que o rascunho for descartado.
 const includeEntregaDoRascunho = {
@@ -124,10 +140,20 @@ export class InspecoesService {
 
   // So as inspecoes de fato realizadas. A chegada sem inspecao (fora do ciclo)
   // fica no Registro de Entrada, que e onde ela nasce e onde ela termina.
-  async listarTodas(fornecedorId?: number) {
+  //
+  // O recorte por data cai sobre a DATA DA INSPECAO, que e a coluna "Data" da
+  // tela. Ela nao existe na entrega: mora no formulario, e o resumo escolhe
+  // qual dos dois manda. Por isso o filtro roda depois do mapa - filtrar a
+  // entrega por dataEntrega deixaria de fora a inspecao feita no mes seguinte
+  // ao da chegada, que e justamente a que o inspetor procura.
+  async listarTodas(filtros: {
+    fornecedorId?: number;
+    de?: string;
+    ate?: string;
+  } = {}) {
     const entregas = await this.prisma.entregaPortaria.findMany({
       where: {
-        ...(fornecedorId ? { fornecedorId } : {}),
+        ...(filtros.fornecedorId ? { fornecedorId: filtros.fornecedorId } : {}),
         OR: [
           { inspecoesVisual: { some: {} } },
           { inspecoesLote: { some: {} } },
@@ -136,7 +162,9 @@ export class InspecoesService {
       include: includeInspecao,
       orderBy: { createdAt: 'desc' },
     });
-    return entregas.map((e) => this.resumo(e));
+    return entregas
+      .map((e) => this.resumo(e))
+      .filter((r) => dentroDoPeriodo(r.dataInspecao, filtros.de, filtros.ate));
   }
 
   // Detalhe da inspecao: o resumo + os formularios COMO FORAM PREENCHIDOS
@@ -309,9 +337,24 @@ export class InspecoesService {
     return 'FORA_DO_CICLO';
   }
 
-  async listarEntradas(fornecedorId?: number) {
+  async listarEntradas(filtros: {
+    fornecedorId?: number;
+    de?: string;
+    ate?: string;
+  } = {}) {
     const entregas = await this.prisma.entregaPortaria.findMany({
-      where: fornecedorId ? { fornecedorId } : {},
+      where: {
+        ...(filtros.fornecedorId ? { fornecedorId: filtros.fornecedorId } : {}),
+        // A entrada e a chegada da carga: o recorte e pela data dela.
+        ...(filtros.de || filtros.ate
+          ? {
+              dataEntrega: {
+                gte: filtros.de ? new Date(filtros.de) : undefined,
+                lte: filtros.ate ? fimDoDia(filtros.ate) : undefined,
+              },
+            }
+          : {}),
+      },
       include: {
         fornecedor: {
           select: {

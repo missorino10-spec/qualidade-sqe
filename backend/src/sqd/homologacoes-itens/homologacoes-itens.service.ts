@@ -68,9 +68,21 @@ export class HomologacoesItensService {
     return CHECKLIST_VISUAL;
   }
 
-  async listar(ano?: number) {
+  // O recorte de periodo e pela DATA DA SOLICITACAO: e ela que numera o
+  // registro e e o marco zero dos prazos. Recortar pela inspecao tiraria da
+  // lista justamente o que ainda esta aguardando as amostras.
+  async listar(ano?: number, de?: string, ate?: string) {
     const registros = await this.prisma.homologacaoItem.findMany({
-      where: { ano: ano ?? undefined },
+      where: {
+        ano: ano ?? undefined,
+        dataSolicitacao:
+          de || ate
+            ? {
+                gte: de ? new Date(`${de}T00:00:00.000Z`) : undefined,
+                lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
+              }
+            : undefined,
+      },
       orderBy: [{ ano: 'desc' }, { sequencial: 'desc' }],
       include: {
         criadoPor: { select: { id: true, nome: true } },

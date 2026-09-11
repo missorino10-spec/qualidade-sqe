@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   Col,
-  Input,
   Modal,
   Row,
   Select,
@@ -18,8 +17,10 @@ import { FilePdfOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { abrirPdfEmNovaAba, api } from '../../api';
+import { abrirPdfEmNovaAba, api, queryDeFiltro } from '../../api';
 import { useAuth } from '../../auth';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
+import { ExportarLista } from '../../design/acoes';
 import { dataBR, separadoresBR } from '../../formatos';
 import { moeda } from '../../moeda';
 import Tabela, { filtrosDe } from '../../components/Tabela';
@@ -36,26 +37,6 @@ import { COR } from '../../design/tokens';
 // R.O — Gestao de Reclamacoes da Qualidade.
 // A lista mostra o andamento de cada reclamacao recebida da Sala de Controle e,
 // em cada linha, quais dos quatro blocos da planilha ja fecharam.
-
-const PERIODOS = [
-  { value: 'SEMANA', label: 'Semana atual' },
-  { value: 'MES', label: 'Mês atual' },
-  { value: 'ANO', label: 'Ano atual' },
-  { value: 'TUDO', label: 'Todo o período' },
-  { value: 'PERSONALIZADO', label: 'Personalizado' },
-];
-
-function intervaloDoPeriodo(periodo: string): { de?: string; ate?: string } {
-  const hoje = dayjs();
-  const fmt = (d: dayjs.Dayjs) => d.format('YYYY-MM-DD');
-  if (periodo === 'SEMANA')
-    return { de: fmt(hoje.startOf('week')), ate: fmt(hoje.endOf('week')) };
-  if (periodo === 'MES')
-    return { de: fmt(hoje.startOf('month')), ate: fmt(hoje.endOf('month')) };
-  if (periodo === 'ANO')
-    return { de: fmt(hoje.startOf('year')), ate: fmt(hoje.endOf('year')) };
-  return {};
-}
 
 // Os quatro flags da linha: verde quando o bloco fechou, cinza quando nao.
 function Flags({ blocos }: { blocos: any[] }) {
@@ -85,15 +66,12 @@ export default function Reclamacoes() {
   const { usuario } = useAuth();
   const admin = usuario?.papel === 'ADMIN';
 
-  const [periodo, setPeriodo] = useState('TUDO');
-  const [intervalo, setIntervalo] = useState(intervaloDoPeriodo('TUDO'));
   const [status, setStatus] = useState<string | undefined>();
 
-  const filtro = {
-    de: intervalo.de || undefined,
-    ate: intervalo.ate || undefined,
-    status,
-  };
+  // O recorte e pela data de recebimento na Qualidade e vale para a lista, para
+  // os totais do topo e para a exportacao — os tres mostram a mesma coisa.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate, status };
 
   const { data: listas } = useQuery<ListasRo>({
     queryKey: ['ro-listas'],
@@ -105,17 +83,6 @@ export default function Reclamacoes() {
     queryKey: ['ro', filtro.de, filtro.ate, filtro.status],
     queryFn: async () => (await api.get('/ro/reclamacoes', { params: filtro })).data,
   });
-
-  function trocarPeriodo(v: string) {
-    setPeriodo(v);
-    // "Personalizado" mantem as datas que ja estavam para o usuario so ajustar.
-    if (v !== 'PERSONALIZADO') setIntervalo(intervaloDoPeriodo(v));
-  }
-
-  function trocarData(campo: 'de' | 'ate', valor: string) {
-    setPeriodo('PERSONALIZADO');
-    setIntervalo((atual) => ({ ...atual, [campo]: valor }));
-  }
 
   const excluir = useMutation({
     mutationFn: async (id: number) => api.delete(`/ro/reclamacoes/${id}`),
@@ -143,55 +110,26 @@ export default function Reclamacoes() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {/* O filtro vale para a lista e para os totais do topo. */}
-      <Card size="small">
-        <Row gutter={[12, 12]} align="bottom">
-          <Col xs={24} sm={12} lg={6}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Período (recebimento na Qualidade)
-            </Typography.Text>
-            <Select
-              style={{ width: '100%' }}
-              value={periodo}
-              onChange={trocarPeriodo}
-              options={PERIODOS}
-            />
-          </Col>
-          <Col xs={12} sm={6} lg={5}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              De
-            </Typography.Text>
-            <Input
-              type="date"
-              value={intervalo.de ?? ''}
-              onChange={(e) => trocarData('de', e.target.value)}
-            />
-          </Col>
-          <Col xs={12} sm={6} lg={5}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Até
-            </Typography.Text>
-            <Input
-              type="date"
-              value={intervalo.ate ?? ''}
-              onChange={(e) => trocarData('ate', e.target.value)}
-            />
-          </Col>
-          <Col xs={24} sm={24} lg={8}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Status da reclamação
-            </Typography.Text>
-            <Select
-              allowClear
-              placeholder="Todos"
-              style={{ width: '100%' }}
-              value={status}
-              onChange={setStatus}
-              options={L.status}
-            />
-          </Col>
-        </Row>
-      </Card>
+      {/* A reclamacao tem a data do cliente e a data em que ela chegou na
+          Qualidade: o rotulo diz qual das duas manda no recorte. */}
+      <FiltroPeriodo
+        controle={periodo}
+        rotulo="Período (recebimento na Qualidade)"
+      >
+        <Col xs={24} sm={24} lg={24}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Status da reclamação
+          </Typography.Text>
+          <Select
+            allowClear
+            placeholder="Todos"
+            style={{ width: '100%' }}
+            value={status}
+            onChange={setStatus}
+            options={L.status}
+          />
+        </Col>
+      </FiltroPeriodo>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
@@ -229,13 +167,19 @@ export default function Reclamacoes() {
       <Card
         title="R.O — Gestão de Reclamações da Qualidade"
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/ro/novo')}
-          >
-            Novo R.O
-          </Button>
+          <Space wrap>
+            <ExportarLista
+              url={`/ro/reclamacoes/relatorio${queryDeFiltro(filtro)}`}
+              nome="ro-reclamacoes"
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/ro/novo')}
+            >
+              Novo R.O
+            </Button>
+          </Space>
         }
       >
         <Tabela

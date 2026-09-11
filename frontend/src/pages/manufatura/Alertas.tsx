@@ -26,7 +26,8 @@ import {
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { abrirPdfEmNovaAba, api } from '../../api';
+import { abrirPdfEmNovaAba, api, queryDeFiltro } from '../../api';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
 import { dataBR, dataInput } from '../../formatos';
 import { EVID } from '../../inspecao';
 import AssinaturaDoLogin from '../../components/AssinaturaDoLogin';
@@ -45,7 +46,12 @@ import {
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import NomeAssinatura from '../../components/NomeAssinatura';
 import { COR } from '../../design/tokens';
-import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
+import {
+  BotaoEditar,
+  BotaoExcluir,
+  BotaoPdf,
+  ExportarLista,
+} from '../../design/acoes';
 
 // ALERTA DA QUALIDADE — espelha o formulario .docx da empresa: titulo + data,
 // "Descricao do problema", texto da acao obrigatoria e os dois paineis de foto
@@ -72,11 +78,15 @@ export default function Alertas() {
   const [status, setStatus] = useState<string | undefined>();
   const [maquinaId, setMaquinaId] = useState<number | undefined>();
 
+  // O recorte vale para a lista, para os totais do topo e para a exportacao —
+  // os tres tem que mostrar a mesma coisa.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate, status, maquinaId };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['manufatura-alertas', status, maquinaId],
+    queryKey: ['manufatura-alertas', filtro.de, filtro.ate, status, maquinaId],
     queryFn: async () =>
-      (await api.get('/manufatura/alertas', { params: { status, maquinaId } }))
-        .data,
+      (await api.get('/manufatura/alertas', { params: filtro })).data,
   });
 
   const { data: maquinas } = useQuery<any[]>({
@@ -210,44 +220,44 @@ export default function Alertas() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Card size="small">
-        <Row gutter={[12, 12]} align="bottom">
-          <Col xs={24} sm={12} lg={6}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Situação
-            </Typography.Text>
-            <Select
-              allowClear
-              placeholder="Todas"
-              style={{ width: '100%' }}
-              value={status}
-              onChange={setStatus}
-              options={STATUS_ALERTA.map((s) => ({
-                value: s.value,
-                label: s.label,
-              }))}
-            />
-          </Col>
-          <Col xs={24} sm={12} lg={10}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Máquina / linha
-            </Typography.Text>
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="Todas"
-              style={{ width: '100%' }}
-              value={maquinaId}
-              onChange={setMaquinaId}
-              options={(maquinas ?? []).map((m) => ({
-                value: m.id,
-                label: `${m.codigo} — ${m.nome}`,
-              }))}
-            />
-          </Col>
-        </Row>
-      </Card>
+      {/* O alerta tem a data de emissao e o prazo para corrigir: o rotulo diz
+          qual das duas manda no recorte. */}
+      <FiltroPeriodo controle={periodo} rotulo="Período (emissão do alerta)">
+        <Col xs={24} sm={12} lg={9}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Situação
+          </Typography.Text>
+          <Select
+            allowClear
+            placeholder="Todas"
+            style={{ width: '100%' }}
+            value={status}
+            onChange={setStatus}
+            options={STATUS_ALERTA.map((s) => ({
+              value: s.value,
+              label: s.label,
+            }))}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={15}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Máquina / linha
+          </Typography.Text>
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Todas"
+            style={{ width: '100%' }}
+            value={maquinaId}
+            onChange={setMaquinaId}
+            options={(maquinas ?? []).map((m) => ({
+              value: m.id,
+              label: `${m.codigo} — ${m.nome}`,
+            }))}
+          />
+        </Col>
+      </FiltroPeriodo>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={8}>
@@ -274,9 +284,19 @@ export default function Alertas() {
       <Card
         title="Alertas da Qualidade"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-            Novo alerta
-          </Button>
+          <Space wrap>
+            <ExportarLista
+              url={`/manufatura/alertas/relatorio${queryDeFiltro(filtro)}`}
+              nome="alertas-qualidade"
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => abrir()}
+            >
+              Novo alerta
+            </Button>
+          </Space>
         }
       >
         <Tabela

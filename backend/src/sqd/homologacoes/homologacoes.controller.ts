@@ -18,6 +18,7 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { CODIGOS_ACAO } from '../sqd-utils';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 import { HomologacoesService } from './homologacoes.service';
 import {
   gerarPdfAutoavaliacao,
@@ -81,6 +82,35 @@ class AutoavaliacaoDto {
   @IsOptional() @IsString() setor?: string;
 }
 
+// O relatorio sai com as mesmas palavras da tela: quem exporta compara o papel
+// com a lista e os dois tem que dizer a mesma coisa.
+const ROTULO_STATUS_HOMOLOGACAO: Record<string, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+};
+
+const ROTULO_RESULTADO: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  APROVADO_CONDICIONALMENTE: 'Aprovado Condicionalmente',
+  REPROVADO: 'Reprovado',
+};
+
+const ROTULO_SOLICITANTE: Record<string, string> = {
+  COMPRAS: 'Compras',
+  ENGENHARIA: 'Engenharia',
+  NC: 'N/C',
+};
+
+// Sem autoavaliacao devolvida nao existe nota nem resultado; a coluna diz o que
+// o registro esta esperando, igual a tela.
+function resultadoHomologacao(h: any): string {
+  if (h.resultado) return ROTULO_RESULTADO[h.resultado] ?? h.resultado;
+  return h.statusHomologacao === 'CANCELADO'
+    ? ''
+    : 'Aguardando retorno do fornecedor';
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQD)
 @Controller('sqd/homologacoes')
@@ -94,8 +124,79 @@ export class HomologacoesController {
   }
 
   @Get()
-  listar(@Query('ano') ano?: string) {
-    return this.service.listar(ano ? Number(ano) : undefined);
+  listar(
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listar(ano ? Number(ano) : undefined, de, ate);
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const registros = await this.service.listar(
+      ano ? Number(ano) : undefined,
+      de,
+      ate,
+    );
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Homologação de Fornecedores',
+        emitidoPor: user.nome,
+        filtros: [{ rotulo: 'Período', valor: periodoTexto(de, ate) }],
+        colunas: [
+          { titulo: 'Número', peso: 60, valor: (h: any) => h.numero },
+          {
+            titulo: 'Solicitação',
+            peso: 45,
+            valor: (h: any) => h.dataSolicitacao,
+            tipo: 'data',
+          },
+          { titulo: 'Semana', peso: 35, valor: (h: any) => h.semana },
+          {
+            titulo: 'Fornecedor',
+            peso: 140,
+            valor: (h: any) => h.fornecedorNome,
+          },
+          {
+            titulo: 'Solicitante',
+            peso: 50,
+            valor: (h: any) => ROTULO_SOLICITANTE[h.solicitante] ?? '',
+          },
+          {
+            titulo: 'Nota',
+            peso: 35,
+            valor: (h: any) => h.nota,
+            tipo: 'numero',
+            negrito: true,
+          },
+          {
+            titulo: 'Resultado',
+            peso: 110,
+            valor: (h: any) => resultadoHomologacao(h),
+          },
+          {
+            titulo: 'Status',
+            peso: 55,
+            valor: (h: any) =>
+              ROTULO_STATUS_HOMOLOGACAO[h.statusHomologacao] ??
+              h.statusHomologacao,
+          },
+        ],
+        linhas: registros,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

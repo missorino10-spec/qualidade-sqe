@@ -18,9 +18,11 @@ import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../../api';
+import { api, queryDeFiltro } from '../../api';
 import { useAuth } from '../../auth';
 import { dataBR } from '../../formatos';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
+import { ExportarLista } from '../../design/acoes';
 import Tabela, { filtrosDe } from '../../components/Tabela';
 import { DOC_8D } from '../../oitod';
 import { DOC_5G } from '../../cincog';
@@ -117,9 +119,15 @@ export default function OitoD() {
   const cnqId = params.get('cnqId');
   const tipoParam = params.get('tipo');
 
+  // O recorte cai sobre a data de abertura e vale tanto para a lista quanto
+  // para a exportacao — os dois mostram a mesma coisa.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['manufatura-doc', tipo],
-    queryFn: async () => (await api.get(`/manufatura/${doc.rota}`)).data,
+    queryKey: ['manufatura-doc', tipo, filtro.de, filtro.ate],
+    queryFn: async () =>
+      (await api.get(`/manufatura/${doc.rota}`, { params: filtro })).data,
   });
 
   function abrir(origemVinculo?: { inspecaoId?: number; cnqId?: number }) {
@@ -211,6 +219,8 @@ export default function OitoD() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <FiltroPeriodo controle={periodo} rotulo="Período (abertura)" />
+
       <Card
         title={doc.titulo}
         extra={
@@ -223,7 +233,17 @@ export default function OitoD() {
                 { value: '5G', label: '5G' },
               ]}
             />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
+            {/* Exporta o documento que esta na tela: o 8D e o 5G tem listas
+                separadas, entao a rota acompanha o filtro do topo. */}
+            <ExportarLista
+              url={`/manufatura/${doc.rota}/relatorio${queryDeFiltro(filtro)}`}
+              nome={tipo === '8D' ? 'oito-d' : 'cinco-g'}
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => abrir()}
+            >
               {doc.novo}
             </Button>
           </Space>

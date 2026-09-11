@@ -43,9 +43,21 @@ export class HomologacoesService {
     return BLOCOS_AUTOAVALIACAO;
   }
 
-  listar(ano?: number) {
+  // O recorte de periodo e pela DATA DA SOLICITACAO: e ela que numera o
+  // registro e e o marco zero dos prazos. Recortar pela finalizacao tiraria da
+  // lista justamente o que ainda esta aguardando o fornecedor.
+  listar(ano?: number, de?: string, ate?: string) {
     return this.prisma.homologacaoFornecedor.findMany({
-      where: { ano: ano ?? undefined },
+      where: {
+        ano: ano ?? undefined,
+        dataSolicitacao:
+          de || ate
+            ? {
+                gte: de ? new Date(`${de}T00:00:00.000Z`) : undefined,
+                lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
+              }
+            : undefined,
+      },
       orderBy: [{ ano: 'desc' }, { sequencial: 'desc' }],
       include: includeHomologacao,
     });

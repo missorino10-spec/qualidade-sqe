@@ -29,6 +29,26 @@ import { EVID } from '../../comum/inspecao';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
 import { PermissaoGuard } from '../../auth/permissao.guard';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
+import {
+  alertaEmAberto,
+  alertaVencido,
+  diasParaPrazo,
+  labelStatusAlerta,
+  situacaoAlerta,
+} from '../../comum/alerta';
+
+// A mesma leitura que a tela mostra embaixo do prazo. So vale enquanto o
+// alerta esta em aberto: alerta encerrado fora do prazo nao fica "atrasado".
+function leituraPrazo(a: {
+  status?: string | null;
+  prazo?: string | Date | null;
+}): string {
+  const dias = diasParaPrazo(a.prazo);
+  if (!alertaEmAberto(a.status) || dias === null) return '';
+  if (dias < 0) return `${Math.abs(dias)} dia(s) de atraso`;
+  return dias === 0 ? 'Vence hoje' : `Faltam ${dias} dia(s)`;
+}
 
 // Espelha o formulario "Alerta da Qualidade" (.docx).
 class AlertaDto {
@@ -76,6 +96,87 @@ export class AlertasController {
       ate,
       maquinaId ? Number(maquinaId) : undefined,
       status,
+    );
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+    @Query('maquinaId') maquinaId?: string,
+    @Query('status') status?: string,
+  ) {
+    const id = maquinaId ? Number(maquinaId) : undefined;
+    const alertas = await this.service.listar(de, ate, id, status);
+    const maquina = id ? await this.service.nomeMaquina(id) : undefined;
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Alertas da Qualidade',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          { rotulo: 'Máquina / linha', valor: maquina ?? 'Todas' },
+          {
+            rotulo: 'Situação',
+            valor: status ? (labelStatusAlerta[status] ?? status) : 'Todas',
+          },
+        ],
+        // Os mesmos tres numeros do topo da tela.
+        totais: [
+          {
+            rotulo: 'Alertas em aberto',
+            valor: String(alertas.filter((a) => alertaEmAberto(a.status)).length),
+          },
+          {
+            rotulo: 'Vencidos',
+            valor: String(alertas.filter((a) => alertaVencido(a)).length),
+          },
+          { rotulo: 'Total no filtro', valor: String(alertas.length) },
+        ],
+        colunas: [
+          { titulo: 'Número', peso: 52, valor: (a: any) => a.numero },
+          { titulo: 'Data', peso: 44, valor: (a: any) => a.data, tipo: 'data' },
+          {
+            titulo: 'Descrição do problema',
+            peso: 150,
+            valor: (a: any) => a.titulo,
+          },
+          {
+            titulo: 'Onde se aplica',
+            peso: 90,
+            valor: (a: any) =>
+              [a.setor, a.maquina?.nome].filter(Boolean).join(' — '),
+          },
+          {
+            titulo: 'Prazo para corrigir',
+            peso: 50,
+            valor: (a: any) => a.prazo,
+            tipo: 'data',
+          },
+          // A leitura do prazo acompanha a data, como na tela: "3 dia(s) de
+          // atraso" diz mais do que a data sozinha.
+          { titulo: 'Prazo', peso: 56, valor: (a: any) => leituraPrazo(a) },
+          {
+            titulo: 'Ação imediata',
+            peso: 130,
+            valor: (a: any) => a.acao,
+          },
+          {
+            titulo: 'Situação',
+            peso: 50,
+            valor: (a: any) => situacaoAlerta(a).texto,
+            negrito: true,
+          },
+        ],
+        linhas: alertas,
+      },
+      formato,
     );
   }
 

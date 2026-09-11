@@ -33,6 +33,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
 import { PermissaoGuard } from '../../auth/permissao.guard';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
+import { nomeCurto } from '../../comum/nome';
 
 // A Manufatura e o unico modulo que oferta a inspecao de producao, entao usa
 // a lista cheia de origens.
@@ -79,8 +81,88 @@ export class InspecaoVisualManufaturaController {
   ) {}
 
   @Get()
-  listar(@Query('tipo') tipo?: string, @Query('maquinaId') maquinaId?: string) {
-    return this.service.listar(tipo, maquinaId ? Number(maquinaId) : undefined);
+  listar(
+    @Query('tipo') tipo?: string,
+    @Query('maquinaId') maquinaId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listar(
+      tipo,
+      maquinaId ? Number(maquinaId) : undefined,
+      de,
+      ate,
+    );
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('tipo') tipo?: string,
+    @Query('maquinaId') maquinaId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const id = maquinaId ? Number(maquinaId) : undefined;
+    const inspecoes = await this.service.listar(tipo, id, de, ate);
+    // O nome vem do cadastro: o recorte pode nao ter nenhuma inspecao e ainda
+    // assim precisa dizer qual maquina foi escolhida.
+    const maquina = id
+      ? await this.prisma.maquina.findUnique({ where: { id } })
+      : null;
+
+    await responderRelatorio(
+      res,
+      {
+        titulo:
+          tipo === 'SETUP'
+            ? 'Inspeção de setup — visual'
+            : 'Inspeção de produção — visual',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Máquina',
+            valor: maquina ? `${maquina.codigo} — ${maquina.nome}` : 'Todas',
+          },
+        ],
+        totais: [{ rotulo: 'Inspeções visuais', valor: String(inspecoes.length) }],
+        colunas: [
+          { titulo: 'Número', peso: 60, valor: (i: any) => i.numero },
+          {
+            titulo: 'Data',
+            peso: 44,
+            valor: (i: any) => i.dataInspecao,
+            tipo: 'data',
+          },
+          { titulo: 'Máquina', peso: 90, valor: (i: any) => i.maquina?.nome },
+          {
+            titulo: 'Item',
+            peso: 130,
+            valor: (i: any) =>
+              [i.itemCodigo, i.itemDescricao].filter(Boolean).join(' — '),
+          },
+          {
+            titulo: 'Inspetor',
+            peso: 80,
+            valor: (i: any) => nomeCurto(i.inspetor?.nome),
+          },
+          // A visual nao tem resultado: a unica situacao que interessa na
+          // lista e se o documento ja foi lancado.
+          {
+            titulo: 'Situação',
+            peso: 56,
+            valor: (i: any) => (i.rascunho ? 'Rascunho' : 'Lançada'),
+          },
+        ],
+        linhas: inspecoes,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

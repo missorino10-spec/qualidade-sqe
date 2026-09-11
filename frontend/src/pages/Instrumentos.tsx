@@ -19,9 +19,11 @@ import {
 import { FilePdfOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { api, abrirPdfEmNovaAba } from '../api';
+import { api, abrirPdfEmNovaAba, queryDeFiltro } from '../api';
 import { useAuth } from '../auth';
 import Tabela, { filtrosDe } from '../components/Tabela';
+import FiltroPeriodo, { usarPeriodo } from '../components/FiltroPeriodo';
+import { ExportarLista } from '../design/acoes';
 import { COR } from '../design/tokens';
 
 /**
@@ -87,10 +89,19 @@ export default function Instrumentos() {
   const [editando, setEditando] = useState<Instrumento | null>(null);
   const [form] = Form.useForm();
 
+  // Instrumento nao tem data de lançamento: ele nao acontece num dia. O que
+  // tem prazo é a calibração, entao o período recorta pela PRÓXIMA
+  // CALIBRAÇÃO — é a pergunta que se faz nesta tela ("o que vence até...").
+  const periodo = usarPeriodo();
+  const filtro = {
+    de: periodo.de,
+    ate: periodo.ate,
+    incluirInativos,
+  };
+
   const { data, isFetching } = useQuery<Instrumento[]>({
-    queryKey: ['instrumentos', incluirInativos],
-    queryFn: async () =>
-      (await api.get('/instrumentos', { params: { incluirInativos } })).data,
+    queryKey: ['instrumentos', filtro.de, filtro.ate, filtro.incluirInativos],
+    queryFn: async () => (await api.get('/instrumentos', { params: filtro })).data,
   });
 
   function invalidar() {
@@ -210,10 +221,34 @@ export default function Instrumentos() {
   }).length;
 
   return (
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    {/* O instrumento nao tem data de lancamento: a pergunta da tela e "o que
+        vence ate quando", entao o recorte cai sobre a proxima calibracao. */}
+    <FiltroPeriodo
+      controle={periodo}
+      rotulo="Período (próxima calibração)"
+      larguraExtra={11}
+    >
+      <Col xs={24} sm={12}>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Mostrar inativos
+        </Typography.Text>
+        <div>
+          <Switch checked={incluirInativos} onChange={setIncluirInativos} />
+        </div>
+      </Col>
+    </FiltroPeriodo>
+
     <Card
       title="Inventário de Instrumentos e Equipamentos — BDBR.QUA.FMR.004.01"
       extra={
-        <Space>
+        <Space wrap>
+          <ExportarLista
+            url={`/instrumentos/relatorio${queryDeFiltro(filtro)}`}
+            nome="instrumentos"
+          />
+          {/* Documento do 004.01, no layout da planilha impressa: sai sempre
+              com o inventário inteiro, independente do recorte da tela. */}
           <Button
             icon={<FilePdfOutlined />}
             onClick={() =>
@@ -261,15 +296,6 @@ export default function Instrumentos() {
           </Card>
         </Col>
       </Row>
-
-      <Space style={{ marginBottom: 12 }} size={6}>
-        <Switch
-          checked={incluirInativos}
-          onChange={setIncluirInativos}
-          size="small"
-        />
-        <Typography.Text type="secondary">Mostrar inativos</Typography.Text>
-      </Space>
 
       {/* A busca e a da propria Tabela, que varre a linha inteira. */}
       <Tabela
@@ -460,5 +486,6 @@ export default function Instrumentos() {
         </Form>
       </Modal>
     </Card>
+    </Space>
   );
 }

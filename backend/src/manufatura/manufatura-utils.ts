@@ -25,6 +25,78 @@ export function numeroManufatura(
   return `${prefixo}${String(sequencial).padStart(4, '0')}/${ano}`;
 }
 
+// ---------------------------------------------------------------------------
+// 8D e 5G: os dois saem da mesma tela e da mesma lista, entao o relatorio dos
+// dois tem as mesmas colunas. O que muda e so o titulo.
+// ---------------------------------------------------------------------------
+export const ROTULO_ORIGEM_DOC: Record<string, string> = {
+  RELATORIO_RO: 'Relatório R.O',
+  PRODUCAO: 'Produção',
+  INSPECAO_EXTRA: 'Inspeção extra',
+  SETUP: 'Setup',
+  RNC: 'RNC',
+  OUTROS: 'Outros',
+};
+
+export const ROTULO_STATUS_DOC: Record<string, string> = {
+  AGUARDANDO: 'Aguardando',
+  EM_ANDAMENTO: 'Em andamento',
+  CONCLUIDO: 'Concluído',
+};
+
+// "Outros" sozinho nao diz de onde veio o problema: o que sai e o texto
+// digitado, como na tela.
+export function textoOrigemDoc(reg: any): string {
+  if (reg?.origem === 'OUTROS' && reg?.origemOutros) return reg.origemOutros;
+  return ROTULO_ORIGEM_DOC[reg?.origem] ?? '';
+}
+
+export function colunasDocumentoManufatura() {
+  return [
+    { titulo: 'Número', peso: 52, valor: (r: any) => r.numero },
+    {
+      titulo: 'Abertura',
+      peso: 44,
+      valor: (r: any) => r.dataAbertura,
+      tipo: 'data' as const,
+    },
+    { titulo: 'Produto / item', peso: 120, valor: (r: any) => r.produtoItem },
+    { titulo: 'Origem', peso: 70, valor: (r: any) => textoOrigemDoc(r) },
+    {
+      titulo: 'Documento',
+      peso: 70,
+      valor: (r: any) => r.documentoReferencia,
+    },
+    {
+      titulo: 'Vínculo',
+      peso: 62,
+      valor: (r: any) => r.inspecao?.numero ?? r.cnq?.numero,
+    },
+    { titulo: 'Responsável', peso: 80, valor: (r: any) => r.responsavel },
+    { titulo: 'Problema', peso: 140, valor: (r: any) => r.descricaoProblema },
+    {
+      titulo: 'Status',
+      peso: 56,
+      valor: (r: any) => ROTULO_STATUS_DOC[r.status] ?? r.status,
+      negrito: true,
+    },
+  ];
+}
+
+export function totaisDocumentoManufatura(linhas: any[], rotulo: string) {
+  return [
+    { rotulo, valor: String(linhas.length) },
+    {
+      rotulo: 'Concluídos',
+      valor: String(linhas.filter((r) => r.status === 'CONCLUIDO').length),
+    },
+    {
+      rotulo: 'Em aberto',
+      valor: String(linhas.filter((r) => r.status !== 'CONCLUIDO').length),
+    },
+  ];
+}
+
 // PPM = pecas com defeito por milhao de pecas produzidas.
 // E o indicador que a planilha usa em todas as abas de maquina.
 export function calcularPpm(produzidas: number, comDefeito: number): number {

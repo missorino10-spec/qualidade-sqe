@@ -31,6 +31,12 @@ import { StorageService } from '../../anexos/storage.service';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
 import { PermissaoGuard } from '../../auth/permissao.guard';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
+import {
+  ROTULO_STATUS_DOC,
+  colunasDocumentoManufatura,
+  totaisDocumentoManufatura,
+} from '../manufatura-utils';
 
 // MÉTODO 5G - aba "MÉTODO 5G" da planilha de Analise de Problemas.
 class CincoGDto {
@@ -110,8 +116,45 @@ export class CincoGController {
   }
 
   @Get()
-  listar(@Query('status') status?: string) {
-    return this.service.listar(status);
+  listar(
+    @Query('status') status?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listar(status, de, ate);
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('status') status?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const linhas = await this.service.listar(status, de, ate);
+    await responderRelatorio(
+      res,
+      {
+        titulo:
+          'Método 5G — Reestabelecimento das condições normais do processo',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período (abertura)', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Status',
+            valor: status ? (ROTULO_STATUS_DOC[status] ?? status) : 'Todos',
+          },
+        ],
+        totais: totaisDocumentoManufatura(linhas, '5G no período'),
+        colunas: colunasDocumentoManufatura(),
+        linhas,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

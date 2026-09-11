@@ -19,10 +19,10 @@ import {
 } from 'antd';
 import { LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api';
+import { api, queryDeFiltro } from '../api';
 import Tabela from '../components/Tabela';
 import { CabecalhoPagina } from '../design/painel';
-import { BotaoEditar } from '../design/acoes';
+import { BotaoEditar, ExportarLista } from '../design/acoes';
 import { COR, ESPACO, TEXTO } from '../design/tokens';
 import { numeroBR } from '../formatos';
 import { ACAO_CLASSE, corClasse, ROTULO_CLASSE } from '../fornecedor';
@@ -284,7 +284,18 @@ export default function AvaliacaoFornecedores() {
         </Col>
       </Row>
 
-      <Card title={`Apuração de ${MESES[mes - 1]} de ${ano}`}>
+      {/* O recorte desta tela nao e um intervalo de datas: e a competencia
+          escolhida no cabeçalho. A exportacao recebe o mesmo ano e mes e sai
+          com a apuracao que esta na tabela abaixo. */}
+      <Card
+        title={`Apuração de ${MESES[mes - 1]} de ${ano}`}
+        extra={
+          <ExportarLista
+            url={`/avaliacao-fornecedores/relatorio${queryDeFiltro({ ano, mes })}`}
+            nome={`idf-${ano}-${String(mes).padStart(2, '0')}`}
+          />
+        }
+      >
         <Tabela
           busca="Buscar fornecedor"
           rowKey="fornecedorId"

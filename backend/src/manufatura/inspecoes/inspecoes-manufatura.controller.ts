@@ -35,10 +35,19 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
 import { PermissaoGuard } from '../../auth/permissao.guard';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 
 // A Manufatura e o unico modulo que oferta a inspecao de producao, entao usa
 // a lista cheia de origens.
 const ORIGENS = ORIGENS_INSPECAO.map((o) => o.value);
+
+// Os mesmos rotulos da coluna "Status" da tela.
+const ROTULO_STATUS_INSPECAO: Record<string, string> = {
+  PENDENTE: 'Pendente de reinspeção',
+  APROVADA: 'Aprovada',
+  APROVADA_COM_OBSERVACAO: 'Aprovada com observação',
+  REPROVADA: 'Reprovada',
+};
 
 // Relatorio de Inspecao Dimensional - Doc BDBR.QUA.FMR.011.06.
 // Os campos abaixo sao os do formulario, na mesma ordem do papel.
@@ -96,16 +105,100 @@ export class InspecoesManufaturaController {
   ) {}
 
   @Get()
-  listar(@Query('tipo') tipo?: string, @Query('maquinaId') maquinaId?: string) {
+  listar(
+    @Query('tipo') tipo?: string,
+    @Query('maquinaId') maquinaId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
     return this.service.listar(
       tipo,
       maquinaId ? Number(maquinaId) : undefined,
+      de,
+      ate,
     );
   }
 
   @Get('setups')
   setups(@Query('maquinaId', ParseIntPipe) maquinaId: number) {
     return this.service.setupsDisponiveis(maquinaId);
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('tipo') tipo?: string,
+    @Query('maquinaId') maquinaId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const id = maquinaId ? Number(maquinaId) : undefined;
+    const inspecoes = await this.service.listar(tipo, id, de, ate);
+    // O nome vem do cadastro: o recorte pode nao ter nenhuma inspecao e ainda
+    // assim precisa dizer qual maquina foi escolhida.
+    const maquina = id
+      ? await this.prisma.maquina.findUnique({ where: { id } })
+      : null;
+
+    await responderRelatorio(
+      res,
+      {
+        titulo:
+          tipo === 'SETUP'
+            ? 'Inspeção de setup — dimensional'
+            : 'Inspeção de produção — dimensional',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Máquina',
+            valor: maquina ? `${maquina.codigo} — ${maquina.nome}` : 'Todas',
+          },
+        ],
+        totais: [
+          { rotulo: 'Inspeções', valor: String(inspecoes.length) },
+        ],
+        colunas: [
+          { titulo: 'Número', peso: 60, valor: (i: any) => i.numero },
+          {
+            titulo: 'Data',
+            peso: 44,
+            valor: (i: any) => i.dataInspecao,
+            tipo: 'data',
+          },
+          { titulo: 'Máquina', peso: 90, valor: (i: any) => i.maquina?.nome },
+          {
+            titulo: 'Item',
+            peso: 130,
+            valor: (i: any) =>
+              [i.itemCodigo, i.itemDescricao].filter(Boolean).join(' — '),
+          },
+          {
+            titulo: 'Tentativas',
+            peso: 40,
+            valor: (i: any) => i.relatorios?.length ?? 0,
+            tipo: 'numero',
+          },
+          // Mesma regra da tela: com rascunho na ultima tentativa a inspecao
+          // ainda nao tem veredito, e o status guardado e o da tentativa
+          // anterior.
+          {
+            titulo: 'Status',
+            peso: 80,
+            valor: (i: any) =>
+              i.relatorios?.some((r: any) => r.rascunho)
+                ? 'Rascunho'
+                : (ROTULO_STATUS_INSPECAO[i.status] ?? i.status),
+          },
+        ],
+        linhas: inspecoes,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

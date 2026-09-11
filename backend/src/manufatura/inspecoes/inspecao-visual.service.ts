@@ -20,15 +20,27 @@ const includeVisual = {
   inspetor: { select: { id: true, nome: true } },
 };
 
+// O recorte por periodo compara com a data gravada em UTC. O "ate" vai ate o
+// fim do dia porque a inspecao lancada sem data informada guarda a hora do
+// lancamento, e meia-noite deixaria o proprio dia de hoje de fora.
+function deUtc(v?: string) {
+  return v ? new Date(`${v.slice(0, 10)}T00:00:00.000Z`) : undefined;
+}
+function ateUtc(v?: string) {
+  return v ? new Date(`${v.slice(0, 10)}T23:59:59.999Z`) : undefined;
+}
+
 @Injectable()
 export class InspecaoVisualManufaturaService {
   constructor(private prisma: PrismaService) {}
 
-  listar(tipo?: string, maquinaId?: number) {
+  listar(tipo?: string, maquinaId?: number, de?: string, ate?: string) {
     return this.prisma.inspecaoVisualManufatura.findMany({
       where: {
         tipo: tipo ? (tipo as any) : undefined,
         maquinaId: maquinaId ?? undefined,
+        dataInspecao:
+          de || ate ? { gte: deUtc(de), lte: ateUtc(ate) } : undefined,
       },
       orderBy: { dataInspecao: 'desc' },
       include: includeVisual,

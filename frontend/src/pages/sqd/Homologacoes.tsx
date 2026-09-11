@@ -17,8 +17,10 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, queryDeFiltro } from '../../api';
 import { useAuth } from '../../auth';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
+import { ExportarLista } from '../../design/acoes';
 import { dataBR } from '../../formatos';
 import {
   corResultado,
@@ -46,9 +48,15 @@ export default function Homologacoes() {
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
 
+  // O recorte e pela data da solicitacao e vale para a lista e para a
+  // exportacao: o PDF e a planilha saem com exatamente o que esta na tela.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['sqd-homologacoes'],
-    queryFn: async () => (await api.get('/sqd/homologacoes')).data,
+    queryKey: ['sqd-homologacoes', filtro.de, filtro.ate],
+    queryFn: async () =>
+      (await api.get('/sqd/homologacoes', { params: filtro })).data,
   });
 
   function abrir() {
@@ -99,14 +107,22 @@ export default function Homologacoes() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <FiltroPeriodo controle={periodo} />
+
       <Card
         title="Homologação de Fornecedores"
         extra={
-          podeEditar && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
-              Nova homologação
-            </Button>
-          )
+          <Space wrap>
+            <ExportarLista
+              url={`/sqd/homologacoes/relatorio${queryDeFiltro(filtro)}`}
+              nome="homologacao-fornecedores"
+            />
+            {podeEditar && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
+                Nova homologação
+              </Button>
+            )}
+          </Space>
         }
       >
         <Tabela

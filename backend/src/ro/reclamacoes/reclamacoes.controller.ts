@@ -43,7 +43,9 @@ import {
   SIM_NAO_RO,
   STATUS_ACAO_RO,
   STATUS_RO,
+  rotuloRo,
 } from '../../comum/ro';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 import { ReclamacoesService } from './reclamacoes.service';
 import { gerarPdfReclamacao, FotosRo } from './reclamacao-pdf';
 
@@ -158,6 +160,125 @@ export class ReclamacoesController {
     @Query('status') status?: string,
   ) {
     return this.service.listar(de, ate, status);
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+    @Query('status') status?: string,
+  ) {
+    const lista: any[] = await this.service.listar(de, ate, status);
+
+    // Mesmos cartoes do topo da tela, contados sobre o mesmo recorte.
+    const encerradas = lista.filter((r) => r.status === 'ENCERRADA').length;
+    const hoje = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    const atrasadas = lista.filter(
+      (r) =>
+        r.status !== 'ENCERRADA' &&
+        r.prazoConclusao &&
+        new Date(r.prazoConclusao).toISOString().slice(0, 10) < hoje,
+    ).length;
+    const custo = lista.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
+
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'R.O — Gestão de Reclamações da Qualidade',
+        emitidoPor: user.nome,
+        filtros: [
+          {
+            rotulo: 'Período (recebimento na Qualidade)',
+            valor: periodoTexto(de, ate),
+          },
+          {
+            rotulo: 'Status da reclamação',
+            valor: status ? rotuloRo('status', status) : 'Todos',
+          },
+        ],
+        totais: [
+          { rotulo: 'R.O no período', valor: String(lista.length) },
+          { rotulo: 'Em aberto', valor: String(lista.length - encerradas) },
+          { rotulo: 'Fora do prazo', valor: String(atrasadas) },
+          {
+            rotulo: 'Custo total (peças)',
+            valor: `R$ ${custo.toLocaleString('pt-BR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`,
+          },
+        ],
+        colunas: [
+          { titulo: 'Número', peso: 55, valor: (r: any) => r.numero },
+          {
+            titulo: 'Recebido em',
+            peso: 45,
+            valor: (r: any) => r.recebidoEm,
+            tipo: 'data',
+          },
+          {
+            titulo: 'Cliente / representante',
+            peso: 100,
+            valor: (r: any) => r.cliente,
+          },
+          {
+            titulo: 'Produto',
+            peso: 120,
+            valor: (r: any) =>
+              [r.produtoCodigo, r.produtoDescricao].filter(Boolean).join(' — '),
+          },
+          {
+            titulo: 'Classificação',
+            peso: 70,
+            valor: (r: any) => rotuloRo('classificacao', r.classificacao),
+          },
+          {
+            titulo: 'Prioridade',
+            peso: 45,
+            valor: (r: any) => rotuloRo('prioridade', r.prioridade),
+          },
+          {
+            titulo: 'Responsável',
+            peso: 75,
+            valor: (r: any) => r.responsavel?.nome,
+          },
+          {
+            titulo: 'Prazo',
+            peso: 45,
+            valor: (r: any) => r.prazoConclusao,
+            tipo: 'data',
+          },
+          {
+            titulo: 'Custo (peças)',
+            peso: 55,
+            valor: (r: any) => r.custoTotal,
+            tipo: 'moeda',
+            negrito: true,
+          },
+          {
+            titulo: 'Blocos concluídos',
+            peso: 55,
+            // Os quatro flags da tela viram a lista dos blocos que fecharam.
+            valor: (r: any) =>
+              (r.blocos ?? []).map((b: any) => b.numero).join(', '),
+          },
+          {
+            titulo: 'Status',
+            peso: 60,
+            valor: (r: any) => rotuloRo('status', r.status),
+          },
+        ],
+        linhas: lista,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

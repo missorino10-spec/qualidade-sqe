@@ -47,6 +47,14 @@ export class AlertasService {
     });
   }
 
+  // Nome da maquina para escrever o filtro no cabecalho do relatorio (o
+  // recorte pode nao ter nenhum alerta e ainda assim precisa dizer qual
+  // maquina foi escolhida).
+  async nomeMaquina(id: number) {
+    const m = await this.prisma.maquina.findUnique({ where: { id } });
+    return m ? `${m.codigo} — ${m.nome}` : undefined;
+  }
+
   async detalhe(id: number) {
     const a = await this.prisma.alertaQualidade.findUnique({
       where: { id },

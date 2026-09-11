@@ -30,6 +30,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../anexos/storage.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import { EVID, ORIGENS_RECEBIMENTO } from '../../comum/inspecao';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 import {
   gerarPdfRegistroHomologacaoItem,
   gerarPdfRelatorioInspecaoItem,
@@ -135,6 +136,48 @@ class EncerrarDesvioDto {
   @IsOptional() @IsString() observacoes?: string;
 }
 
+// O relatorio sai com as mesmas palavras da tela: quem exporta compara o papel
+// com a lista e os dois tem que dizer a mesma coisa.
+const ROTULO_STATUS_HOMOLOGACAO: Record<string, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+};
+
+const ROTULO_RESULTADO_ITEM: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  REPROVADO: 'Reprovado',
+  CANCELADO: 'Cancelado',
+};
+
+const ROTULO_MOTIVO: Record<string, string> = {
+  PRIMEIRO_FORNECIMENTO: 'Primeiro fornecimento',
+  ALTERACAO_MATERIAL: 'Alteração de material',
+  ALTERACAO_PROCESSO: 'Alteração de processo',
+};
+
+const ROTULO_SOLICITANTE_ITEM: Record<string, string> = {
+  COMPRAS: 'Compras',
+  ENGENHARIA: 'Engenharia',
+  NC: 'N/C',
+  FORNECEDOR: 'Fornecedor',
+};
+
+// Sem amostras inspecionadas nao existe resultado; a coluna diz o que o
+// registro esta esperando, igual a tela.
+function resultadoItem(h: any): string {
+  if (h.resultado) return ROTULO_RESULTADO_ITEM[h.resultado] ?? h.resultado;
+  return h.statusHomologacao === 'CANCELADO'
+    ? ''
+    : 'Aguardando amostras do fornecedor';
+}
+
+// Os tres estados da coluna de concessao, como em components/DesvioQualidade.
+function situacaoDesvio(h: any): string {
+  if (!h.desvioQualidade) return 'Não';
+  return h.desvioEncerradoEm ? 'Sim — encerrado' : 'Sim — aberto';
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQD)
 @Controller('sqd/homologacoes-itens')
@@ -152,8 +195,96 @@ export class HomologacoesItensController {
   }
 
   @Get()
-  listar(@Query('ano') ano?: string) {
-    return this.service.listar(ano ? Number(ano) : undefined);
+  listar(
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listar(ano ? Number(ano) : undefined, de, ate);
+  }
+
+  // Relatorio da LISTA (nao confundir com ':id/relatorio/pdf', que e o
+  // relatorio de inspecao de UM registro). Precisa vir antes de ':id', senao
+  // "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorioLista(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('ano') ano?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const registros = await this.service.listar(
+      ano ? Number(ano) : undefined,
+      de,
+      ate,
+    );
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Homologação de Itens',
+        emitidoPor: user.nome,
+        filtros: [{ rotulo: 'Período', valor: periodoTexto(de, ate) }],
+        colunas: [
+          { titulo: 'Número', peso: 55, valor: (h: any) => h.numero },
+          { titulo: 'Rev.', peso: 25, valor: (h: any) => h.revisao },
+          {
+            titulo: 'Solicitação',
+            peso: 42,
+            valor: (h: any) => h.dataSolicitacao,
+            tipo: 'data',
+          },
+          { titulo: 'Semana', peso: 32, valor: (h: any) => h.semana },
+          {
+            titulo: 'Fornecedor',
+            peso: 100,
+            valor: (h: any) => h.fornecedorNome,
+          },
+          {
+            titulo: 'Item',
+            peso: 120,
+            valor: (h: any) =>
+              [h.itemCodigo, h.itemDescricao].filter(Boolean).join(' — '),
+          },
+          {
+            titulo: 'Motivo',
+            peso: 65,
+            valor: (h: any) => ROTULO_MOTIVO[h.motivo] ?? '',
+          },
+          {
+            titulo: 'Solicitante',
+            peso: 45,
+            valor: (h: any) => ROTULO_SOLICITANTE_ITEM[h.solicitante] ?? '',
+          },
+          {
+            titulo: 'Tentativas',
+            peso: 35,
+            valor: (h: any) => h.tentativas,
+            tipo: 'numero',
+          },
+          {
+            titulo: 'Resultado',
+            peso: 95,
+            valor: (h: any) => resultadoItem(h),
+          },
+          {
+            titulo: 'Desvio de qualidade',
+            peso: 60,
+            valor: (h: any) => situacaoDesvio(h),
+          },
+          {
+            titulo: 'Status',
+            peso: 50,
+            valor: (h: any) =>
+              ROTULO_STATUS_HOMOLOGACAO[h.statusHomologacao] ??
+              h.statusHomologacao,
+          },
+        ],
+        linhas: registros,
+      },
+      formato,
+    );
   }
 
   @Get(':id')

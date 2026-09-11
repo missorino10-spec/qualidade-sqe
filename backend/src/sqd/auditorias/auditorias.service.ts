@@ -78,9 +78,21 @@ export class AuditoriasService {
     };
   }
 
-  async listar(ano?: number) {
+  // O recorte de periodo e pela DATA DA AUDITORIA: e ela que numera o registro
+  // e e o marco zero do prazo de reavaliacao. Recortar pela data limite da
+  // reavaliacao jogaria a auditoria para um mes em que nada aconteceu.
+  async listar(ano?: number, de?: string, ate?: string) {
     const registros = await this.prisma.auditoriaFornecedor.findMany({
-      where: { ano: ano ?? undefined },
+      where: {
+        ano: ano ?? undefined,
+        dataAuditoria:
+          de || ate
+            ? {
+                gte: de ? new Date(`${de}T00:00:00.000Z`) : undefined,
+                lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
+              }
+            : undefined,
+      },
       orderBy: [{ ano: 'desc' }, { sequencial: 'desc' }],
       include: {
         criadoPor: { select: { id: true, nome: true } },

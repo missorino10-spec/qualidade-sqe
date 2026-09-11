@@ -20,7 +20,8 @@ import { FileTextOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { abrirPdfEmNovaAba, api } from '../../api';
+import { api, queryDeFiltro } from '../../api';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
 import { dataBR, dataInput, separadoresBR } from '../../formatos';
 import { semanaAno } from '../../semana';
 import Tabela, { filtrosDe } from '../../components/Tabela';
@@ -31,22 +32,12 @@ import {
   useValorTotal,
 } from '../../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../../moeda';
-import { BotaoEditar, BotaoExcluir, BotaoPdf } from '../../design/acoes';
+import { BotaoEditar, BotaoExcluir, ExportarLista } from '../../design/acoes';
 
 // Custo da Nao Qualidade — espelha a aba "Defeitos e CNQ" da planilha.
 // Total = quantidade x valor unitario, mas pode ser digitado a mao quando o
 // custo do desvio nao vem dessa conta.
 const CAMPOS_VALOR = { quantidade: 'quantidade', unitario: 'valorUnitario' };
-
-// Atalhos do filtro de periodo. A semana e de DOMINGO a SABADO, como no
-// restante do sistema (src/semana.ts).
-const PERIODOS: { value: string; label: string }[] = [
-  { value: 'SEMANA', label: 'Semana atual' },
-  { value: 'MES', label: 'Mês atual' },
-  { value: 'ANO', label: 'Ano atual' },
-  { value: 'TUDO', label: 'Todo o período' },
-  { value: 'PERSONALIZADO', label: 'Personalizado' },
-];
 
 // A data do lancamento chega como meia-noite UTC: ler o trecho ISO evita que
 // 28/07 vire a semana de 27/07 no fuso do navegador (ver src/formatos.ts).
@@ -55,18 +46,6 @@ function semanaDaData(valor?: string | Date | null): string {
   if (!iso) return '-';
   const [ano, mes, dia] = iso.split('-').map(Number);
   return semanaAno(new Date(ano, mes - 1, dia)).semana;
-}
-
-function intervaloDoPeriodo(periodo: string): { de?: string; ate?: string } {
-  const hoje = dayjs();
-  const fmt = (d: dayjs.Dayjs) => d.format('YYYY-MM-DD');
-  if (periodo === 'SEMANA')
-    return { de: fmt(hoje.startOf('week')), ate: fmt(hoje.endOf('week')) };
-  if (periodo === 'MES')
-    return { de: fmt(hoje.startOf('month')), ate: fmt(hoje.endOf('month')) };
-  if (periodo === 'ANO')
-    return { de: fmt(hoje.startOf('year')), ate: fmt(hoje.endOf('year')) };
-  return {};
 }
 
 export default function Cnq() {
@@ -80,14 +59,13 @@ export default function Cnq() {
   const ctrlTotal = useValorTotal(form, CAMPOS_VALOR);
 
   // Filtro da tela: o mesmo recorte vale para a lista, para os totais e para
-  // o PDF. Abre sem recorte para nao esconder lancamentos de meses anteriores.
-  const [periodo, setPeriodo] = useState('TUDO');
-  const [intervalo, setIntervalo] = useState(intervaloDoPeriodo('TUDO'));
+  // a exportacao — os tres tem que mostrar a mesma coisa.
+  const periodo = usarPeriodo();
   const [maquinaId, setMaquinaId] = useState<number | undefined>();
 
   const filtro = {
-    de: intervalo.de || undefined,
-    ate: intervalo.ate || undefined,
+    de: periodo.de,
+    ate: periodo.ate,
     maquinaId,
   };
 
@@ -96,18 +74,6 @@ export default function Cnq() {
     queryFn: async () =>
       (await api.get('/manufatura/cnq', { params: filtro })).data,
   });
-
-  function trocarPeriodo(v: string) {
-    setPeriodo(v);
-    // "Personalizado" mantem as datas que ja estavam para o usuario so ajustar.
-    if (v !== 'PERSONALIZADO') setIntervalo(intervaloDoPeriodo(v));
-  }
-
-  // Mexer numa data manualmente passa o filtro para "Personalizado".
-  function trocarData(campo: 'de' | 'ate', valor: string) {
-    setPeriodo('PERSONALIZADO');
-    setIntervalo((atual) => ({ ...atual, [campo]: valor }));
-  }
 
   const { data: maquinas } = useQuery<any[]>({
     queryKey: ['maquinas'],
@@ -179,60 +145,26 @@ export default function Cnq() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {/* O filtro vale para a lista, para os totais e para o PDF. */}
-      <Card size="small">
-        <Row gutter={[12, 12]} align="bottom">
-          <Col xs={24} sm={12} lg={5}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Período
-            </Typography.Text>
-            <Select
-              style={{ width: '100%' }}
-              value={periodo}
-              onChange={trocarPeriodo}
-              options={PERIODOS}
-            />
-          </Col>
-          <Col xs={12} sm={6} lg={4}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              De
-            </Typography.Text>
-            <Input
-              type="date"
-              value={intervalo.de ?? ''}
-              onChange={(e) => trocarData('de', e.target.value)}
-            />
-          </Col>
-          <Col xs={12} sm={6} lg={4}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Até
-            </Typography.Text>
-            <Input
-              type="date"
-              value={intervalo.ate ?? ''}
-              onChange={(e) => trocarData('ate', e.target.value)}
-            />
-          </Col>
-          <Col xs={24} sm={12} lg={11}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Máquina / linha
-            </Typography.Text>
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="Todas"
-              style={{ width: '100%' }}
-              value={maquinaId}
-              onChange={setMaquinaId}
-              options={(maquinas ?? []).map((m) => ({
-                value: m.id,
-                label: `${m.codigo} — ${m.nome}`,
-              }))}
-            />
-          </Col>
-        </Row>
-      </Card>
+      <FiltroPeriodo controle={periodo}>
+        <Col xs={24} sm={24} lg={24}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Máquina / linha
+          </Typography.Text>
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Todas"
+            style={{ width: '100%' }}
+            value={maquinaId}
+            onChange={setMaquinaId}
+            options={(maquinas ?? []).map((m) => ({
+              value: m.id,
+              label: `${m.codigo} — ${m.nome}`,
+            }))}
+          />
+        </Col>
+      </FiltroPeriodo>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={8}>
@@ -254,21 +186,13 @@ export default function Cnq() {
 
       <Card
         title="Custo da Não Qualidade (CNQ)"
-        /* O PDF sai do filtro e vem para as acoes da tela, onde ele fica em
-           todos os outros modulos. O que ele exporta continua sendo o que o
-           filtro acima esta mostrando. */
+        /* O que sai no PDF e na planilha e exatamente o que o filtro acima
+           esta mostrando. */
         extra={
           <Space wrap>
-            <BotaoPdf
-              onClick={() =>
-                abrirPdfEmNovaAba(
-                  `/manufatura/cnq/pdf?${new URLSearchParams(
-                    Object.entries(filtro)
-                      .filter(([, v]) => v !== undefined && v !== '')
-                      .map(([k, v]) => [k, String(v)]),
-                  ).toString()}`,
-                )
-              }
+            <ExportarLista
+              url={`/manufatura/cnq/relatorio${queryDeFiltro(filtro)}`}
+              nome="cnq"
             />
             <Button
               type="primary"

@@ -22,18 +22,19 @@ import { PlusOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, queryDeFiltro } from '../api';
 import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { dataBR, numeroBR } from '../formatos';
 import { semanaAno } from '../semana';
 import Tabela from '../components/Tabela';
+import FiltroPeriodo, { usarPeriodo } from '../components/FiltroPeriodo';
 import { SelectItem } from '../components/CamposItem';
 import {
   CamposFornecedor,
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
 import { CabecalhoPagina } from '../design/painel';
-import { BotaoEditar, BotaoExcluir } from '../design/acoes';
+import { BotaoEditar, BotaoExcluir, ExportarLista } from '../design/acoes';
 import { COR, TAG } from '../design/tokens';
 
 // Registro de Entrada - a chegada da carga, ponto de partida do SQE.
@@ -101,16 +102,24 @@ export default function RegistrosEntrada() {
 
   const { data: fornecedores } = useFornecedores();
 
+  // O recorte vale para a lista, para os cartoes e para a exportacao: os tres
+  // tem que mostrar exatamente a mesma coisa.
+  const periodo = usarPeriodo();
+  const filtro = {
+    de: periodo.de,
+    ate: periodo.ate,
+    fornecedorId: fornecedorFiltro,
+  };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['registros-entrada', fornecedorFiltro],
+    queryKey: [
+      'registros-entrada',
+      filtro.de,
+      filtro.ate,
+      filtro.fornecedorId,
+    ],
     queryFn: async () =>
-      (
-        await api.get('/registros-entrada', {
-          params: fornecedorFiltro
-            ? { fornecedorId: fornecedorFiltro }
-            : undefined,
-        })
-      ).data,
+      (await api.get('/registros-entrada', { params: filtro })).data,
   });
 
   // A mesma conta do servidor, so para a tela mostrar a decisao antes de gravar.
@@ -271,31 +280,35 @@ export default function RegistrosEntrada() {
         titulo="Registro de Entrada"
         descricao="A chegada da carga. Fora do ciclo, encerra aqui; dentro do ciclo, segue para a inspeção."
         acoes={
-          <Button type="primary" icon={<PlusOutlined />} onClick={novoRegistro}>
-            Nova entrada
-          </Button>
+          <Space wrap>
+            <ExportarLista
+              url={`/registros-entrada/relatorio${queryDeFiltro(filtro)}`}
+              nome="registros-entrada"
+            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={novoRegistro}>
+              Nova entrada
+            </Button>
+          </Space>
         }
       />
 
-      <Card size="small">
-        <Form layout="vertical" style={{ marginBottom: -16 }}>
-          <Row gutter={12}>
-            <Col xs={24} sm={12} lg={8}>
-              <Form.Item label="Fornecedor">
-                <Select
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="Todos os fornecedores"
-                  value={fornecedorFiltro}
-                  onChange={setFornecedorFiltro}
-                  options={opcoesFornecedor(fornecedores)}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Card>
+      <FiltroPeriodo controle={periodo}>
+        <Col xs={24}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Fornecedor
+          </Typography.Text>
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Todos os fornecedores"
+            style={{ width: '100%' }}
+            value={fornecedorFiltro}
+            onChange={setFornecedorFiltro}
+            options={opcoesFornecedor(fornecedores)}
+          />
+        </Col>
+      </FiltroPeriodo>
 
       <Row gutter={[16, 16]}>
         {[

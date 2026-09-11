@@ -18,8 +18,10 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, queryDeFiltro } from '../../api';
 import { useAuth } from '../../auth';
+import FiltroPeriodo, { usarPeriodo } from '../../components/FiltroPeriodo';
+import { ExportarLista } from '../../design/acoes';
 import { dataBR } from '../../formatos';
 import {
   FILTROS_DESVIO,
@@ -54,9 +56,15 @@ export default function HomologacoesItens() {
   const [form] = Form.useForm();
   const [salvando, setSalvando] = useState(false);
 
+  // O recorte e pela data da solicitacao e vale para a lista e para a
+  // exportacao: o PDF e a planilha saem com exatamente o que esta na tela.
+  const periodo = usarPeriodo();
+  const filtro = { de: periodo.de, ate: periodo.ate };
+
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ['sqd-homologacoes-itens'],
-    queryFn: async () => (await api.get('/sqd/homologacoes-itens')).data,
+    queryKey: ['sqd-homologacoes-itens', filtro.de, filtro.ate],
+    queryFn: async () =>
+      (await api.get('/sqd/homologacoes-itens', { params: filtro })).data,
   });
 
   function abrir() {
@@ -107,14 +115,22 @@ export default function HomologacoesItens() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <FiltroPeriodo controle={periodo} />
+
       <Card
         title="Homologação de Itens"
         extra={
-          podeEditar && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
-              Nova homologação de item
-            </Button>
-          )
+          <Space wrap>
+            <ExportarLista
+              url={`/sqd/homologacoes-itens/relatorio${queryDeFiltro(filtro)}`}
+              nome="homologacao-itens"
+            />
+            {podeEditar && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={abrir}>
+                Nova homologação de item
+              </Button>
+            )}
+          </Space>
         }
       >
         <Tabela

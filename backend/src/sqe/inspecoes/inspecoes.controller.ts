@@ -28,6 +28,7 @@ import { gerarPdfInspecao } from './inspecao-pdf';
 import { StorageService } from '../../anexos/storage.service';
 import { carregarFotosEvidencia } from '../../comum/fotos-evidencia';
 import { EVID, ORIGENS_RECEBIMENTO } from '../../comum/inspecao';
+import { periodoTexto, responderRelatorio } from '../../comum/relatorio-lista';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -111,6 +112,19 @@ class EditarLoteDto extends CamposInspecaoDto {
   @IsOptional() @IsArray() desenhos?: any[];
 }
 
+// O relatorio sai com as mesmas palavras da tela.
+const ROTULO_RESULTADO: Record<string, string> = {
+  APROVADO: 'Aprovado',
+  REPROVADO: 'Reprovado',
+  RASCUNHO: 'Rascunho',
+  SEM_INSPECAO: 'Sem inspeção',
+};
+
+const ROTULO_FORMULARIO: Record<string, string> = {
+  VISUAL: 'Visual',
+  LOTE: 'Lote / Dimensional',
+};
+
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQE)
 @Controller('inspecoes')
@@ -128,9 +142,106 @@ export class InspecoesController {
   }
 
   @Get()
-  findAll(@Query('fornecedorId') fornecedorId?: string) {
-    return this.service.listarTodas(
-      fornecedorId ? Number(fornecedorId) : undefined,
+  findAll(
+    @Query('fornecedorId') fornecedorId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    return this.service.listarTodas({
+      fornecedorId: fornecedorId ? Number(fornecedorId) : undefined,
+      de,
+      ate,
+    });
+  }
+
+  // Relatorio do recorte que a tela esta mostrando, em PDF ou planilha.
+  // Precisa vir antes de ':id', senao "relatorio" cai na rota do detalhe.
+  @Get('relatorio')
+  async relatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('fornecedorId') fornecedorId?: string,
+    @Query('de') de?: string,
+    @Query('ate') ate?: string,
+  ) {
+    const id = fornecedorId ? Number(fornecedorId) : undefined;
+    const inspecoes = await this.service.listarTodas({
+      fornecedorId: id,
+      de,
+      ate,
+    });
+    const conta = (r: string) =>
+      inspecoes.filter((i: any) => i.resultado === r).length;
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Inspeções de recebimento',
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Período', valor: periodoTexto(de, ate) },
+          {
+            rotulo: 'Fornecedor',
+            valor: id
+              ? ((inspecoes[0] as any)?.fornecedor?.nome ?? String(id))
+              : 'Todos',
+          },
+        ],
+        totais: [
+          { rotulo: 'Inspeções', valor: String(inspecoes.length) },
+          { rotulo: 'Aprovadas', valor: String(conta('APROVADO')) },
+          { rotulo: 'Reprovadas', valor: String(conta('REPROVADO')) },
+          { rotulo: 'Rascunhos', valor: String(conta('RASCUNHO')) },
+        ],
+        colunas: [
+          {
+            titulo: 'Inspeção',
+            peso: 60,
+            valor: (i: any) => i.numeroInspecao,
+            negrito: true,
+          },
+          {
+            titulo: 'Data',
+            peso: 45,
+            valor: (i: any) => i.dataInspecao,
+            tipo: 'data',
+          },
+          { titulo: 'Semana', peso: 35, valor: (i: any) => i.semana },
+          { titulo: 'Ano', peso: 30, valor: (i: any) => i.ano },
+          {
+            titulo: 'Formulário',
+            peso: 75,
+            valor: (i: any) =>
+              (i.formularios ?? [])
+                .map((f: string) => ROTULO_FORMULARIO[f] ?? f)
+                .join(', '),
+          },
+          {
+            titulo: 'Tipo',
+            peso: 35,
+            valor: (i: any) => (i.inspecaoExtra ? 'Extra' : 'Ciclo'),
+          },
+          {
+            titulo: 'Fornecedor',
+            peso: 110,
+            valor: (i: any) => i.fornecedor?.nome,
+          },
+          { titulo: 'Item', peso: 130, valor: (i: any) => i.item?.descricao },
+          {
+            titulo: 'Resultado',
+            peso: 55,
+            valor: (i: any) => ROTULO_RESULTADO[i.resultado] ?? i.resultado,
+          },
+          {
+            titulo: 'RNC',
+            peso: 55,
+            valor: (i: any) =>
+              (i.rncs ?? []).map((r: any) => r.numero).join(', '),
+          },
+        ],
+        linhas: inspecoes,
+      },
+      formato,
     );
   }
 

@@ -52,9 +52,20 @@ const CAMPOS_DATA = ['dataAbertura', 'dataTermino'] as const;
 export class CincoGService {
   constructor(private prisma: PrismaService) {}
 
-  listar(status?: string) {
+  listar(status?: string, de?: string, ate?: string) {
     return this.prisma.cincoG.findMany({
-      where: { status: status ? (status as any) : undefined },
+      where: {
+        status: status ? (status as any) : undefined,
+        // "Ate" vale o dia inteiro: a data de abertura guarda hora e parar na
+        // meia-noite deixaria de fora tudo que foi aberto no ultimo dia.
+        dataAbertura:
+          de || ate
+            ? {
+                gte: de ? new Date(de) : undefined,
+                lte: ate ? new Date(`${ate}T23:59:59.999Z`) : undefined,
+              }
+            : undefined,
+      },
       orderBy: { dataAbertura: 'desc' },
       include: includeCincoG,
     });

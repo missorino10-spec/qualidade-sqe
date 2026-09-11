@@ -67,19 +67,26 @@ export default function FiltroPeriodo({
   controle,
   children,
   larguraExtra = 11,
+  rotulo = 'Período',
 }: {
   controle: ReturnType<typeof usarPeriodo>;
   /** Filtros proprios da tela (fornecedor, maquina, status...). */
   children?: ReactNode;
   /** Colunas do grid (de 24) que os filtros extras ocupam em telas grandes. */
   larguraExtra?: number;
+  /**
+   * Quando a tela tem mais de uma data por registro, o rotulo diz QUAL delas
+   * manda no recorte — ex. "Período (recebimento na Qualidade)" no R.O, onde a
+   * reclamacao tem data do cliente e data de chegada na Qualidade.
+   */
+  rotulo?: string;
 }) {
   return (
     <Card size="small">
       <Row gutter={[12, 12]} align="bottom">
         <Col xs={24} sm={12} lg={5}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Período
+            {rotulo}
           </Typography.Text>
           <Select
             style={{ width: '100%' }}
