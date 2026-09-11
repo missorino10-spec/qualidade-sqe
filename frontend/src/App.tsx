@@ -13,6 +13,7 @@ import InspecaoDetalhe from './pages/InspecaoDetalhe';
 import RncLista from './pages/RncLista';
 import RncDetalhe from './pages/RncDetalhe';
 import Periodicidade from './pages/Periodicidade';
+import AvaliacaoFornecedores from './pages/AvaliacaoFornecedores';
 import PainelManufatura from './pages/manufatura/PainelManufatura';
 import InspecoesManufatura from './pages/manufatura/InspecoesManufatura';
 import InspecaoManufaturaDetalhe from './pages/manufatura/InspecaoManufaturaDetalhe';
@@ -96,6 +97,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Privado modulo="SQE"><Dashboard /></Privado>} />
+      <Route path="/avaliacao-fornecedores" element={<Privado modulo="SQE"><AvaliacaoFornecedores /></Privado>} />
       <Route path="/periodicidade" element={<Privado modulo="SQE"><Periodicidade /></Privado>} />
       <Route path="/fornecedores" element={<Privado modulo="CAD_FORNECEDORES"><Fornecedores /></Privado>} />
       <Route path="/itens" element={<Privado modulo="CAD_ITENS"><Itens /></Privado>} />

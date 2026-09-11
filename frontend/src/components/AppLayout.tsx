@@ -76,6 +76,11 @@ const itensMenu: {
       { key: '/inspecoes', icon: <AuditOutlined />, label: 'Inspeções' },
       { key: '/rnc', icon: <WarningOutlined />, label: 'RNC' },
       {
+        key: '/avaliacao-fornecedores',
+        icon: <LineChartOutlined />,
+        label: 'Avaliação de Fornecedores',
+      },
+      {
         key: '/periodicidade',
         icon: <SlidersOutlined />,
         label: 'Periodicidade',

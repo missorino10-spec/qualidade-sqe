@@ -86,12 +86,7 @@ export function pctConformidade(
   return Math.round(((inspecionados - reprovados) / inspecionados) * 1000) / 10;
 }
 
-// Classificacao apurada pela % de conformidade (bandas oficiais)
-// A>=98, B 90-97.99, C 80-89.99, D<80
-export function classificarPorConformidade(pct: number): Classificacao {
-  if (pct >= 98) return 'A';
-  if (pct >= 90) return 'B';
-  if (pct >= 80) return 'C';
-  return 'D';
-}
+// A classe do fornecedor NAO sai mais da conformidade sozinha: ela vem do IDF,
+// que pesa conformidade, tempo de resposta da RNC e nivel do plano de acao.
+// Ver src/sqe/avaliacao/idf.ts.
 

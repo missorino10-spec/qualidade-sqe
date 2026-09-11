@@ -54,6 +54,8 @@ model Usuario {
   inspecoesVisual InspecaoVisual[]  @relation("InspVisualInspetor")
   inspecoesLote   InspecaoLote[]    @relation("InspLoteInspetor")
   rncs            Rnc[]             @relation("RncCriadoPor")
+
+  avaliacoesFornecedor AvaliacaoFornecedor[] @relation("AvaliacaoFornecedorPor")
   anexos          Anexo[]
   historicos      HistoricoStatus[]
 
@@ -186,6 +188,7 @@ model Fornecedor {
   inspecoesLote    InspecaoLote[]
   rncs             Rnc[]
   historicoClasses HistoricoClassificacao[]
+  avaliacoes       AvaliacaoFornecedor[]
 }
 
 // Ate 2 contatos por fornecedor (cadastro simples)
@@ -275,22 +278,84 @@ model HistoricoStatus {
   @@index([entidadeTipo, entidadeId])
 }
 
-// Historico de classificacao por trimestre fiscal (out->set)
+// Historico de classificacao. Cada linha e o fechamento de uma competencia
+// mensal do IDF (ver AvaliacaoFornecedor). Os registros antigos, de quando a
+// classe era apurada por trimestre fiscal, continuam aqui e se distinguem pelo
+// formato do rotulo.
 model HistoricoClassificacao {
   id                   Int           @id @default(autoincrement())
   fornecedorId         Int
   fornecedor           Fornecedor    @relation(fields: [fornecedorId], references: [id])
-  trimestreFiscal      String // ex: "FY26-Q3"
+  // Competencia da avaliacao: "2026-09". Registros legados: "FY26-Q3".
+  trimestreFiscal      String
   periodoInicio        DateTime
   periodoFim           DateTime
-  classificacaoInicial Classificacao // classificacao de fornecimento do periodo
+  classificacaoInicial Classificacao // classe que o fornecedor tinha no periodo
   lotesInspecionados   Int
   lotesReprovados      Int
   pctConformidade      Float
-  classificacaoApurada Classificacao // calculada pela conformidade
+  classificacaoApurada Classificacao // apurada pelo IDF (legados: por conformidade)
   createdAt            DateTime      @default(now())
 
   @@index([fornecedorId])
+}
+
+// Avaliacao mensal do fornecedor - IDF (Indice de Desempenho do Fornecedor).
+//
+// IDF = C1 x 50% + C2 x 30% + C3 x 20%, cada criterio virando nota de 0 a 10:
+//   C1 - % de conformidade das inspecoes de recebimento
+//   C2 - tempo de resposta das RNCs
+//   C3 - nivel do plano de acao das RNCs
+// A classe que sai do IDF substitui a antiga classe por conformidade e e ela
+// que comanda a periodicidade de inspecao.
+//
+// A competencia NAO e o mes civil: fecha no dia 26, como folha de pagamento.
+// A avaliacao e registro proprio - le os dados da RNC e das inspecoes, mas nao
+// fica presa a eles. Depois de fechada, nada mais a reescreve.
+model AvaliacaoFornecedor {
+  id            Int        @id @default(autoincrement())
+  fornecedorId  Int
+  fornecedor    Fornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+  ano           Int
+  mes           Int // 1-12
+  periodoInicio DateTime // dia 27 do mes anterior
+  periodoFim    DateTime // dia 26 da competencia
+
+  // C1 - conformidade do recebimento
+  lotesInspecionados Int    @default(0)
+  lotesReprovados    Int    @default(0)
+  pctConformidade    Float  @default(0)
+  notaC1Auto         Float?
+
+  // C2 - tempo de resposta da RNC
+  rncsConsideradas   Int    @default(0)
+  horasRespostaMedia Float?
+  notaC2Auto         Float?
+
+  // C3 - nivel do plano de acao
+  notaC3Auto Float?
+
+  // Nota digitada a mao. Sobrepoe a automatica: existe criterio externo que o
+  // sistema nao enxerga e que a Qualidade precisa poder registrar.
+  notaC1Manual Float?
+  notaC2Manual Float?
+  notaC3Manual Float?
+  justificativa String?
+
+  idf           Float?
+  classificacao Classificacao?
+
+  // Fechada congela os numeros e aplica a classe no fornecedor.
+  fechada   Boolean   @default(false)
+  fechadaEm DateTime?
+
+  atualizadoPorId Int?
+  atualizadoPor   Usuario?  @relation("AvaliacaoFornecedorPor", fields: [atualizadoPorId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([fornecedorId, ano, mes])
+  @@index([ano, mes])
 }
 
 // ---------------------- MODULO SQE ----------------------

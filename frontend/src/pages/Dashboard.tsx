@@ -1,15 +1,5 @@
 import { useState } from 'react';
-import {
-  Button,
-  Card,
-  Col,
-  DatePicker,
-  Modal,
-  Row,
-  Space,
-  Tag,
-  message,
-} from 'antd';
+import { Button, Card, Col, DatePicker, Row, Space, Tag } from 'antd';
 import {
   CabecalhoPagina,
   CartaoIndicador,
@@ -30,7 +20,8 @@ import {
   RetweetOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Dayjs } from 'dayjs';
 import { api } from '../api';
 import { useAuth } from '../auth';
@@ -58,7 +49,7 @@ function tendenciaTag(t: string) {
 }
 
 export default function Dashboard() {
-  const qc = useQueryClient();
+  const navigate = useNavigate();
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<[Dayjs, Dayjs] | null>(null);
 
@@ -75,18 +66,6 @@ export default function Dashboard() {
     queryKey: ['evolucao-fornecedores'],
     queryFn: async () =>
       (await api.get('/dashboard/evolucao-fornecedores')).data,
-  });
-
-  const fecharTrimestre = useMutation({
-    mutationFn: async () => (await api.post('/dashboard/fechar-trimestre')).data,
-    onSuccess: (res: any) => {
-      message.success(
-        `Trimestre ${res.trimestre} fechado. ${res.fornecedoresProcessados} fornecedor(es) reclassificado(s).`,
-      );
-      qc.invalidateQueries({ queryKey: ['evolucao-fornecedores'] });
-      qc.invalidateQueries({ queryKey: ['fornecedores'] });
-    },
-    onError: () => message.error('Não foi possível fechar o trimestre.'),
   });
 
   const ind = kpis?.indicadores ?? {};
@@ -232,19 +211,9 @@ export default function Dashboard() {
           podeAdmin && (
             <Button
               icon={<ReconciliationOutlined />}
-              loading={fecharTrimestre.isPending}
-              onClick={() =>
-                Modal.confirm({
-                  title: 'Fechar trimestre fiscal',
-                  content:
-                    'Isto vai registrar o histórico do período, reclassificar os fornecedores pela conformidade apurada e zerar os contadores do trimestre. Deseja continuar?',
-                  okText: 'Fechar trimestre',
-                  cancelText: 'Cancelar',
-                  onOk: () => fecharTrimestre.mutate(),
-                })
-              }
+              onClick={() => navigate('/avaliacao-fornecedores')}
             >
-              Fechar trimestre
+              Avaliação de fornecedores
             </Button>
           )
         }
@@ -272,6 +241,14 @@ export default function Dashboard() {
               width: 150,
               align: 'center',
               render: (c: string) => <Tag color={corClasse[c]}>{c}</Tag>,
+            },
+            {
+              title: 'IDF',
+              dataIndex: 'idf',
+              width: 90,
+              align: 'center',
+              render: (v: number | null) =>
+                v === null ? '—' : numeroBR(v, 2),
             },
             {
               title: 'Conformidade',

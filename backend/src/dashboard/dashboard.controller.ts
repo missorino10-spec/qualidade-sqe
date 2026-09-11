@@ -1,14 +1,6 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../auth/modulo.decorator';
 import { PermissaoGuard } from '../auth/permissao.guard';
@@ -34,12 +26,5 @@ export class DashboardController {
     return this.service.historicoClassificacao(
       fornecedorId ? Number(fornecedorId) : undefined,
     );
-  }
-
-  @UseGuards(RolesGuard)
-  @Roles('QUALIDADE', 'ADMIN')
-  @Post('fechar-trimestre')
-  fecharTrimestre() {
-    return this.service.fecharTrimestre();
   }
 }

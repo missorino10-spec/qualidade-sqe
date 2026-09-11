@@ -59,7 +59,7 @@ export default function Periodicidade() {
         type="info"
         showIcon
         message="Como funciona"
-        description="A classificação de fornecimento (A, B, C ou D) define a frequência de inspeção, o percentual de amostra e o NQA aplicado no recebimento. Ajuste os valores abaixo conforme a política de qualidade da empresa."
+        description="A classificação (A, B, C ou D) define a frequência de inspeção, o percentual de amostra e o NQA aplicado no recebimento. Quem define a classe de cada fornecedor é o IDF, apurado todo mês na Avaliação de Fornecedores. Ajuste os valores abaixo conforme a política de qualidade da empresa."
       />
       <Tabela
         busca="Buscar classificação"

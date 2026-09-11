@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FeriadosService } from '../feriados/feriados.service';
 import { Feriados, somarDiasUteis } from '../comum/dias-uteis';
-import {
-  classificarPorConformidade,
-  pctConformidade,
-  trimestreFiscal,
-} from '../sqe/sqe-utils';
+import { AvaliacaoService } from '../sqe/avaliacao/avaliacao.service';
 
 function pct(parte: number, total: number): number {
   if (!total) return 0;
@@ -59,6 +55,7 @@ export class DashboardService {
   constructor(
     private prisma: PrismaService,
     private feriados: FeriadosService,
+    private avaliacao: AvaliacaoService,
   ) {}
 
   /**
@@ -255,97 +252,49 @@ export class DashboardService {
     };
   }
 
-  // Evolucao/historico de classificacao dos fornecedores (para o painel)
+  // Evolucao dos fornecedores na competencia aberta. A classe apurada vem do
+  // IDF - o mesmo indice que a Avaliacao de Fornecedores fecha todo mes.
   async evolucaoFornecedores() {
+    const { ano, mes } = this.avaliacao.competenciaAtual();
+    const avaliacao = await this.avaliacao.listar(ano, mes);
     const fornecedores = await this.prisma.fornecedor.findMany({
       where: { ativo: true },
-      orderBy: { nome: 'asc' },
+      select: { id: true, totalEntregas: true, totalInspecoes: true },
     });
+    const totais = new Map(fornecedores.map((f) => [f.id, f]));
+    const ordem = { A: 1, B: 2, C: 3, D: 4 } as Record<string, number>;
 
-    return fornecedores.map((f) => {
-      const conformidade = pctConformidade(
-        f.lotesInspecionados,
-        f.lotesReprovados,
-      );
-      const classificacaoAtual =
-        f.lotesInspecionados > 0
-          ? classificarPorConformidade(conformidade)
-          : f.classificacaoFornecimento;
-      const ordem = { A: 1, B: 2, C: 3, D: 4 } as Record<string, number>;
+    return avaliacao.linhas.map((l) => {
+      const classificacaoAtual = l.classificacao ?? l.classificacaoFornecimento;
       let tendencia: 'UPGRADE' | 'DOWNGRADE' | 'IGUAL' = 'IGUAL';
-      if (ordem[classificacaoAtual] < ordem[f.classificacaoFornecimento])
+      if (ordem[classificacaoAtual] < ordem[l.classificacaoFornecimento])
         tendencia = 'UPGRADE';
-      else if (ordem[classificacaoAtual] > ordem[f.classificacaoFornecimento])
+      else if (ordem[classificacaoAtual] > ordem[l.classificacaoFornecimento])
         tendencia = 'DOWNGRADE';
 
       return {
-        id: f.id,
-        codigo: f.codigo,
-        nome: f.nome,
-        classificacaoFornecimento: f.classificacaoFornecimento,
+        id: l.fornecedorId,
+        codigo: l.codigo,
+        nome: l.nome,
+        classificacaoFornecimento: l.classificacaoFornecimento,
         classificacaoAtual,
-        pctConformidade: conformidade,
-        lotesInspecionados: f.lotesInspecionados,
-        lotesReprovados: f.lotesReprovados,
-        totalEntregas: f.totalEntregas,
-        totalInspecoes: f.totalInspecoes,
+        pctConformidade: l.pctConformidade,
+        lotesInspecionados: l.lotesInspecionados,
+        lotesReprovados: l.lotesReprovados,
+        totalEntregas: totais.get(l.fornecedorId)?.totalEntregas ?? 0,
+        totalInspecoes: totais.get(l.fornecedorId)?.totalInspecoes ?? 0,
+        idf: l.idf,
         tendencia,
       };
     });
   }
 
-  // Historico de classificacao por trimestre fiscal
+  // Historico de classificacao: uma linha por competencia fechada.
   async historicoClassificacao(fornecedorId?: number) {
     return this.prisma.historicoClassificacao.findMany({
       where: fornecedorId ? { fornecedorId } : undefined,
       include: { fornecedor: { select: { nome: true, codigo: true } } },
       orderBy: { createdAt: 'desc' },
     });
-  }
-
-  // Fecha o trimestre fiscal: snapshot no historico + atualiza classificacao + zera contadores.
-  // Chamado automaticamente na virada do trimestre (ou manualmente pela Qualidade/Admin).
-  async fecharTrimestre() {
-    const { label, inicio, fim } = trimestreFiscal(new Date());
-    const fornecedores = await this.prisma.fornecedor.findMany({
-      where: { ativo: true },
-    });
-    const resultados: any[] = [];
-    for (const f of fornecedores) {
-      const conformidade = pctConformidade(
-        f.lotesInspecionados,
-        f.lotesReprovados,
-      );
-      const apurada =
-        f.lotesInspecionados > 0
-          ? classificarPorConformidade(conformidade)
-          : f.classificacaoFornecimento;
-
-      const snapshot = await this.prisma.historicoClassificacao.create({
-        data: {
-          fornecedorId: f.id,
-          trimestreFiscal: label,
-          periodoInicio: inicio,
-          periodoFim: fim,
-          classificacaoInicial: f.classificacaoFornecimento,
-          lotesInspecionados: f.lotesInspecionados,
-          lotesReprovados: f.lotesReprovados,
-          pctConformidade: conformidade,
-          classificacaoApurada: apurada,
-        },
-      });
-
-      // Nova classificacao de fornecimento = apurada; zera contadores do periodo
-      await this.prisma.fornecedor.update({
-        where: { id: f.id },
-        data: {
-          classificacaoFornecimento: apurada,
-          lotesInspecionados: 0,
-          lotesReprovados: 0,
-        },
-      });
-      resultados.push(snapshot);
-    }
-    return { trimestre: label, fornecedoresProcessados: resultados.length };
   }
 }

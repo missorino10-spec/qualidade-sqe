@@ -15,6 +15,7 @@ import { AnexosModule } from './anexos/anexos.module';
 import { HistoricoModule } from './historico/historico.module';
 import { InspecoesModule } from './sqe/inspecoes/inspecoes.module';
 import { RncModule } from './sqe/rnc/rnc.module';
+import { AvaliacaoModule } from './sqe/avaliacao/avaliacao.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MaquinasModule } from './manufatura/maquinas/maquinas.module';
 import { DefeitosModule } from './manufatura/defeitos/defeitos.module';
@@ -61,6 +62,7 @@ const servirFrontend = existsSync(frontendDir);
     HistoricoModule,
     InspecoesModule,
     RncModule,
+    AvaliacaoModule,
     DashboardModule,
     MaquinasModule,
     DefeitosModule,
