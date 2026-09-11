@@ -74,7 +74,7 @@ export class AvaliacaoService {
         where: { status: { not: 'CANCELADA' }, dataAbertura: janela },
         select: {
           fornecedorId: true,
-          dataAbertura: true,
+          dataEnvioFornecedor: true,
           dataRetorno: true,
           nivelPlano: true,
         },
@@ -109,12 +109,15 @@ export class AvaliacaoService {
         l.resultado === 'REPROVADO',
       );
 
-    // C2 e C3 - uma nota por RNC, depois a media do mes.
+    // C2 e C3 - uma nota por RNC, depois a media do mes. A RNC que a Qualidade
+    // ainda nao enviou ao fornecedor fica de fora dos dois criterios: o relogio
+    // nem comecou e nao ha o que cobrar de quem nao foi avisado.
     const porFornecedor = new Map<
       number,
       { horas: number[]; notasC2: number[]; notasC3: number[] }
     >();
     for (const r of rncs) {
+      if (!r.dataEnvioFornecedor) continue;
       let acc = porFornecedor.get(r.fornecedorId);
       if (!acc) {
         acc = { horas: [], notasC2: [], notasC3: [] };
@@ -122,15 +125,14 @@ export class AvaliacaoService {
       }
       if (r.dataRetorno) {
         const h =
-          (r.dataRetorno.getTime() - r.dataAbertura.getTime()) / 3600000;
+          (r.dataRetorno.getTime() - r.dataEnvioFornecedor.getTime()) / 3600000;
         acc.horas.push(Math.max(0, h));
         acc.notasC2.push(notaTempoResposta(Math.max(0, h)));
       } else {
         // Sem resposta ate o fechamento: perde o indicador do mes.
         acc.notasC2.push(0);
       }
-      const nota = notaPlanoAcao(r.nivelPlano);
-      if (nota !== null) acc.notasC3.push(nota);
+      acc.notasC3.push(notaPlanoAcao(r.nivelPlano));
     }
 
     const ids = new Set<number>([
@@ -148,8 +150,8 @@ export class AvaliacaoService {
 
       const rnc = porFornecedor.get(id);
       const temRnc = !!rnc && rnc.notasC2.length > 0;
-      // Recebeu no mes e nao gerou RNC: nota maxima automatica nos dois
-      // criterios que dependem dela.
+      // Recebeu no mes e nao gerou RNC - ou gerou e nenhuma chegou a ser
+      // enviada: nota maxima automatica nos dois criterios que dependem dela.
       const semRncComRecebimento = !temRnc && inspecionados > 0;
 
       resultado.set(id, {
@@ -165,9 +167,7 @@ export class AvaliacaoService {
             ? 10
             : null,
         notaC3Auto: temRnc
-          ? // Todas as RNCs do mes marcadas como "nao aplicavel": o criterio
-            // nao tem como julgar e nao pode punir.
-            (media(rnc!.notasC3) ?? 10)
+          ? media(rnc!.notasC3)
           : semRncComRecebimento
             ? 10
             : null,

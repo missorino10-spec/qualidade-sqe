@@ -54,7 +54,9 @@ export function notaConformidade(pct: number | null): number | null {
   return 0;
 }
 
-// C2 - tempo de resposta. Base de 72h e mais 48h a cada degrau.
+// C2 - tempo de resposta. Base de 72h e mais 48h a cada degrau. O relogio
+// comeca no ENVIO da RNC ao fornecedor, nao na abertura: a RNC pode ser aberta
+// num dia e enviada em outro, e esse intervalo e da Qualidade, nao dele.
 export function notaTempoResposta(horas: number): number {
   if (horas <= 72) return 10;
   if (horas <= 120) return 8;
@@ -65,11 +67,11 @@ export function notaTempoResposta(horas: number): number {
 }
 
 // C3 - nivel do plano de acao, direto do campo que a Qualidade preenche na RNC
-// quando o fornecedor responde. NAO_APLICAVEL nao e nota: sai da media (e se
-// todas as RNCs do mes forem assim, o criterio nao pesa contra o fornecedor).
+// quando o fornecedor responde. NAO_APLICAVEL vale 10: naquele desvio nao foi
+// preciso plano de acao, entao o fornecedor nao deve nada.
 // RNC sem plano respondido no fechamento vale 0 - perde o indicador do mes.
-export function notaPlanoAcao(nivel: string | null): number | null {
-  if (nivel === 'NAO_APLICAVEL') return null;
+export function notaPlanoAcao(nivel: string | null): number {
+  if (nivel === 'NAO_APLICAVEL') return 10;
   if (nivel === 'EXCELENTE') return 10;
   if (nivel === 'SATISFATORIO') return 6;
   return 0; // RUIM ou ainda sem resposta

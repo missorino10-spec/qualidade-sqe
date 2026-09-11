@@ -234,7 +234,7 @@ export default function AvaliacaoFornecedores() {
         }
         description={
           data
-            ? `Período de apuração: ${new Date(data.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(data.periodoFim).toLocaleDateString('pt-BR')}. A competência fecha no dia 26: RNC aberta até o dia 26 conta neste mês, do dia 27 em diante cai no mês seguinte.`
+            ? `Período de apuração: ${new Date(data.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(data.periodoFim).toLocaleDateString('pt-BR')}. A competência fecha no dia 26: RNC aberta até o dia 26 conta neste mês, do dia 27 em diante cai no mês seguinte. O tempo de resposta é contado do envio da RNC ao fornecedor até o retorno dele — RNC ainda não enviada fica de fora do C2 e do C3.`
             : undefined
         }
       />
@@ -331,9 +331,9 @@ export default function AvaliacaoFornecedores() {
               align: 'center',
             },
             {
-              title: 'Resposta média',
+              title: 'Resposta (do envio)',
               dataIndex: 'horasRespostaMedia',
-              width: 130,
+              width: 150,
               align: 'center',
               render: (v: number | null) =>
                 v === null || v === undefined ? '—' : `${numeroBR(v, 1)} h`,
