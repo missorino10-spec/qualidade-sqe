@@ -6,6 +6,8 @@ import {
   Modal,
   Space,
   Tag,
+  Tooltip,
+  Typography,
   message,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -90,7 +92,10 @@ export default function Fornecedores() {
 
   function abrir(f?: any) {
     setEditando(f ?? null);
-    form.setFieldsValue(f ?? valoresIniciaisFornecedor);
+    // A ultima apuracao do IDF vem junto do fornecedor so para a tela explicar
+    // a origem da classe — nao e campo de cadastro e nao entra no formulario.
+    const { ultimaApuracao, ...campos } = f ?? {};
+    form.setFieldsValue(f ? campos : valoresIniciaisFornecedor);
     setOpen(true);
   }
   function fechar() {
@@ -125,9 +130,12 @@ export default function Fornecedores() {
             render: (v?: string) => v ?? '-',
           },
           {
+            // A classe e a mesma do painel do SQE — e quem manda na
+            // periodicidade de inspecao. Debaixo dela vai de onde ela veio:
+            // sem a origem, um "C" na tela nao diz se foi apurado ou digitado.
             title: 'Classificação',
             dataIndex: 'classificacaoFornecimento',
-            width: 120,
+            width: 150,
             align: 'center',
             filters: [
               ...filtrosDe(
@@ -136,17 +144,46 @@ export default function Fornecedores() {
                 ),
               ),
               { text: 'Eventual', value: 'EVENTUAL' },
+              { text: 'Sem avaliação', value: 'SEM_AVALIACAO' },
             ],
             onFilter: (v: any, r: any) =>
               v === 'EVENTUAL'
                 ? !!r.eventual
-                : !r.eventual && r.classificacaoFornecimento === v,
-            render: (c: string, r: any) =>
-              r.eventual ? (
-                <Tag>Eventual</Tag>
-              ) : (
-                <Tag color={corClasse[c]}>{c}</Tag>
-              ),
+                : v === 'SEM_AVALIACAO'
+                  ? !r.eventual && !r.ultimaApuracao
+                  : !r.eventual && r.classificacaoFornecimento === v,
+            render: (c: string, r: any) => {
+              if (r.eventual) return <Tag>Eventual</Tag>;
+              const ap = r.ultimaApuracao;
+              const origem = !ap
+                ? 'Sem avaliação'
+                : ap.classe === c
+                  ? ap.periodo
+                  : 'Definida manualmente';
+              return (
+                <Tooltip
+                  title={
+                    !ap
+                      ? 'Nenhum trimestre do IDF fechado ainda. A classe atual é a do cadastro e será sobrescrita no primeiro fechamento.'
+                      : ap.classe === c
+                        ? `Apurada no fechamento do trimestre ${ap.periodo}, no painel de Avaliação de fornecedores.`
+                        : `O trimestre ${ap.periodo} apurou ${ap.classe}. O valor atual foi alterado no cadastro e vale até o próximo fechamento de trimestre.`
+                  }
+                >
+                  <Space direction="vertical" size={0}>
+                    <Tag
+                      color={corClasse[c]}
+                      style={{ marginInlineEnd: 0, fontWeight: 700 }}
+                    >
+                      {c}
+                    </Tag>
+                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                      {origem}
+                    </Typography.Text>
+                  </Space>
+                </Tooltip>
+              );
+            },
           },
           {
             title: 'Escopo',
@@ -218,7 +255,11 @@ export default function Fornecedores() {
           onFinish={(v) => salvar.mutate(v)}
           style={{ marginTop: 12 }}
         >
-          <CamposFornecedor mostrarAtivo={!!editando} mostrarEventual />
+          <CamposFornecedor
+            mostrarAtivo={!!editando}
+            mostrarEventual
+            ultimaApuracao={editando?.ultimaApuracao}
+          />
         </Form>
       </Modal>
     </Card>

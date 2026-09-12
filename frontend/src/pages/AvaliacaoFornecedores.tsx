@@ -21,11 +21,16 @@ import { LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, queryDeFiltro } from '../api';
 import Tabela from '../components/Tabela';
+import {
+  LegendaIdf,
+  NotaIdf,
+  NotaIdfCompacta,
+} from '../components/NotaIdf';
 import { CabecalhoPagina } from '../design/painel';
 import { BotaoEditar, ExportarLista } from '../design/acoes';
 import { COR, ESPACO, TEXTO } from '../design/tokens';
 import { numeroBR } from '../formatos';
-import { ACAO_CLASSE, corClasse, ROTULO_CLASSE } from '../fornecedor';
+import { ACAO_CLASSE } from '../fornecedor';
 import { useAuth } from '../auth';
 
 const MESES = [
@@ -43,13 +48,22 @@ const MESES = [
   'Dezembro',
 ];
 
-function TagClasse({ c }: { c?: string | null }) {
-  if (!c) return <Typography.Text type="secondary">—</Typography.Text>;
-  return (
-    <Tag color={corClasse[c]} style={{ fontWeight: 600 }}>
-      {c} — {ROTULO_CLASSE[c]}
-    </Tag>
+// Media das notas que existem. Periodo sem nota nao entra na conta - a mesma
+// regra do backend, para o cartao do topo bater com a coluna da tabela.
+function mediaIdf(valores: (number | null | undefined)[]): number | null {
+  const notas = valores.filter(
+    (v): v is number => v !== null && v !== undefined,
   );
+  if (!notas.length) return null;
+  return notas.reduce((s, v) => s + v, 0) / notas.length;
+}
+
+// "2 de 3 meses apurados" — o que o tooltip do trimestre precisa dizer para o
+// numero parcial nao parecer errado.
+function detalheTrimestre(t: any): string | undefined {
+  if (!t) return undefined;
+  const meses = `${t.mesesApurados} de ${t.mesesDoPeriodo} meses apurados`;
+  return t.fechado ? `${t.rotulo} fechado · ${meses}` : `${t.rotulo} · ${meses}`;
 }
 
 // Nota de criterio: mostra a efetiva e avisa quando ela veio digitada a mao.
@@ -123,8 +137,13 @@ export default function AvaliacaoFornecedores() {
     mutationFn: async () =>
       (await api.post('/avaliacao-fornecedores/fechar', { ano, mes })).data,
     onSuccess: (res: any) => {
+      // Quem reclassifica o cadastro e o TRIMESTRE. O mes so congela: so ha o
+      // que anunciar de mudanca de classe quando o terceiro mes fecha junto.
       message.success(
-        `Competência ${res.competencia} fechada. ${res.fechados} fornecedor(es) avaliado(s), ${res.reclassificados} com mudança de classe.`,
+        res.trimestre
+          ? `Competência ${res.competencia} fechada e trimestre ${res.trimestre.rotulo} concluído. ${res.trimestre.avaliados} fornecedor(es) avaliado(s), ${res.trimestre.reclassificados} com mudança de classe no cadastro.`
+          : `Competência ${res.competencia} fechada — ${res.fechados} fornecedor(es). A classe do cadastro só muda quando o trimestre inteiro fechar.`,
+        6,
       );
       recarregar();
     },
@@ -161,11 +180,27 @@ export default function AvaliacaoFornecedores() {
   const avaliados = linhas.filter((l) => l.idf !== null);
   const resumo = consolidado?.resumo;
 
+  // O trimestre e o periodo que manda: o anterior e o que esta valendo no
+  // cadastro de cada fornecedor, o atual e o que vai valer quando fechar.
+  const tAnterior = data?.trimestreAnterior;
+  const tAtual = data?.trimestreAtual;
+  const rotAnterior = tAnterior?.rotulo ?? 'Trimestre anterior';
+  const rotAtual = tAtual?.rotulo ?? 'Trimestre atual';
+  const mediaAnterior = mediaIdf(linhas.map((l) => l.trimestreAnterior?.idf));
+  const mediaAtual = mediaIdf(linhas.map((l) => l.trimestreAtual?.idf));
+  const variacao =
+    mediaAnterior !== null && mediaAtual !== null
+      ? mediaAtual - mediaAnterior
+      : null;
+  const faltamFechar = tAtual
+    ? tAtual.meses.filter((m: number) => !tAtual.mesesFechados.includes(m))
+    : [];
+
   return (
     <Space direction="vertical" size={ESPACO.lg} style={{ width: '100%' }}>
       <CabecalhoPagina
         titulo="Avaliação de fornecedores — IDF"
-        descricao="IDF = Conformidade (50%) + Resposta à RNC (30%) + Plano de ação (20%). A classe apurada substitui a classificação do fornecedor e define a periodicidade de inspeção."
+        descricao="IDF = Conformidade (50%) + Resposta à RNC (30%) + Plano de ação (20%). A apuração é mensal, mas quem define a classe do fornecedor — e com ela a periodicidade de inspeção — é o TRIMESTRE: ele fecha sozinho quando o terceiro mês é fechado."
         acoes={
           <Space wrap>
             <Select
@@ -191,8 +226,7 @@ export default function AvaliacaoFornecedores() {
                   onClick={() =>
                     Modal.confirm({
                       title: 'Reabrir competência',
-                      content:
-                        'As notas voltam a ser recalculadas a partir dos dados atuais das inspeções e das RNCs. A classe já aplicada nos fornecedores só muda quando você fechar de novo. Deseja continuar?',
+                      content: `As notas voltam a ser recalculadas a partir dos dados atuais das inspeções e das RNCs, e o trimestre ${rotAtual} volta a ficar parcial. A classe já aplicada nos fornecedores não é revertida: ela se atualiza quando o trimestre fechar de novo. Deseja continuar?`,
                       okText: 'Reabrir',
                       cancelText: 'Cancelar',
                       onOk: () => reabrir.mutate(),
@@ -210,7 +244,9 @@ export default function AvaliacaoFornecedores() {
                     Modal.confirm({
                       title: `Fechar a competência ${MESES[mes - 1]}/${ano}`,
                       content:
-                        'Isto congela as notas do período, registra o histórico e aplica a classe apurada em cada fornecedor — o que muda a periodicidade de inspeção no recebimento. Deseja continuar?',
+                        faltamFechar.length > 1
+                          ? `Isto congela as notas de ${MESES[mes - 1]}. A classe dos fornecedores NÃO muda agora: ela é reescrita quando o trimestre ${rotAtual} fechar, o que acontece automaticamente ao fechar o último mês dele (${faltamFechar.map((m: number) => MESES[m - 1]).join(', ')} ainda em aberto). Deseja continuar?`
+                          : `Isto congela as notas de ${MESES[mes - 1]} e conclui o trimestre ${rotAtual}. A classe apurada no trimestre passa a valer no cadastro de cada fornecedor — o que muda a periodicidade de inspeção no recebimento. Deseja continuar?`,
                       okText: 'Fechar competência',
                       cancelText: 'Cancelar',
                       onOk: () => fechar.mutate(),
@@ -239,8 +275,30 @@ export default function AvaliacaoFornecedores() {
         }
       />
 
+      {/* Onde o trimestre esta. E a informacao que responde "quando isso vai
+          virar classificação no cadastro?" — sem ela, o número parcial da
+          tabela nao tem contexto. */}
+      {tAtual && (
+        <Alert
+          type={tAtual.fechado ? 'success' : 'warning'}
+          showIcon
+          message={
+            tAtual.fechado
+              ? `Trimestre ${rotAtual} concluído — a classe apurada já está aplicada no cadastro dos fornecedores`
+              : `Trimestre ${rotAtual} em curso — ${tAtual.mesesFechados.length} de 3 meses fechados`
+          }
+          description={
+            tAtual.fechado
+              ? `Quem está valendo hoje na periodicidade de inspeção é a classe de ${rotAtual}. Ela só muda quando o próximo trimestre fechar.`
+              : `A classe que está valendo hoje no cadastro é a de ${rotAnterior}. Ela será reescrita automaticamente quando ${faltamFechar
+                  .map((m: number) => MESES[m - 1])
+                  .join(', ')} ${faltamFechar.length > 1 ? 'forem fechados' : 'for fechado'} — é o fechamento do trimestre que reclassifica, não o do mês.`
+          }
+        />
+      )}
+
       <Row gutter={[ESPACO.lg, ESPACO.lg]}>
-        <Col xs={12} md={6}>
+        <Col flex="1 1 180px">
           <Card size="small">
             <Statistic
               title="Fornecedores avaliados"
@@ -250,33 +308,61 @@ export default function AvaliacaoFornecedores() {
             />
           </Card>
         </Col>
-        <Col xs={12} md={6}>
+        <Col flex="1 1 180px">
           <Card size="small">
             <Statistic
-              title="IDF médio da competência"
-              value={
-                avaliados.length
-                  ? avaliados.reduce((s, l) => s + l.idf, 0) / avaliados.length
-                  : 0
-              }
+              title={`IDF médio — ${MESES[mes - 1]}`}
+              value={mediaIdf(avaliados.map((l) => l.idf)) ?? 0}
               precision={2}
+              decimalSeparator=","
               valueStyle={{ color: TEXTO.forte }}
             />
           </Card>
         </Col>
-        <Col xs={12} md={6}>
+        {/* Como estava x como está: o cartao que o usuario pediu para
+            enxergar o desempenho do trimestre enquanto ele corre. */}
+        <Col flex="1 1 220px">
           <Card size="small">
             <Statistic
-              title="Em atenção (C)"
+              title={`IDF médio — ${rotAtual}${tAtual?.fechado ? '' : ' (parcial)'}`}
+              value={mediaAtual ?? 0}
+              precision={2}
+              decimalSeparator=","
+              valueStyle={{
+                color:
+                  variacao === null
+                    ? TEXTO.forte
+                    : variacao >= 0
+                      ? COR.sucesso
+                      : COR.critico,
+              }}
+              suffix={
+                variacao === null ? undefined : (
+                  <Typography.Text
+                    style={{ fontSize: 13 }}
+                    type="secondary"
+                  >
+                    {variacao >= 0 ? '▲' : '▼'} {numeroBR(Math.abs(variacao), 2)}{' '}
+                    vs {rotAnterior}
+                  </Typography.Text>
+                )
+              }
+            />
+          </Card>
+        </Col>
+        <Col flex="1 1 150px">
+          <Card size="small">
+            <Statistic
+              title={`Em atenção (C) — ${MESES[mes - 1]}`}
               value={avaliados.filter((l) => l.classificacao === 'C').length}
               valueStyle={{ color: COR.atencao }}
             />
           </Card>
         </Col>
-        <Col xs={12} md={6}>
+        <Col flex="1 1 150px">
           <Card size="small">
             <Statistic
-              title="Críticos (D)"
+              title={`Críticos (D) — ${MESES[mes - 1]}`}
               value={avaliados.filter((l) => l.classificacao === 'D').length}
               valueStyle={{ color: COR.critico }}
             />
@@ -366,33 +452,63 @@ export default function AvaliacaoFornecedores() {
               ),
             },
             {
-              title: 'IDF',
+              // O numero e a letra andam juntos: a coluna "Classificação"
+              // separada foi absorvida aqui.
+              title: `IDF — ${MESES[mes - 1]}`,
               dataIndex: 'idf',
-              width: 90,
+              width: 120,
               align: 'center',
-              render: (v: number | null) =>
-                v === null ? (
-                  <Tooltip title="Sem recebimento na competência — fica de fora da média do trimestre.">
-                    <Typography.Text type="secondary">—</Typography.Text>
-                  </Tooltip>
-                ) : (
-                  <strong style={{ fontSize: 15 }}>{numeroBR(v, 2)}</strong>
-                ),
+              render: (v: number | null, r: any) => (
+                <NotaIdf
+                  valor={v}
+                  classe={r.classificacao}
+                  tamanho="lg"
+                  vazio="Sem avaliação"
+                  detalhe={
+                    v === null
+                      ? 'Sem recebimento na competência — fica de fora da média do trimestre.'
+                      : undefined
+                  }
+                />
+              ),
             },
             {
-              title: 'Classificação',
-              dataIndex: 'classificacao',
-              width: 180,
+              // O que esta valendo AGORA no cadastro do fornecedor.
+              title: rotAnterior,
+              width: 120,
               align: 'center',
-              render: (c: string | null) => <TagClasse c={c} />,
+              render: (_: any, r: any) => (
+                <NotaIdf
+                  valor={r.trimestreAnterior?.idf}
+                  classe={r.trimestreAnterior?.classificacao}
+                  parcial={!r.trimestreAnterior?.fechado}
+                  detalhe={detalheTrimestre(r.trimestreAnterior)}
+                />
+              ),
             },
             {
+              // O que VAI valer quando o trimestre fechar.
+              title: `${rotAtual}${tAtual?.fechado ? '' : ' (parcial)'}`,
+              width: 130,
+              align: 'center',
+              render: (_: any, r: any) => (
+                <NotaIdf
+                  valor={r.trimestreAtual?.idf}
+                  classe={r.trimestreAtual?.classificacao}
+                  tamanho="lg"
+                  parcial={!r.trimestreAtual?.fechado}
+                  detalhe={detalheTrimestre(r.trimestreAtual)}
+                />
+              ),
+            },
+            {
+              // A acao segue o trimestre em curso, que e o periodo que comanda.
               title: 'Ação',
-              width: 260,
+              width: 250,
               render: (_: any, r: any) =>
-                r.classificacao ? (
+                r.trimestreAtual?.classificacao ? (
                   <Typography.Text style={{ fontSize: 12 }} type="secondary">
-                    {ACAO_CLASSE[r.classificacao]}
+                    {ACAO_CLASSE[r.trimestreAtual.classificacao]}
                   </Typography.Text>
                 ) : null,
             },
@@ -415,6 +531,9 @@ export default function AvaliacaoFornecedores() {
             },
           ]}
         />
+        <div style={{ marginTop: ESPACO.md }}>
+          <LegendaIdf />
+        </div>
       </Card>
 
       <Card
@@ -440,51 +559,79 @@ export default function AvaliacaoFornecedores() {
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 100, fixed: 'left' },
             { title: 'Fornecedor', dataIndex: 'nome', fixed: 'left' },
+            // Os 12 meses: numero com a inicial da classe do lado. Com 12
+            // colunas seguidas, etiqueta cheia viraria parede de cor.
             ...MESES.map((m, i) => ({
               title: m.slice(0, 3),
-              width: 70,
+              width: 78,
               align: 'center' as const,
-              render: (_: any, r: any) =>
-                r.meses[i] === null ? (
-                  <Typography.Text type="secondary">—</Typography.Text>
-                ) : (
-                  numeroBR(r.meses[i], 2)
-                ),
+              render: (_: any, r: any) => (
+                <NotaIdfCompacta
+                  valor={r.meses[i]}
+                  classe={r.classesMes?.[i]}
+                  parcial={!consolidado?.mesesFechados?.[i]}
+                  detalhe={`${m} de ${ano}`}
+                />
+              ),
             })),
             ...[1, 2, 3, 4].map((t) => ({
               title: `${t}T`,
-              width: 90,
+              width: 110,
               align: 'center' as const,
-              render: (_: any, r: any) =>
-                r.trimestres[t - 1] === null ? (
-                  <Typography.Text type="secondary">—</Typography.Text>
-                ) : (
-                  <Tag color={corClasse[r.classesTrimestre[t - 1]]}>
-                    {numeroBR(r.trimestres[t - 1], 2)}
-                  </Tag>
-                ),
+              render: (_: any, r: any) => (
+                <NotaIdf
+                  valor={r.trimestres[t - 1]}
+                  classe={r.classesTrimestre[t - 1]}
+                  parcial={!r.trimestresFechados?.[t - 1]}
+                  vazio="—"
+                  detalhe={
+                    r.trimestresFechados?.[t - 1]
+                      ? `${t}T/${ano} fechado`
+                      : `${t}T/${ano} · ${r.trimestresApurados?.[t - 1] ?? 0} de 3 meses apurados`
+                  }
+                />
+              ),
             })),
             {
-              title: 'Anual',
-              dataIndex: 'anual',
-              width: 110,
+              // O que esta valendo: so os trimestres ja fechados.
+              title: 'Anual consolidado',
+              width: 140,
               align: 'center',
-              render: (v: number | null) =>
-                v === null ? (
-                  <Typography.Text type="secondary">—</Typography.Text>
-                ) : (
-                  <strong>{numeroBR(v, 2)}</strong>
-                ),
+              render: (_: any, r: any) => (
+                <NotaIdf
+                  valor={r.anualConsolidado}
+                  classe={r.classeAnualConsolidado}
+                  tamanho="lg"
+                  vazio="Sem trimestre fechado"
+                  detalhe="Média dos trimestres já fechados — é o desempenho oficial do ano até aqui."
+                />
+              ),
             },
             {
-              title: 'Classificação anual',
-              dataIndex: 'classificacaoAnual',
-              width: 180,
+              // Como ficaria somando o trimestre que ainda corre.
+              title: 'Anual projetado',
+              width: 140,
               align: 'center',
-              render: (c: string | null) => <TagClasse c={c} />,
+              render: (_: any, r: any) => (
+                <NotaIdf
+                  valor={r.anualProjetado}
+                  classe={r.classeAnualProjetado}
+                  tamanho="lg"
+                  parcial
+                  detalhe="Média de todos os trimestres com nota, inclusive o que ainda está em curso."
+                />
+              ),
             },
           ]}
         />
+        <div style={{ marginTop: ESPACO.md }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Número em <i>itálico</i> e mais claro = período ainda em aberto,
+            recalculado a cada consulta. <b>Anual consolidado</b> considera só os
+            trimestres fechados; <b>Anual projetado</b> soma também o trimestre
+            em curso.
+          </Typography.Text>
+        </div>
       </Card>
 
       <Modal

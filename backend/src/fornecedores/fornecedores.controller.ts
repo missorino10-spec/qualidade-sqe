@@ -68,11 +68,48 @@ class FornecedorDto {
 export class FornecedoresController {
   constructor(private prisma: PrismaService) {}
 
+  // A classificacao do cadastro e a mesma que o painel do SQE aplica ao fechar
+  // o trimestre. Para a tela nao ficar com um A/B/C/D sem explicacao, cada
+  // fornecedor vem com a ULTIMA apuracao trimestral do historico: e assim que
+  // se ve se o valor veio do desempenho ou de uma edicao manual.
   @Get()
-  findAll() {
-    return this.prisma.fornecedor.findMany({
-      orderBy: { nome: 'asc' },
-      include: { contatos: true },
+  async findAll() {
+    const [fornecedores, historico] = await Promise.all([
+      this.prisma.fornecedor.findMany({
+        orderBy: { nome: 'asc' },
+        include: { contatos: true },
+      }),
+      this.prisma.historicoClassificacao.findMany({
+        // So o fechamento TRIMESTRAL ("3T/2026") reclassifica. O historico tem
+        // registros antigos por mes ("2026-09") e por trimestre fiscal
+        // ("FY26-Q3"), de regras que nao valem mais: eles ficam guardados, mas
+        // nao explicam a classe de hoje.
+        where: { trimestreFiscal: { contains: 'T/' } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          fornecedorId: true,
+          trimestreFiscal: true,
+          classificacaoApurada: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    const ultima = new Map<number, (typeof historico)[number]>();
+    for (const h of historico)
+      if (!ultima.has(h.fornecedorId)) ultima.set(h.fornecedorId, h);
+
+    return fornecedores.map((f) => {
+      const h = ultima.get(f.id);
+      return {
+        ...f,
+        ultimaApuracao: h
+          ? {
+              periodo: h.trimestreFiscal,
+              classe: h.classificacaoApurada,
+              em: h.createdAt,
+            }
+          : null,
+      };
     });
   }
 

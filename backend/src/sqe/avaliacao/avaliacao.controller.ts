@@ -61,6 +61,23 @@ const ACAO_CLASSE: Record<string, string> = {
   D: 'Ação imediata — suspensão e auditoria',
 };
 
+// Padrao unico de leitura da classe: a letra e o nome da faixa, igual na tela,
+// no papel e na planilha.
+const textoClasse = (c?: string | null) =>
+  c ? `${c} — ${ROTULO_CLASSE[c]}` : '';
+
+const mediaIdf = (valores: (number | null | undefined)[]) => {
+  const notas = valores.filter((v): v is number => v !== null && v !== undefined);
+  if (!notas.length) return 0;
+  return notas.reduce((s, v) => s + v, 0) / notas.length;
+};
+
+const doisDigitos = (v: number) =>
+  v.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 @UseGuards(JwtAuthGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQE)
 @Controller('avaliacao-fornecedores')
@@ -105,6 +122,13 @@ export class AvaliacaoController {
     const nota = (l: any, n: 1 | 2 | 3) =>
       l[`notaC${n}Manual`] ?? l[`notaC${n}Auto`];
 
+    // O papel sai com as mesmas tres leituras da tela: o mes apurado, o
+    // trimestre que esta valendo no cadastro e o trimestre em curso. Numero e
+    // letra vao em colunas vizinhas para a planilha continuar somavel.
+    const ant = dados.trimestreAnterior;
+    const atu = dados.trimestreAtual;
+    const rotuloAtual = atu.fechado ? atu.rotulo : `${atu.rotulo} (parcial)`;
+
     await responderRelatorio(
       res,
       {
@@ -125,6 +149,12 @@ export class AvaliacaoController {
             rotulo: 'Situação',
             valor: dados.fechada ? 'Fechada' : 'Em aberto',
           },
+          {
+            rotulo: 'Classe vigente',
+            valor: ant.fechado
+              ? `${ant.rotulo} (fechado)`
+              : `${ant.rotulo} (sem fechamento)`,
+          },
         ],
         totais: [
           {
@@ -133,35 +163,35 @@ export class AvaliacaoController {
           },
           {
             rotulo: 'IDF médio da competência',
-            valor: (avaliados.length
-              ? avaliados.reduce((s, l) => s + l.idf, 0) / avaliados.length
-              : 0
-            ).toLocaleString('pt-BR', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }),
+            valor: doisDigitos(mediaIdf(avaliados.map((l) => l.idf))),
+          },
+          {
+            rotulo: `IDF médio ${atu.rotulo}`,
+            valor: doisDigitos(
+              mediaIdf(linhas.map((l) => l.trimestreAtual?.idf)),
+            ),
           },
           { rotulo: 'Em atenção (C)', valor: String(porClasse('C')) },
           { rotulo: 'Críticos (D)', valor: String(porClasse('D')) },
         ],
         colunas: [
-          { titulo: 'Código', peso: 40, valor: (l: any) => l.codigo },
-          { titulo: 'Fornecedor', peso: 130, valor: (l: any) => l.nome },
+          { titulo: 'Código', peso: 34, valor: (l: any) => l.codigo },
+          { titulo: 'Fornecedor', peso: 110, valor: (l: any) => l.nome },
           {
             titulo: 'Lotes insp.',
-            peso: 35,
+            peso: 28,
             valor: (l: any) => l.lotesInspecionados,
             tipo: 'numero',
           },
           {
             titulo: 'Reprov.',
-            peso: 30,
+            peso: 26,
             valor: (l: any) => l.lotesReprovados,
             tipo: 'numero',
           },
           {
             titulo: 'Conformidade',
-            peso: 45,
+            peso: 38,
             // Sem lote inspecionado nao ha conformidade: a tela mostra "—" e o
             // papel fica em branco, em vez de anunciar 0%.
             valor: (l: any) =>
@@ -170,53 +200,76 @@ export class AvaliacaoController {
           },
           {
             titulo: 'C1 (50%)',
-            peso: 35,
+            peso: 28,
             valor: (l: any) => nota(l, 1),
             tipo: 'numero',
           },
           {
             titulo: 'RNCs',
-            peso: 28,
+            peso: 24,
             valor: (l: any) => l.rncsConsideradas,
             tipo: 'numero',
           },
           {
             titulo: 'Resposta (do envio)',
-            peso: 50,
+            peso: 40,
             valor: (l: any) => l.horasRespostaMedia,
             tipo: 'numero',
           },
           {
             titulo: 'C2 (30%)',
-            peso: 35,
+            peso: 28,
             valor: (l: any) => nota(l, 2),
             tipo: 'numero',
           },
           {
             titulo: 'C3 (20%)',
-            peso: 35,
+            peso: 28,
             valor: (l: any) => nota(l, 3),
             tipo: 'numero',
           },
           {
-            titulo: 'IDF',
-            peso: 35,
+            titulo: 'IDF do mês',
+            peso: 30,
             valor: (l: any) => l.idf,
             tipo: 'numero',
             negrito: true,
           },
           {
-            titulo: 'Classificação',
-            peso: 75,
-            valor: (l: any) =>
-              l.classificacao
-                ? `${l.classificacao} — ${ROTULO_CLASSE[l.classificacao]}`
-                : '',
+            titulo: 'Classe do mês',
+            peso: 48,
+            valor: (l: any) => textoClasse(l.classificacao),
           },
           {
+            titulo: `IDF ${ant.rotulo}`,
+            peso: 32,
+            valor: (l: any) => l.trimestreAnterior?.idf ?? null,
+            tipo: 'numero',
+          },
+          {
+            titulo: `Classe ${ant.rotulo}`,
+            peso: 48,
+            valor: (l: any) => textoClasse(l.trimestreAnterior?.classificacao),
+          },
+          {
+            titulo: `IDF ${rotuloAtual}`,
+            peso: 34,
+            valor: (l: any) => l.trimestreAtual?.idf ?? null,
+            tipo: 'numero',
+            negrito: true,
+          },
+          {
+            titulo: `Classe ${rotuloAtual}`,
+            peso: 48,
+            valor: (l: any) => textoClasse(l.trimestreAtual?.classificacao),
+          },
+          {
+            // A acao segue o trimestre em curso: e o desempenho que esta
+            // acontecendo, nao o mes solto.
             titulo: 'Ação',
-            peso: 110,
-            valor: (l: any) => ACAO_CLASSE[l.classificacao] ?? '',
+            peso: 92,
+            valor: (l: any) =>
+              ACAO_CLASSE[l.trimestreAtual?.classificacao] ?? '',
           },
         ],
         linhas,

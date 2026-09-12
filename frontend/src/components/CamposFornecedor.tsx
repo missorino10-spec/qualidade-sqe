@@ -9,6 +9,7 @@ import {
   Switch,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { ROTULO_CLASSE } from '../fornecedor';
 
 // Campos do cadastro de fornecedor, sem o <Form> em volta. Compartilhado pela
 // tela de Fornecedores e pelo cadastro pontual feito dentro de Nova Inspecao -
@@ -32,9 +33,12 @@ export const valoresIniciaisFornecedor = {
 export function CamposFornecedor({
   mostrarAtivo,
   mostrarEventual,
+  ultimaApuracao,
 }: {
   mostrarAtivo?: boolean;
   mostrarEventual?: boolean;
+  /** Ultimo fechamento trimestral do IDF, para explicar de onde veio a classe. */
+  ultimaApuracao?: { periodo: string; classe: string; em: string } | null;
 }) {
   return (
     <>
@@ -96,17 +100,23 @@ export function CamposFornecedor({
       </Form.Item>
       <Row gutter={12}>
         <Col span={8}>
+          {/* Mesma letra e mesmo nome de faixa do painel do SQE. A classe e
+              deste campo que sai para a periodicidade de inspecao, e e ele que
+              o fechamento do trimestre reescreve. */}
           <Form.Item
             name="classificacaoFornecimento"
             label="Classificação de fornecimento"
+            extra={
+              ultimaApuracao
+                ? `Último fechamento: ${ultimaApuracao.periodo} apurou ${ultimaApuracao.classe} — ${ROTULO_CLASSE[ultimaApuracao.classe]}. O próximo fechamento de trimestre sobrescreve este campo.`
+                : 'Ainda sem trimestre apurado no IDF. Ao fechar o primeiro trimestre no painel do SQE, a classe apurada passa a sobrescrever este campo.'
+            }
           >
             <Select
-              options={[
-                { value: 'A', label: 'A — Excelente' },
-                { value: 'B', label: 'B — Bom' },
-                { value: 'C', label: 'C — Regular' },
-                { value: 'D', label: 'D — Crítico' },
-              ]}
+              options={(['A', 'B', 'C', 'D'] as const).map((c) => ({
+                value: c,
+                label: `${c} — ${ROTULO_CLASSE[c]}`,
+              }))}
             />
           </Form.Item>
         </Col>
