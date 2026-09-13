@@ -302,7 +302,7 @@ export default function InspecaoVisualDetalhe() {
         width={1000}
         confirmLoading={salvando}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         /* Documento ja lancado nao volta a rascunho: o "Salvar rascunho" so
            existe enquanto ele ainda nao valeu. */
         footer={[

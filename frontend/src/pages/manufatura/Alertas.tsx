@@ -427,7 +427,7 @@ export default function Alertas() {
         confirmLoading={salvando}
         onOk={salvar}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Row gutter={12}>
@@ -546,7 +546,7 @@ export default function Alertas() {
         cancelText="Cancelar"
         onOk={renovar}
         onCancel={() => setRenovando(null)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert
           type="info"
@@ -577,7 +577,7 @@ export default function Alertas() {
         cancelText="Cancelar"
         onOk={encerrar}
         onCancel={() => setEncerrando(null)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formEncerramento} layout="vertical">
           <Form.Item
@@ -609,7 +609,7 @@ export default function Alertas() {
           </Space>
         }
         onCancel={() => setDetalhe(null)}
-        destroyOnClose
+        destroyOnHidden
       >
         {detalhe && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>

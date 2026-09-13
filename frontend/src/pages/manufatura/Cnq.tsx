@@ -330,7 +330,7 @@ export default function Cnq() {
         confirmLoading={salvando}
         onOk={salvar}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}

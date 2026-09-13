@@ -191,7 +191,7 @@ export default function Maquinas() {
         confirmLoading={salvando}
         onOk={salvar}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Row gutter={12}>

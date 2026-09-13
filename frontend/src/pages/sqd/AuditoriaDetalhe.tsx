@@ -796,7 +796,7 @@ export default function AuditoriaDetalhe() {
           salvarRegistro.mutate(await formRegistro.validateFields())
         }
         onCancel={() => setRegistroOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formRegistro} layout="vertical">
           <Row gutter={12}>
@@ -883,7 +883,7 @@ export default function AuditoriaDetalhe() {
           salvarChecklist.mutate(await formChecklist.validateFields())
         }
         onCancel={() => setChecklistOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formChecklist} layout="vertical">
           <Row gutter={12}>

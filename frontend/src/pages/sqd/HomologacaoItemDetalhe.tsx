@@ -1079,7 +1079,7 @@ export default function HomologacaoItemDetalhe() {
           salvarRegistro.mutate(await formRegistro.validateFields())
         }
         onCancel={() => setRegistroOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formRegistro} layout="vertical">
           <Row gutter={12}>
@@ -1203,7 +1203,7 @@ export default function HomologacaoItemDetalhe() {
         width={1180}
         confirmLoading={salvarInspecao.isPending}
         onCancel={() => setInspecaoOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         /* Rodape na mao por causa do "Salvar rascunho". O rascunho nao valida
            nada: e para isso que ele serve. Relatorio ja lancado nao volta a
            rascunho - o resultado do item ja saiu dele. */

@@ -459,7 +459,7 @@ export default function InspecoesManufatura({
         width={1100}
         confirmLoading={salvando}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         /* Rodape na mao por causa do "Salvar rascunho": o mesmo formulario sai
            pela metade ou completo, e quem decide e o botao clicado. */
         footer={[
@@ -508,7 +508,7 @@ export default function InspecoesManufatura({
         width={900}
         confirmLoading={salvandoVisual}
         onCancel={() => setOpenVisual(false)}
-        destroyOnClose
+        destroyOnHidden
         footer={[
           <Button key="cancelar" onClick={() => setOpenVisual(false)}>
             Cancelar

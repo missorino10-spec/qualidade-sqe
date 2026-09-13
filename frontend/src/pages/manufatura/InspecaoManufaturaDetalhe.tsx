@@ -646,7 +646,7 @@ export default function InspecaoManufaturaDetalhe() {
           setOpen(false);
           setEdicao(null);
         }}
-        destroyOnClose
+        destroyOnHidden
         /* Rodape na mao por causa do "Salvar rascunho". Relatorio JA LANCADO
            nao volta a rascunho: o documento ja vale, e desfazer isso mexeria
            nos indicadores para tras. */

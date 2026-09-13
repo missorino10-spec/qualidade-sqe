@@ -264,7 +264,7 @@ export default function Auditorias() {
         confirmLoading={salvando}
         onOk={salvar}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           A data da auditoria numera o registro e é o marco zero do prazo de

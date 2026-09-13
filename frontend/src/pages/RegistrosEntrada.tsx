@@ -465,7 +465,7 @@ export default function RegistrosEntrada() {
         okText={vaiInspecionar ? 'Registrar e inspecionar' : 'Registrar entrada'}
         cancelText="Cancelar"
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={salvar}>
           <Row gutter={12}>
@@ -828,7 +828,7 @@ export default function RegistrosEntrada() {
         okText="Cadastrar"
         cancelText="Cancelar"
         width={900}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={formFornecedor}

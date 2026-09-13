@@ -1653,7 +1653,7 @@ export default function Inspecoes() {
         onCancel={() => setDecisaoRnc(null)}
         footer={null}
         width={640}
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert
           type="warning"

@@ -244,7 +244,7 @@ export default function Homologacoes() {
         confirmLoading={salvando}
         onOk={salvar}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           A data da solicitação é a mesma em que o formulário de autoavaliação

@@ -771,7 +771,7 @@ export default function HomologacaoDetalhe() {
           salvarRegistro.mutate(await formRegistro.validateFields())
         }
         onCancel={() => setRegistroOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formRegistro} layout="vertical">
           <Row gutter={12}>
@@ -885,7 +885,7 @@ export default function HomologacaoDetalhe() {
           salvarAvaliacao.mutate(await formAvaliacao.validateFields())
         }
         onCancel={() => setAvaliacaoOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={formAvaliacao} layout="vertical">
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
