@@ -170,7 +170,7 @@ export default function RegistrosEntrada() {
       qc.invalidateQueries({ queryKey: ['registros-entrada'] });
       qc.invalidateQueries({ queryKey: ['avaliar'] });
       qc.invalidateQueries({ queryKey: ['fornecedores'] });
-      qc.invalidateQueries({ queryKey: ['kpis'] });
+      qc.invalidateQueries({ queryKey: ['kpis-sqe'] });
 
       // Cai no ciclo (ou extra): a inspecao continua na tela de Inspeções,
       // presa a esta entrada.
@@ -221,7 +221,7 @@ export default function RegistrosEntrada() {
       setEditando(null);
       setFicha(null);
       qc.invalidateQueries({ queryKey: ['registros-entrada'] });
-      qc.invalidateQueries({ queryKey: ['kpis'] });
+      qc.invalidateQueries({ queryKey: ['kpis-sqe'] });
       message.success('Entrada corrigida.');
     } catch (e: any) {
       message.error(
@@ -241,7 +241,7 @@ export default function RegistrosEntrada() {
       qc.invalidateQueries({ queryKey: ['registros-entrada'] });
       qc.invalidateQueries({ queryKey: ['avaliar'] });
       qc.invalidateQueries({ queryKey: ['fornecedores'] });
-      qc.invalidateQueries({ queryKey: ['kpis'] });
+      qc.invalidateQueries({ queryKey: ['kpis-sqe'] });
       message.success('Entrada excluída e contador do ciclo estornado.');
     } catch (e: any) {
       message.error(

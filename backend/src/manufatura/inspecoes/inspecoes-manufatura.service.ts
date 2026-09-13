@@ -147,8 +147,11 @@ export class InspecoesManufaturaService {
             inspetorId: usuarioId,
           },
         });
-      } catch {
+      } catch (e: any) {
         // Numero tomado por outro inspetor no mesmo instante: tenta o proximo.
+        // Qualquer outro erro sobe: insistir 5 vezes numa falha de banco so
+        // troca a causa real por um "nao foi possivel numerar" enganoso.
+        if (e?.code !== 'P2002') throw e;
       }
     }
     throw new ConflictException(

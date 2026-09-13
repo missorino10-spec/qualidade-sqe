@@ -107,8 +107,11 @@ export class InspecaoVisualManufaturaService {
           },
         });
         return this.detalhe(criada.id);
-      } catch {
+      } catch (e: any) {
         // Numero tomado por outro inspetor no mesmo instante: tenta o proximo.
+        // Qualquer outro erro sobe. Sem isso, uma falha do detalhe() logo acima
+        // cairia aqui e a inspecao seria criada de novo na tentativa seguinte.
+        if (e?.code !== 'P2002') throw e;
       }
     }
     throw new ConflictException(

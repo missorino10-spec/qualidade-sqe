@@ -242,9 +242,16 @@ export default function RncDetalhe() {
       ).data,
   });
 
+  // A RNC alimenta o C2 e o C3 do IDF: mexer nela muda a nota do fornecedor e
+  // os indicadores do painel, entao as duas telas tambem sao derrubadas aqui.
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['rnc'] });
     qc.invalidateQueries({ queryKey: ['rnc', 'detalhe', id] });
+    qc.invalidateQueries({ queryKey: ['avaliacao-fornecedores'] });
+    qc.invalidateQueries({ queryKey: ['avaliacao-consolidado'] });
+    qc.invalidateQueries({ queryKey: ['evolucao-fornecedores'] });
+    qc.invalidateQueries({ queryKey: ['fornecedores'] });
+    qc.invalidateQueries({ queryKey: ['kpis-sqe'] });
   }
 
   const atualizar = useMutation({
@@ -445,11 +452,10 @@ export default function RncDetalhe() {
                 onClick={() => {
                   formEncerrar.setFieldsValue({
                     dataEncerramento: dayjs(),
-                    verificacaoEficacia:
-                      rnc.verificacaoEficacia ?? 'PENDENTE',
-                    dataVerificacao: rnc.dataVerificacao
-                      ? dayjs(rnc.dataVerificacao)
-                      : undefined,
+                    // O comentario entra limpo: o modal nao e destruido ao
+                    // fechar, entao um texto digitado e cancelado antes voltaria
+                    // junto e iria para o historico sem ninguem perceber.
+                    comentario: undefined,
                   });
                   setEncerrarOpen(true);
                 }}

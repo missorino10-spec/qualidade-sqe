@@ -62,6 +62,7 @@ export default function Tabela<T extends object>({ busca, ...props }: Props<T>) 
   // barra de cima nem aparece.
   const [larguraConteudo, setLarguraConteudo] = useState(0);
   const [termo, setTermo] = useState('');
+  const [pagina, setPagina] = useState(1);
 
   const linhas = useMemo(() => {
     const origem = (props.dataSource ?? []) as T[];
@@ -125,6 +126,22 @@ export default function Tabela<T extends object>({ busca, ...props }: Props<T>) 
   const total = ((props.dataSource ?? []) as T[]).length;
   const visiveis = ((linhas ?? []) as T[]).length;
 
+  // A pagina atual e nossa quando ha busca: o Ant guarda a pagina por conta
+  // dele e, filtrando da pagina 3 para 4 resultados, a tabela ficava em branco
+  // porque a pagina 3 deixou de existir. Digitou, volta para a primeira.
+  const paginacao =
+    busca && props.pagination !== false
+      ? {
+          ...(typeof props.pagination === 'object' ? props.pagination : {}),
+          current: pagina,
+          onChange: (p: number, tamanho: number) => {
+            setPagina(p);
+            if (typeof props.pagination === 'object')
+              props.pagination.onChange?.(p, tamanho);
+          },
+        }
+      : props.pagination;
+
   return (
     <div ref={caixa} className="tabela-rolagem-topo">
       {busca && (
@@ -134,7 +151,10 @@ export default function Tabela<T extends object>({ busca, ...props }: Props<T>) 
             prefix={<SearchOutlined />}
             placeholder={busca}
             value={termo}
-            onChange={(e) => setTermo(e.target.value)}
+            onChange={(e) => {
+              setTermo(e.target.value);
+              setPagina(1);
+            }}
           />
           {termo.trim() && (
             <Typography.Text type="secondary">
@@ -151,7 +171,7 @@ export default function Tabela<T extends object>({ busca, ...props }: Props<T>) 
       >
         <div style={{ width: larguraConteudo, height: 1 }} />
       </div>
-      <Table {...props} dataSource={linhas} />
+      <Table {...props} dataSource={linhas} pagination={paginacao} />
     </div>
   );
 }

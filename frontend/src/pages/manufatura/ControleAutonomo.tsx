@@ -115,6 +115,7 @@ export default function ControleAutonomo() {
               title="Nota média"
               value={notaMedia}
               precision={1}
+              decimalSeparator=","
               suffix="%"
             />
           </Card>
@@ -125,6 +126,7 @@ export default function ControleAutonomo() {
               title="Dentro do padrão"
               value={pct(conformes, lista.length)}
               precision={1}
+              decimalSeparator=","
               suffix="%"
               valueStyle={{ color: COR.sucesso }}
             />
@@ -136,6 +138,7 @@ export default function ControleAutonomo() {
               title="Fora do padrão"
               value={pct(foraDoPadrao, lista.length)}
               precision={1}
+              decimalSeparator=","
               suffix="%"
               valueStyle={{ color: COR.critico }}
             />

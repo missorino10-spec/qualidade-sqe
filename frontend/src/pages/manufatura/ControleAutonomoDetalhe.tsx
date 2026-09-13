@@ -272,6 +272,7 @@ export default function ControleAutonomoDetalhe() {
               title="Nota final"
               value={nota}
               precision={2}
+              decimalSeparator=","
               suffix="%"
             />
           </Card>

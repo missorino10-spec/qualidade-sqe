@@ -483,6 +483,7 @@ export default function OitoDDetalhe() {
       });
       message.success('8D salvo.');
       qc.invalidateQueries({ queryKey: ['manufatura-8d'] });
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? 'Não foi possível salvar o 8D.');
     } finally {
@@ -495,6 +496,7 @@ export default function OitoDDetalhe() {
       await api.post(`/manufatura/8d/${id}/aprovar`);
       message.success('8D aprovado pela Qualidade.');
       qc.invalidateQueries({ queryKey: ['manufatura-8d'] });
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? 'Não foi possível aprovar.');
     }
@@ -507,6 +509,7 @@ export default function OitoDDetalhe() {
       await api.delete(`/manufatura/8d/${id}`);
       message.success('8D excluído.');
       qc.invalidateQueries({ queryKey: ['manufatura-8d'] });
+      qc.invalidateQueries({ queryKey: ['manufatura-doc'] });
       navigate('/manufatura/8d');
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? 'Não foi possível excluir o 8D.');

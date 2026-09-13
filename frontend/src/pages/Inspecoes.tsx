@@ -539,15 +539,20 @@ export default function Inspecoes() {
     setEdicao(null);
   }
 
+  // Uma inspecao mexe no lote, no recebimento, na RNC e, por tabela, no IDF do
+  // fornecedor e nos indicadores do painel. Tudo que le esses numeros entra
+  // aqui, senao a tela ao lado continua mostrando o valor de antes.
   function invalidar() {
     qc.invalidateQueries({ queryKey: ['inspecoes'] });
-    qc.invalidateQueries({ queryKey: ['entregas'] });
     qc.invalidateQueries({ queryKey: ['registros-entrada'] });
     qc.invalidateQueries({ queryKey: ['registro-entrada'] });
     qc.invalidateQueries({ queryKey: ['avaliar'] });
     qc.invalidateQueries({ queryKey: ['fornecedores'] });
     qc.invalidateQueries({ queryKey: ['rnc'] });
-    qc.invalidateQueries({ queryKey: ['kpis'] });
+    qc.invalidateQueries({ queryKey: ['kpis-sqe'] });
+    qc.invalidateQueries({ queryKey: ['avaliacao-fornecedores'] });
+    qc.invalidateQueries({ queryKey: ['avaliacao-consolidado'] });
+    qc.invalidateQueries({ queryKey: ['evolucao-fornecedores'] });
   }
 
   // Cadastro pontual do fornecedor que nao esta na base (ex: importacao).

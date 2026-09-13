@@ -15,6 +15,10 @@ uploads/
 # Dumps tirados antes de limpeza no banco: contem dado real, nao versionar
 backup/
 
+# Fotografia da API (scripts/fotografia.js): e a resposta crua das telas com
+# dado de producao e so vale para a maquina e o dia em que foi tirada.
+scripts/fotografia/
+
 # Prisma
 *.db
 
