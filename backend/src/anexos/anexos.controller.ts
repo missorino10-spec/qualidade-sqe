@@ -23,6 +23,26 @@ import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { StorageService } from './storage.service';
 import { corrigirNomeArquivo, disposicaoAnexo } from './nome-arquivo';
 
+// Formatos aceitos no anexo, definidos pela Qualidade em 13/09/2026: so os que
+// os documentos do sistema usam de verdade. .csv e .xlsm ficaram de fora de
+// proposito - o .xlsm carrega macro, que e justamente o que nao se quer
+// circulando por anexo. A trava vale somente para envio novo: anexo antigo com
+// outra extensao continua listando e baixando como sempre.
+//
+// A conferencia e pela extensao do nome, e nao pelo mimeType, porque o mimeType
+// chega do navegador de quem envia (dado que o usuario controla) e e a extensao
+// que decide com que programa o arquivo vai abrir na ponta.
+const EXTENSOES_ACEITAS = [
+  '.pdf',
+  '.xls',
+  '.xlsx',
+  '.doc',
+  '.docx',
+  '.jpg',
+  '.jpeg',
+  '.png',
+];
+
 // Anexo e uma tabela so para o sistema inteiro. Quem manda no acesso e o
 // "entidadeTipo": anexo de RNC exige SQE, de 8D exige Manufatura, e assim por
 // diante. Sem isso qualquer pessoa logada baixaria o arquivo de qualquer area.
@@ -59,6 +79,14 @@ export class AnexosController {
 
     // O nome vem do multipart em latin-1; sem isso todo acento fica torto.
     const nomeArquivo = corrigirNomeArquivo(file.originalname);
+
+    const extensao = extname(nomeArquivo).toLowerCase();
+    if (!EXTENSOES_ACEITAS.includes(extensao)) {
+      throw new BadRequestException(
+        `Tipo de arquivo não permitido${extensao ? ` (${extensao})` : ''}. ` +
+          'Envie PDF, Excel (.xls, .xlsx), Word (.doc, .docx) ou imagem (.jpg, .jpeg, .png).',
+      );
+    }
 
     // Mesmo formato de nome de antes, para a coluna "caminho" nao mudar.
     const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
