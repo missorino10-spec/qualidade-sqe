@@ -87,6 +87,29 @@ function compsDoTrimestre(ano: number, trimestre: number): Comp[] {
   return mesesDoTrimestre(trimestre).map((mes) => ({ ano, mes }));
 }
 
+// Competencia imediatamente anterior, virando o ano em janeiro.
+function compAnterior({ ano, mes }: Comp): Comp {
+  return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
+}
+
+const antesDe = (a: Comp, b: Comp) =>
+  a.ano < b.ano || (a.ano === b.ano && a.mes < b.mes);
+
+// Competencias de "de" ate "ate", inclusive, em ordem crescente. O teto existe
+// so para o laco nunca correr solto se vier uma data absurda do banco.
+function compsEntre(de: Comp, ate: Comp, teto = 60): Comp[] {
+  const lista: Comp[] = [];
+  let atual = de;
+  while (!antesDe(ate, atual) && lista.length < teto) {
+    lista.push(atual);
+    atual =
+      atual.mes === 12
+        ? { ano: atual.ano + 1, mes: 1 }
+        : { ano: atual.ano, mes: atual.mes + 1 };
+  }
+  return lista;
+}
+
 @Injectable()
 export class AvaliacaoService {
   constructor(private prisma: PrismaService) {}
@@ -95,6 +118,119 @@ export class AvaliacaoService {
   competenciaAtual() {
     const { ano, mes } = competenciaDe(new Date());
     return { ano, mes, ...competencia(ano, mes) };
+  }
+
+  // ---------------------------------------------------------------------------
+  // FECHAMENTO AUTOMATICO
+  //
+  // Passou o dia 26, a competencia venceu e fecha sozinha - ninguem precisa
+  // clicar todo mes. O terceiro mes de um trimestre arrasta o trimestre junto
+  // (e com ele a reclassificacao no cadastro), e o quarto trimestre conclui o
+  // ano. O botao de fechar continua existindo so para antecipar o mes corrente.
+  //
+  // O gatilho e a propria consulta ao painel: quem abre a tela poe em dia o que
+  // venceu. E de proposito que nao existe agendador - assim o fechamento nao
+  // depende do servidor estar de pe a meia-noite (na nuvem ele hiberna) e o
+  // sistema se acerta sozinho depois de qualquer parada, inclusive quando ele
+  // for para o servidor da empresa.
+  // ---------------------------------------------------------------------------
+
+  // Competencia ja conferida neste processo: evita ir ao banco a cada consulta.
+  private emDia: string | null = null;
+  // Uma sincronizacao por vez: duas telas abertas juntas nao fecham em dobro.
+  private sincronizacao: Promise<void> | null = null;
+
+  private async sincronizar() {
+    const atual = this.competenciaAtual();
+    const marca = chave(atual.ano, atual.mes);
+    if (this.emDia === marca) return;
+    if (!this.sincronizacao) {
+      this.sincronizacao = this.fecharVencidas(atual)
+        .then(() => {
+          this.emDia = marca;
+        })
+        .catch((e) => {
+          // Fechamento e rotina de bastidor: se falhar, a tela ainda tem que
+          // abrir. Fica sem marcar como em dia e a proxima consulta tenta de novo.
+          console.error('[IDF] fechamento automatico falhou:', e);
+        })
+        .finally(() => {
+          this.sincronizacao = null;
+        });
+    }
+    await this.sincronizacao;
+  }
+
+  // Primeira competencia com dado - e dali que o fechamento comeca a varrer.
+  // Sem dado nenhum nao ha o que fechar.
+  private async primeiraCompetencia(): Promise<Comp | null> {
+    const [visual, lote, rnc, avaliacao] = await Promise.all([
+      this.prisma.inspecaoVisual.findFirst({
+        where: { rascunho: false },
+        orderBy: { dataInspecao: 'asc' },
+        select: { dataInspecao: true },
+      }),
+      this.prisma.inspecaoLote.findFirst({
+        where: { rascunho: false },
+        orderBy: { dataInspecao: 'asc' },
+        select: { dataInspecao: true },
+      }),
+      this.prisma.rnc.findFirst({
+        where: { status: { not: 'CANCELADA' } },
+        orderBy: { dataAbertura: 'asc' },
+        select: { dataAbertura: true },
+      }),
+      this.prisma.avaliacaoFornecedor.findFirst({
+        orderBy: [{ ano: 'asc' }, { mes: 'asc' }],
+        select: { ano: true, mes: true },
+      }),
+    ]);
+    const candidatas: Comp[] = [
+      visual?.dataInspecao,
+      lote?.dataInspecao,
+      rnc?.dataAbertura,
+    ]
+      .filter((d): d is Date => !!d)
+      .map((d) => competenciaDe(d));
+    if (avaliacao) candidatas.push({ ano: avaliacao.ano, mes: avaliacao.mes });
+    if (!candidatas.length) return null;
+    return candidatas.reduce((menor, c) => (antesDe(c, menor) ? c : menor));
+  }
+
+  private async fecharVencidas(atual: Comp) {
+    const comDado = await this.primeiraCompetencia();
+    if (!comDado) return;
+    // Comeca no primeiro mes do TRIMESTRE do dado mais antigo, nao no mes dele.
+    // Um trimestre so fecha com os tres meses fechados: se o primeiro dado cai
+    // em Agosto, Julho tem que fechar junto (vazio, sem nota) ou o 3T nunca
+    // fecharia e a reclassificacao nunca aconteceria. Mes sem recebimento fica
+    // de fora da media do trimestre de qualquer forma.
+    const primeira: Comp = {
+      ano: comDado.ano,
+      mes: mesesDoTrimestre(trimestreCalendario(comDado.mes))[0],
+    };
+    // A competencia corrente ainda esta correndo: vence so no dia 26.
+    const ultima = compAnterior(atual);
+    if (antesDe(ultima, primeira)) return;
+
+    const comps = compsEntre(primeira, ultima);
+    const registros = await this.prisma.avaliacaoFornecedor.findMany({
+      where: { OR: comps.map((c) => ({ ano: c.ano, mes: c.mes })) },
+      select: { ano: true, mes: true, fechada: true, fechadaEm: true },
+    });
+    // Competencia que ja passou por um fechamento nao volta sozinha: ou esta
+    // fechada, ou foi REABERTA a mao para correcao - e reabrir tem que valer
+    // mais do que a rotina, senao a correcao seria desfeita na hora.
+    const jaMexidas = new Set(
+      registros
+        .filter((r) => r.fechada || r.fechadaEm)
+        .map((r) => chave(r.ano, r.mes)),
+    );
+
+    for (const c of comps) {
+      if (jaMexidas.has(chave(c.ano, c.mes))) continue;
+      await this.fechar(c.ano, c.mes);
+    }
   }
 
   // Apura C1, C2 e C3 de todos os fornecedores em varias competencias de uma
@@ -440,6 +576,7 @@ export class AvaliacaoService {
   // anterior (o que esta valendo no cadastro) e o trimestre atual (o que vai
   // valer quando ele fechar) ao lado.
   async listar(ano: number, mes: number) {
+    await this.sincronizar();
     const { inicio, fim, label } = competencia(ano, mes);
     const atual = { ano, trimestre: trimestreCalendario(mes) };
     const anterior = trimestreAnterior(atual.ano, atual.trimestre);
@@ -702,10 +839,14 @@ export class AvaliacaoService {
   // Reabre a competencia para corrigir. O trimestre volta a ser parcial (ele so
   // e fechado quando os tres meses estao), mas a classe ja aplicada no cadastro
   // nao e revertida: quem corrige a nota fecha de novo e ela se atualiza.
+  //
+  // `fechadaEm` e mantido de proposito: e a marca de que esta competencia ja
+  // passou por um fechamento. Sem ela o fechamento automatico tornaria a fechar
+  // a competencia na consulta seguinte e a correcao nunca aconteceria.
   async reabrir(ano: number, mes: number) {
     const { count } = await this.prisma.avaliacaoFornecedor.updateMany({
       where: { ano, mes, fechada: true },
-      data: { fechada: false, fechadaEm: null },
+      data: { fechada: false },
     });
     if (!count)
       throw new BadRequestException('Esta competência não está fechada.');
@@ -719,6 +860,7 @@ export class AvaliacaoService {
   // CONSOLIDADO so com os trimestres ja fechados (o que esta valendo) e o
   // PROJETADO somando tambem o trimestre em curso (como esta ficando).
   async consolidado(ano: number) {
+    await this.sincronizar();
     const comps: Comp[] = Array.from({ length: 12 }, (_, i) => ({
       ano,
       mes: i + 1,
@@ -769,9 +911,14 @@ export class AvaliacaoService {
     });
 
     const comNota = linhas.filter((l) => l.anualProjetado !== null);
+    // O ano fecha quando os 12 meses fecham - nao ha o que apertar. Dali em
+    // diante o consolidado e o projetado sao o mesmo numero e o resultado do
+    // ano esta congelado, porque todo mes que o compoe esta congelado.
+    const anoFechado = mesesFechados.every(Boolean);
     return {
       ano,
       mesesFechados,
+      anoFechado,
       linhas,
       resumo: {
         avaliados: comNota.length,

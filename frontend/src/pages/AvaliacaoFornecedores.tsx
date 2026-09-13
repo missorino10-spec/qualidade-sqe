@@ -195,12 +195,14 @@ export default function AvaliacaoFornecedores() {
   const faltamFechar = tAtual
     ? tAtual.meses.filter((m: number) => !tAtual.mesesFechados.includes(m))
     : [];
+  // O ano fecha junto com o 12o mes: nao existe botao, e consequencia.
+  const anoFechado = !!consolidado?.anoFechado;
 
   return (
     <Space direction="vertical" size={ESPACO.lg} style={{ width: '100%' }}>
       <CabecalhoPagina
         titulo="Avaliação de fornecedores — IDF"
-        descricao="IDF = Conformidade (50%) + Resposta à RNC (30%) + Plano de ação (20%). A apuração é mensal, mas quem define a classe do fornecedor — e com ela a periodicidade de inspeção — é o TRIMESTRE: ele fecha sozinho quando o terceiro mês é fechado."
+        descricao="IDF = Conformidade (50%) + Resposta à RNC (30%) + Plano de ação (20%). A apuração é mensal, mas quem define a classe do fornecedor — e com ela a periodicidade de inspeção — é o TRIMESTRE. O fechamento é automático: passado o dia 26, o mês fecha sozinho; o terceiro mês fecha o trimestre e reclassifica, e o quarto trimestre conclui o ano."
         acoes={
           <Space wrap>
             <Select
@@ -226,7 +228,7 @@ export default function AvaliacaoFornecedores() {
                   onClick={() =>
                     Modal.confirm({
                       title: 'Reabrir competência',
-                      content: `As notas voltam a ser recalculadas a partir dos dados atuais das inspeções e das RNCs, e o trimestre ${rotAtual} volta a ficar parcial. A classe já aplicada nos fornecedores não é revertida: ela se atualiza quando o trimestre fechar de novo. Deseja continuar?`,
+                      content: `As notas voltam a ser recalculadas a partir dos dados atuais das inspeções e das RNCs, e o trimestre ${rotAtual} volta a ficar parcial. A competência fica aberta até você fechá-la de novo — o fechamento automático não desfaz a reabertura. A classe já aplicada nos fornecedores não é revertida: ela se atualiza quando o trimestre fechar de novo. Deseja continuar?`,
                       okText: 'Reabrir',
                       cancelText: 'Cancelar',
                       onOk: () => reabrir.mutate(),
@@ -242,18 +244,18 @@ export default function AvaliacaoFornecedores() {
                   loading={fechar.isPending}
                   onClick={() =>
                     Modal.confirm({
-                      title: `Fechar a competência ${MESES[mes - 1]}/${ano}`,
+                      title: `Antecipar o fechamento de ${MESES[mes - 1]}/${ano}`,
                       content:
                         faltamFechar.length > 1
-                          ? `Isto congela as notas de ${MESES[mes - 1]}. A classe dos fornecedores NÃO muda agora: ela é reescrita quando o trimestre ${rotAtual} fechar, o que acontece automaticamente ao fechar o último mês dele (${faltamFechar.map((m: number) => MESES[m - 1]).join(', ')} ainda em aberto). Deseja continuar?`
-                          : `Isto congela as notas de ${MESES[mes - 1]} e conclui o trimestre ${rotAtual}. A classe apurada no trimestre passa a valer no cadastro de cada fornecedor — o que muda a periodicidade de inspeção no recebimento. Deseja continuar?`,
-                      okText: 'Fechar competência',
+                          ? `Esta competência fecharia sozinha depois do dia 26. Fechar agora congela as notas de ${MESES[mes - 1]} antes disso. A classe dos fornecedores NÃO muda: ela é reescrita quando o trimestre ${rotAtual} fechar (${faltamFechar.map((m: number) => MESES[m - 1]).join(', ')} ainda em aberto). Deseja continuar?`
+                          : `Esta competência fecharia sozinha depois do dia 26. Fechar agora congela as notas de ${MESES[mes - 1]} e conclui o trimestre ${rotAtual}: a classe apurada passa a valer no cadastro de cada fornecedor — o que muda a periodicidade de inspeção no recebimento. Deseja continuar?`,
+                      okText: 'Fechar agora',
                       cancelText: 'Cancelar',
                       onOk: () => fechar.mutate(),
                     })
                   }
                 >
-                  Fechar competência
+                  Fechar agora
                 </Button>
               ))}
           </Space>
@@ -270,7 +272,7 @@ export default function AvaliacaoFornecedores() {
         }
         description={
           data
-            ? `Período de apuração: ${new Date(data.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(data.periodoFim).toLocaleDateString('pt-BR')}. A competência fecha no dia 26: RNC aberta até o dia 26 conta neste mês, do dia 27 em diante cai no mês seguinte. O tempo de resposta é contado do envio da RNC ao fornecedor até o retorno dele — RNC ainda não enviada fica de fora do C2 e do C3.`
+            ? `Período de apuração: ${new Date(data.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(data.periodoFim).toLocaleDateString('pt-BR')}. A competência fecha no dia 26 e, passada essa data, é fechada automaticamente — RNC aberta até o dia 26 conta neste mês, do dia 27 em diante cai no mês seguinte. O tempo de resposta é contado do envio da RNC ao fornecedor até o retorno dele — RNC ainda não enviada fica de fora do C2 e do C3.`
             : undefined
         }
       />
@@ -290,9 +292,9 @@ export default function AvaliacaoFornecedores() {
           description={
             tAtual.fechado
               ? `Quem está valendo hoje na periodicidade de inspeção é a classe de ${rotAtual}. Ela só muda quando o próximo trimestre fechar.`
-              : `A classe que está valendo hoje no cadastro é a de ${rotAnterior}. Ela será reescrita automaticamente quando ${faltamFechar
+              : `A classe que está valendo hoje no cadastro é a de ${rotAnterior}. Ela será reescrita sozinha quando ${faltamFechar
                   .map((m: number) => MESES[m - 1])
-                  .join(', ')} ${faltamFechar.length > 1 ? 'forem fechados' : 'for fechado'} — é o fechamento do trimestre que reclassifica, não o do mês.`
+                  .join(', ')} ${faltamFechar.length > 1 ? 'fecharem' : 'fechar'} — cada mês fecha após o dia 26 e é o fechamento do trimestre que reclassifica, não o do mês.`
           }
         />
       )}
@@ -537,7 +539,16 @@ export default function AvaliacaoFornecedores() {
       </Card>
 
       <Card
-        title={`Consolidado de ${ano} — trimestres calendário e anual`}
+        title={
+          <Space size={8}>
+            {`Consolidado de ${ano} — trimestres calendário e anual`}
+            {anoFechado ? (
+              <Tag color="green">Ano fechado</Tag>
+            ) : (
+              <Tag>Ano em curso</Tag>
+            )}
+          </Space>
+        }
         extra={
           resumo && (
             <Typography.Text type="secondary">
@@ -617,8 +628,12 @@ export default function AvaliacaoFornecedores() {
                   valor={r.anualProjetado}
                   classe={r.classeAnualProjetado}
                   tamanho="lg"
-                  parcial
-                  detalhe="Média de todos os trimestres com nota, inclusive o que ainda está em curso."
+                  parcial={!anoFechado}
+                  detalhe={
+                    anoFechado
+                      ? 'Ano fechado: igual ao consolidado, já não há trimestre em curso.'
+                      : 'Média de todos os trimestres com nota, inclusive o que ainda está em curso.'
+                  }
                 />
               ),
             },
@@ -629,7 +644,10 @@ export default function AvaliacaoFornecedores() {
             Número em <i>itálico</i> e mais claro = período ainda em aberto,
             recalculado a cada consulta. <b>Anual consolidado</b> considera só os
             trimestres fechados; <b>Anual projetado</b> soma também o trimestre
-            em curso.
+            em curso.{' '}
+            {anoFechado
+              ? 'Os 12 meses estão fechados: o resultado deste ano está congelado e os dois números coincidem.'
+              : 'O ano fecha sozinho quando o 12º mês fechar — a partir daí os dois números coincidem.'}
           </Typography.Text>
         </div>
       </Card>
