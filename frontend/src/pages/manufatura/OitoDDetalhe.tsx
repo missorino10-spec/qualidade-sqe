@@ -282,9 +282,11 @@ function QuadroFotos({
                 queryKey: ['anexos', entidadeTipo, entidadeId],
               });
               onSuccess?.({});
-            } catch (e) {
-              onError?.(e as any);
-              message.error('Falha no envio da foto.');
+            } catch (e: any) {
+              onError?.(e);
+              message.error(
+                e?.response?.data?.message ?? 'Falha no envio da foto.',
+              );
             }
           }}
         >

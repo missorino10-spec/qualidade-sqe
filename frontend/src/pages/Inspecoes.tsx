@@ -633,8 +633,10 @@ export default function Inspecoes() {
           await api.post('/anexos', fd, {
             params: { entidadeTipo: 'RNC', entidadeId: rncObrigatoria.id },
           });
-        } catch {
-          message.warning('Uma evidência não pôde ser enviada.');
+        } catch (e: any) {
+          message.warning(
+            e?.response?.data?.message ?? 'Uma evidência não pôde ser enviada.',
+          );
         }
       }
       const rnc = rncObrigatoria;

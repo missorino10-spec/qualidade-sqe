@@ -192,8 +192,11 @@ export default function OitoD() {
         await api.post('/anexos', fd, {
           params: { entidadeTipo: DOC_ANEXO[tipo], entidadeId: id },
         });
-      } catch {
-        message.warning(`Não foi possível anexar "${arquivo.name}".`);
+      } catch (e: any) {
+        message.warning(
+          e?.response?.data?.message ??
+            `Não foi possível anexar "${arquivo.name}".`,
+        );
       }
     }
   }

@@ -41,6 +41,11 @@ const EXTENSOES_ACEITAS = [
   '.jpg',
   '.jpeg',
   '.png',
+  // O chao de fabrica usa iPad e a camera da Apple grava em HEIC. As telas de
+  // evidencia ja ofereciam esse formato; sem ele aqui, a foto do desvio tirada
+  // no tablete seria recusada na hora de anexar.
+  '.heic',
+  '.heif',
 ];
 
 // Anexo e uma tabela so para o sistema inteiro. Quem manda no acesso e o
@@ -84,7 +89,8 @@ export class AnexosController {
     if (!EXTENSOES_ACEITAS.includes(extensao)) {
       throw new BadRequestException(
         `Tipo de arquivo não permitido${extensao ? ` (${extensao})` : ''}. ` +
-          'Envie PDF, Excel (.xls, .xlsx), Word (.doc, .docx) ou imagem (.jpg, .jpeg, .png).',
+          'Envie PDF, Excel (.xls, .xlsx), Word (.doc, .docx) ou ' +
+          'imagem (.jpg, .jpeg, .png, .heic, .heif).',
       );
     }
 

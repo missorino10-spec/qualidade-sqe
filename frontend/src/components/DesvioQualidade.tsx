@@ -198,9 +198,11 @@ export function CardDesvioQualidade({
                     queryKey: ['anexos', entidadeTipo, id],
                   });
                   onSuccess?.({});
-                } catch (e) {
-                  onError?.(e as any);
-                  message.error('Falha no envio do documento.');
+                } catch (e: any) {
+                  onError?.(e);
+                  message.error(
+                    e?.response?.data?.message ?? 'Falha no envio do documento.',
+                  );
                 }
               }}
             >

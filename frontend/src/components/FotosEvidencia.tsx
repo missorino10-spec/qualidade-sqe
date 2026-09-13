@@ -61,8 +61,11 @@ export async function enviarFotosEvidencia(
       await api.post('/anexos', fd, {
         params: { entidadeTipo, entidadeId, legenda },
       });
-    } catch {
-      message.warning(`A evidência "${f.name}" não pôde ser enviada.`);
+    } catch (e: any) {
+      message.warning(
+        e?.response?.data?.message ??
+          `A evidência "${f.name}" não pôde ser enviada.`,
+      );
     }
   }
 }
