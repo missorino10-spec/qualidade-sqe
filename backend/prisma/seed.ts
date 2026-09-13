@@ -103,10 +103,16 @@ async function main() {
     },
   ];
 
+  // "update: {}" como no admin: os valores abaixo sao a CARGA INICIAL, nao a
+  // verdade. NQA, percentual de amostra e conformidade minima sao editaveis na
+  // tela de Periodicidade e mandam no plano de amostragem e no C1 do IDF - com
+  // "update: p" o seed regravava os quatro registros a cada boot e o ajuste
+  // feito pela Qualidade voltava para a tabela do codigo no deploy seguinte,
+  // sem aviso.
   for (const p of periodicidades) {
     await prisma.periodicidadeConfig.upsert({
       where: { classificacao: p.classificacao },
-      update: p,
+      update: {},
       create: p,
     });
   }
