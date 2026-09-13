@@ -3,6 +3,7 @@ import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser, AuthUser } from './current-user.decorator';
+import { LoginThrottleGuard } from './login-throttle.guard';
 
 class LoginDto {
   @IsEmail()
@@ -22,6 +23,7 @@ class TrocarSenhaDto {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @UseGuards(LoginThrottleGuard)
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.senha);

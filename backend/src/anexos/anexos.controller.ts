@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   Res,
@@ -51,7 +52,8 @@ export class AnexosController {
     @CurrentUser() user: AuthUser,
   ) {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
-    if (!entidadeTipo || !entidadeId) {
+    const idEntidade = Number(entidadeId);
+    if (!entidadeTipo || !Number.isInteger(idEntidade)) {
       throw new BadRequestException('Informe entidadeTipo e entidadeId.');
     }
 
@@ -69,7 +71,7 @@ export class AnexosController {
     return this.prisma.anexo.create({
       data: {
         entidadeTipo,
-        entidadeId: Number(entidadeId),
+        entidadeId: idEntidade,
         nomeArquivo,
         caminho: nomeNoStorage,
         mimeType: file.mimetype,
@@ -85,22 +87,31 @@ export class AnexosController {
     @Query('entidadeTipo') entidadeTipo: string,
     @Query('entidadeId') entidadeId: string,
   ) {
+    // Mesma checagem do upload: sem isso um entidadeId vazio ou com letra
+    // virava NaN e o erro so aparecia la no Prisma, como 500.
+    const id = Number(entidadeId);
+    if (!entidadeTipo || !Number.isInteger(id)) {
+      throw new BadRequestException('Informe entidadeTipo e entidadeId.');
+    }
     return this.prisma.anexo.findMany({
-      where: { entidadeTipo, entidadeId: Number(entidadeId) },
+      where: { entidadeTipo, entidadeId: id },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   @Get(':id/download')
-  async download(@Param('id') id: string, @Res() res: Response) {
-    const anexo = await this.prisma.anexo.findUnique({
-      where: { id: Number(id) },
-    });
+  async download(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const anexo = await this.prisma.anexo.findUnique({ where: { id } });
     if (!anexo) throw new NotFoundException('Anexo não encontrado');
 
     const bytes = await this.storage.baixar(anexo.caminho);
     res.set({
       'Content-Type': anexo.mimeType || 'application/octet-stream',
+      // O mimeType vem do navegador de quem subiu o arquivo, ou seja, e um dado
+      // que o usuario controla. O anexo ja desce como "attachment"; o nosniff
+      // fecha a brecha de o navegador adivinhar outro tipo e executar o
+      // conteudo no dominio da API.
+      'X-Content-Type-Options': 'nosniff',
       'Content-Disposition': disposicaoAnexo(anexo.nomeArquivo),
       'Content-Length': String(bytes.length),
     });

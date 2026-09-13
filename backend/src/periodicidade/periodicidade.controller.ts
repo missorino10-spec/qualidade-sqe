@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -46,6 +47,11 @@ export class PeriodicidadeController {
     @Param('classificacao') classificacao: string,
     @Body() dto: UpdatePeriodicidadeDto,
   ) {
+    // So existem as quatro classes. Qualquer outra letra chegava no Prisma como
+    // enum invalido e voltava 500; agora para aqui, com 400 e texto claro.
+    if (!['A', 'B', 'C', 'D'].includes(classificacao)) {
+      throw new BadRequestException('Classificação deve ser A, B, C ou D.');
+    }
     return this.prisma.periodicidadeConfig.update({
       where: { classificacao: classificacao as any },
       data: dto,

@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import { jwtSecret } from './jwt-secret';
 
 export interface JwtPayload {
   sub: number;
@@ -11,20 +13,32 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'dev-secret-trocar-em-producao',
+      secretOrKey: jwtSecret(),
     });
   }
 
+  // O usuario e relido do banco a cada chamada, e nao aproveitado do token.
+  // O token vale 12h: sem esta consulta, quem fosse desativado (ou rebaixado de
+  // ADMIN) continuava entrando pelo resto do dia com o token que ja tinha na
+  // mao. E a mesma regra que o PermissaoGuard ja seguia para os modulos - o
+  // papel e o "ativo" ficavam de fora por descuido.
   async validate(payload: JwtPayload) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, nome: true, papel: true, ativo: true },
+    });
+    if (!usuario || !usuario.ativo) {
+      throw new UnauthorizedException('Sessão inválida');
+    }
     return {
-      id: payload.sub,
-      email: payload.email,
-      nome: payload.nome,
-      papel: payload.papel,
+      id: usuario.id,
+      email: usuario.email,
+      nome: usuario.nome,
+      papel: usuario.papel,
     };
   }
 }
