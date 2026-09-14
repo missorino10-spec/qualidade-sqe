@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { RncService } from '../rnc/rnc.service';
 import { TIPO_DESVIO } from '../../comum/tipo-desvio';
+import { proximoSequencial } from '../../comum/numeracao';
 import {
   numeroDocumento,
   semanaAno,
@@ -586,7 +587,11 @@ export class InspecoesService {
         where: { inspecaoAno: ano },
         orderBy: { inspecaoSequencial: 'desc' },
       });
-      const sequencial = (ultima?.inspecaoSequencial ?? 0) + 1;
+      const sequencial = proximoSequencial(
+        'INSP',
+        ultima?.inspecaoSequencial,
+        ano,
+      );
       try {
         return await this.prisma.entregaPortaria.update({
           where: { id: entregaId },

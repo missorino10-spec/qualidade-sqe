@@ -4,6 +4,8 @@
 // O checklist visual e o motor de calculo das cotas sao comuns aos tres modulos
 // e ficam em src/comum/inspecao.ts.
 
+import { montarNumero } from '../comum/numeracao';
+
 export type Classificacao = 'A' | 'B' | 'C' | 'D';
 
 // Semana no formato "YYYY-Www", contando semanas de DOMINGO a SABADO.
@@ -28,12 +30,15 @@ export function semanaAno(d: Date): { semana: string; ano: number } {
 // Numeracao dos documentos: prefixo + sequencial de 4 digitos + ano completo.
 // Ex: INSP0001/2026 (inspecao) e RNC0001/2026 (nao conformidade). O prefixo
 // deixa claro de que documento se trata; o sequencial reinicia a cada ano.
+//
+// As duas series tem a heranca de 2026 (RNC comeca no 200, INSP no 500, e sem
+// os zeros a esquerda naquele ano); a regra mora em comum/numeracao.ts.
 export function numeroDocumento(
   prefixo: 'INSP' | 'RNC',
   sequencial: number,
   ano: number,
 ): string {
-  return `${prefixo}${String(sequencial).padStart(4, '0')}/${ano}`;
+  return montarNumero(prefixo, sequencial, ano);
 }
 
 // Trimestre fiscal da empresa: ano fiscal comeca em outubro.

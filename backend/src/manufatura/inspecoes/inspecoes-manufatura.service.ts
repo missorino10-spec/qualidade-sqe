@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
 import { numeroManufatura, statusPorResultado } from '../manufatura-utils';
+import { proximoSequencial } from '../../comum/numeracao';
 import {
   CotaMaxMin,
   calcularCotaMaxMin,
@@ -103,7 +104,7 @@ export class InspecoesManufaturaService {
         where: { tipo, ano },
         orderBy: { sequencial: 'desc' },
       });
-      const sequencial = (ultimo?.sequencial ?? 0) + 1;
+      const sequencial = proximoSequencial(prefixo, ultimo?.sequencial, ano);
       try {
         return await this.prisma.relatorioDimensional.create({
           data: {

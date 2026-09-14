@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { HistoricoService } from '../../historico/historico.service';
 import { numeroDocumento, semanaAno } from '../sqe-utils';
+import { proximoSequencial } from '../../comum/numeracao';
 import {
   DESVIO,
   dadosAberturaDesvio,
@@ -69,7 +70,7 @@ export class RncService {
       where: { ano },
       orderBy: { sequencial: 'desc' },
     });
-    const sequencial = (ultima?.sequencial ?? 0) + 1;
+    const sequencial = proximoSequencial('RNC', ultima?.sequencial, ano);
     return { numero: numeroDocumento('RNC', sequencial, ano), ano, sequencial };
   }
 

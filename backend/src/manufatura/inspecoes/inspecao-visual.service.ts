@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { semanaAno } from '../../sqe/sqe-utils';
 import { numeroManufatura } from '../manufatura-utils';
+import { proximoSequencial } from '../../comum/numeracao';
 
 // INSPECAO VISUAL DA MANUFATURA - documento proprio, sem cotas e sem
 // reinspecao: e o registro do que o inspetor observou naquele momento, com o
@@ -75,7 +76,7 @@ export class InspecaoVisualManufaturaService {
         where: { tipo, ano },
         orderBy: { sequencial: 'desc' },
       });
-      const sequencial = (ultimo?.sequencial ?? 0) + 1;
+      const sequencial = proximoSequencial(prefixo, ultimo?.sequencial, ano);
       try {
         const criada = await this.prisma.inspecaoVisualManufatura.create({
           data: {

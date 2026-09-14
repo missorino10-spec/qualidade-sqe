@@ -2,6 +2,8 @@
 // A semana e o trimestre fiscal sao os mesmos do SQE (regra da empresa),
 // entao reaproveitamos de sqe-utils em vez de duplicar a regra.
 
+import { montarNumero } from '../comum/numeracao';
+
 // SETV/PRODV sao a inspecao VISUAL: serie propria, separada da do dimensional,
 // para que cada documento tenha a sua sequencia continua.
 export type PrefixoManufatura =
@@ -17,12 +19,15 @@ export type PrefixoManufatura =
 // Numeracao dos documentos da manufatura, no mesmo padrao do SQE:
 // SET0001/2026, PROD0001/2026, SETV0001/2026, PRODV0001/2026, CNQ0001/2026,
 // 8D0001/2026, 5G0001/2026, ICAQ0001/2026.
+//
+// SET, PROD, SETV e PRODV tem a heranca de 2026 (comecam no 300 e saem sem os
+// zeros a esquerda naquele ano); a regra mora em comum/numeracao.ts.
 export function numeroManufatura(
   prefixo: PrefixoManufatura,
   sequencial: number,
   ano: number,
 ): string {
-  return `${prefixo}${String(sequencial).padStart(4, '0')}/${ano}`;
+  return montarNumero(prefixo, sequencial, ano);
 }
 
 // ---------------------------------------------------------------------------

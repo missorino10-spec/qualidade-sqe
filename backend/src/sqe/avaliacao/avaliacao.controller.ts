@@ -285,6 +285,108 @@ export class AvaliacaoController {
     );
   }
 
+  // Papel e planilha da aba "Anual consolidado": o ano inteiro de uma vez, um
+  // fornecedor por linha.
+  //
+  // Os doze meses e os quatro trimestres saem so com o numero, sem a letra ao
+  // lado: a classe se le direto da faixa (>=9 A, >=7 B, >=5 C, abaixo disso D)
+  // e duplicar tudo levaria a largura de 22 para 34 colunas. Nos dois
+  // resultados do ano, que sao a leitura que interessa, a letra vai junto.
+  @Get('consolidado/relatorio')
+  async consolidadoRelatorio(
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('ano') ano?: string,
+  ) {
+    const anoSel = ano ? Number(ano) : this.service.competenciaAtual().ano;
+    const dados = await this.service.consolidado(anoSel);
+    const linhas: any[] = dados.linhas ?? [];
+    const resumo = dados.resumo;
+
+    // Mes ainda sem fechamento continua sendo recalculado a cada consulta. O
+    // papel diz quais sao, senao quem le acha que o ano todo ja esta congelado.
+    const abertos = MESES.filter((_, i) => !dados.mesesFechados?.[i]).map((m) =>
+      m.slice(0, 3),
+    );
+
+    await responderRelatorio(
+      res,
+      {
+        titulo: `Avaliação de fornecedores — IDF anual consolidado ${anoSel}`,
+        emitidoPor: user.nome,
+        filtros: [
+          { rotulo: 'Ano', valor: String(anoSel) },
+          {
+            rotulo: 'Situação',
+            valor: dados.anoFechado ? 'Ano fechado' : 'Ano em curso',
+          },
+          {
+            rotulo: 'Meses em aberto',
+            valor: abertos.length ? abertos.join(', ') : 'nenhum',
+          },
+        ],
+        totais: [
+          { rotulo: 'Fornecedores avaliados', valor: String(resumo.avaliados) },
+          {
+            rotulo: 'IDF médio do ano',
+            valor: doisDigitos(resumo.mediaGeral ?? 0),
+          },
+          { rotulo: 'Estratégicos (A)', valor: String(resumo.porClasse.A) },
+          { rotulo: 'Aprovados (B)', valor: String(resumo.porClasse.B) },
+          { rotulo: 'Em atenção (C)', valor: String(resumo.porClasse.C) },
+          { rotulo: 'Críticos (D)', valor: String(resumo.porClasse.D) },
+        ],
+        colunas: [
+          { titulo: 'Código', peso: 34, valor: (l: any) => l.codigo },
+          { titulo: 'Fornecedor', peso: 110, valor: (l: any) => l.nome },
+          ...MESES.map((m, i) => ({
+            titulo: m.slice(0, 3),
+            peso: 24,
+            valor: (l: any) => l.meses?.[i] ?? null,
+            tipo: 'numero' as const,
+          })),
+          ...[1, 2, 3, 4].map((t) => ({
+            titulo: `${t}T`,
+            peso: 26,
+            valor: (l: any) => l.trimestres?.[t - 1] ?? null,
+            tipo: 'numero' as const,
+          })),
+          {
+            titulo: 'Anual consolidado',
+            peso: 34,
+            valor: (l: any) => l.anualConsolidado,
+            tipo: 'numero',
+            negrito: true,
+          },
+          {
+            titulo: 'Classe consolidada',
+            peso: 52,
+            valor: (l: any) => textoClasse(l.classeAnualConsolidado),
+          },
+          {
+            titulo: 'Anual projetado',
+            peso: 32,
+            valor: (l: any) => l.anualProjetado,
+            tipo: 'numero',
+          },
+          {
+            titulo: 'Classe projetada',
+            peso: 52,
+            valor: (l: any) => textoClasse(l.classeAnualProjetado),
+          },
+          {
+            titulo: 'Ação',
+            peso: 92,
+            valor: (l: any) => ACAO_CLASSE[l.classeAnualProjetado] ?? '',
+          },
+        ],
+        linhas,
+      },
+      formato,
+    );
+  }
+
   @Get('fornecedor/:id')
   historico(@Param('id', ParseIntPipe) id: number) {
     return this.service.historico(id);

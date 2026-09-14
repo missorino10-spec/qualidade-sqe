@@ -339,7 +339,16 @@ export default function ProducaoDiaria() {
 
       {indicadores(data, isLoading)}
 
-      <Card size="small" title={`Lançamento diário — ${mes.format('MM/YYYY')}`}>
+      <Card
+        size="small"
+        title={`Lançamento diário — ${mes.format('MM/YYYY')}`}
+        extra={
+          <ExportarLista
+            url={`/maquinas/${maquina.id}/producao/relatorio?ano=${ano}&mes=${numeroMes}`}
+            nome={`producao-ppm-${maquina.codigo}-${mes.format('YYYY-MM')}`}
+          />
+        }
+      >
         <Tabela
           size="small"
           rowKey="chave"

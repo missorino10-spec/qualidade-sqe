@@ -550,14 +550,20 @@ export default function AvaliacaoFornecedores() {
           </Space>
         }
         extra={
-          resumo && (
-            <Typography.Text type="secondary">
-              {resumo.avaliados} avaliado(s) · média geral{' '}
-              {numeroBR(resumo.mediaGeral ?? 0, 2)} · A {resumo.porClasse.A} ·
-              B {resumo.porClasse.B} · C {resumo.porClasse.C} · D{' '}
-              {resumo.porClasse.D}
-            </Typography.Text>
-          )
+          <Space wrap>
+            {resumo && (
+              <Typography.Text type="secondary">
+                {resumo.avaliados} avaliado(s) · média geral{' '}
+                {numeroBR(resumo.mediaGeral ?? 0, 2)} · A {resumo.porClasse.A} ·
+                B {resumo.porClasse.B} · C {resumo.porClasse.C} · D{' '}
+                {resumo.porClasse.D}
+              </Typography.Text>
+            )}
+            <ExportarLista
+              url={`/avaliacao-fornecedores/consolidado/relatorio?ano=${ano}`}
+              nome={`idf-consolidado-${ano}`}
+            />
+          </Space>
         }
       >
         <Tabela

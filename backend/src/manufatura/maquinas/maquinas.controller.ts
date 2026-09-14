@@ -28,6 +28,7 @@ import { ModuloSistema } from '@prisma/client';
 import { Modulo } from '../../auth/modulo.decorator';
 import { PermissaoGuard } from '../../auth/permissao.guard';
 import { responderRelatorio } from '../../comum/relatorio-lista';
+import { calcularPpm } from '../manufatura-utils';
 
 // O recorte desta tela e o mes inteiro, e nao um par De-Ate: a grade de
 // apontamento e mensal, como as abas da planilha.
@@ -45,6 +46,9 @@ const MESES = [
   'Novembro',
   'Dezembro',
 ];
+
+// Abreviacao do dia da semana como a tela escreve ("05/09 sex").
+const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
 const ROTULO_AREA: Record<string, string> = {
   FABRICACAO: 'Fabricação',
@@ -192,6 +196,113 @@ export class MaquinasController {
       id,
       ano ? Number(ano) : hoje.getFullYear(),
       mes ? Number(mes) : hoje.getMonth() + 1,
+    );
+  }
+
+  // Relatorio de uma maquina so, dia a dia - o mesmo que a tela mostra depois
+  // de entrar na maquina. O servico devolve apenas os dias que tem apontamento;
+  // aqui o mes e preenchido por inteiro, igual a grade da tela, para que o dia
+  // em branco apareca no papel como dia sem lancamento.
+  @Get(':id/producao/relatorio')
+  async relatorioProducaoMaquina(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentUser() user: AuthUser,
+    @Query('formato') formato?: string,
+    @Query('ano') ano?: string,
+    @Query('mes') mes?: string,
+  ) {
+    const hoje = new Date();
+    const a = ano ? Number(ano) : hoje.getFullYear();
+    const m = mes ? Number(mes) : hoje.getMonth() + 1;
+    const [maquina, producao] = await Promise.all([
+      this.service.detalhe(id),
+      this.service.producaoDoMes(id, a, m),
+    ]);
+
+    const apontado = new Map(
+      producao.dias.map((d) => [new Date(d.data).getUTCDate(), d]),
+    );
+    const diasNoMes = new Date(Date.UTC(a, m, 0)).getUTCDate();
+    const linhas = Array.from({ length: diasNoMes }, (_, i) => {
+      const dia = i + 1;
+      const d = apontado.get(dia);
+      const produzidas = d?.qtdProduzida ?? 0;
+      const defeitos = d?.qtdDefeito ?? 0;
+      return {
+        dia: `${String(dia).padStart(2, '0')}/${String(m).padStart(2, '0')} ${
+          DIAS_SEMANA[new Date(Date.UTC(a, m - 1, dia)).getUTCDay()]
+        }`,
+        lancado: d != null,
+        qtdProduzida: d ? produzidas : null,
+        qtdDefeito: d ? defeitos : null,
+        // Dia sem producao nao tem PPM: a tela mostra "-" e aqui fica vazio.
+        ppm: produzidas ? calcularPpm(produzidas, defeitos) : null,
+      };
+    });
+
+    await responderRelatorio(
+      res,
+      {
+        titulo: 'Produção Diária e PPM — lançamento diário',
+        emitidoPor: user.nome,
+        filtros: [
+          {
+            rotulo: 'Máquina',
+            valor: `${maquina.codigo} — ${maquina.nome}`,
+          },
+          {
+            rotulo: 'Área',
+            valor: ROTULO_AREA[maquina.area] ?? maquina.area,
+          },
+          { rotulo: 'Mês', valor: `${MESES[m - 1]} de ${a}` },
+        ],
+        // Os mesmos tres numeros do topo da tela da maquina.
+        totais: [
+          {
+            rotulo: 'Produzidas no mês',
+            valor: producao.pecasProduzidas.toLocaleString('pt-BR'),
+          },
+          {
+            rotulo: 'Peças com defeito',
+            valor: producao.pecasComDefeito.toLocaleString('pt-BR'),
+          },
+          { rotulo: 'PPM do mês', valor: producao.ppm.toLocaleString('pt-BR') },
+          {
+            rotulo: 'Dias apontados',
+            valor: `${producao.dias.length} de ${diasNoMes}`,
+          },
+        ],
+        colunas: [
+          { titulo: 'Dia', peso: 90, valor: (l: any) => l.dia },
+          {
+            titulo: 'Qtd. produzida',
+            peso: 90,
+            valor: (l: any) => l.qtdProduzida,
+            tipo: 'numero',
+          },
+          {
+            titulo: 'Qtd. com defeito',
+            peso: 90,
+            valor: (l: any) => l.qtdDefeito,
+            tipo: 'numero',
+          },
+          {
+            titulo: 'PPM do dia',
+            peso: 80,
+            valor: (l: any) => l.ppm,
+            tipo: 'numero',
+            negrito: true,
+          },
+          {
+            titulo: 'Situação',
+            peso: 90,
+            valor: (l: any) => (l.lancado ? 'Lançado' : 'Sem lançamento'),
+          },
+        ],
+        linhas,
+      },
+      formato,
     );
   }
 
