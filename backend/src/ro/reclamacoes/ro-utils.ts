@@ -10,12 +10,15 @@ export function numeroRo(sequencial: number, ano: number): string {
 // planilha) usa o somarDiasUteis de comum/dias-uteis.ts, que ja desconta os
 // feriados do calendario.
 
+// Custo total = quantidade x valor unitario, fechado no centavo. O
+// arredondamento e o mesmo do CNQ: sem ele, 3 x 19,99 daria 59,969999999999999
+// e o valor gravado no registro nao seria um valor em dinheiro de verdade.
 export function custoTotalRo(
   quantidade?: number | null,
   valorUnitario?: number | null,
 ): number | null {
   if (quantidade == null || valorUnitario == null) return null;
-  return Number(quantidade) * Number(valorUnitario);
+  return Math.round(Number(quantidade) * Number(valorUnitario) * 100) / 100;
 }
 
 type Tarefa = {
