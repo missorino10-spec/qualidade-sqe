@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import Tabela from '../components/Tabela';
+import ImportarPlanilha from '../components/ImportarPlanilha';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { opcoesUnidadeItem } from '../unidades';
 
@@ -153,9 +154,15 @@ export default function Itens() {
     <Card
       title="Itens — base de códigos e custo"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-          Novo item
-        </Button>
+        <Space wrap>
+          <ImportarPlanilha
+            cadastro="itens"
+            aoConcluir={() => qc.invalidateQueries({ queryKey: ['itens'] })}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
+            Novo item
+          </Button>
+        </Space>
       }
     >
       <Space style={{ marginBottom: 12, width: '100%' }} wrap>

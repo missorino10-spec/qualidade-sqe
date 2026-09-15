@@ -19,6 +19,7 @@ import {
   valoresIniciaisFornecedor,
 } from '../components/CamposFornecedor';
 import Tabela, { filtrosDe } from '../components/Tabela';
+import ImportarPlanilha from '../components/ImportarPlanilha';
 import { corClasse } from '../fornecedor';
 
 export default function Fornecedores() {
@@ -108,9 +109,17 @@ export default function Fornecedores() {
     <Card
       title="Fornecedores"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-          Novo fornecedor
-        </Button>
+        <Space wrap>
+          <ImportarPlanilha
+            cadastro="fornecedores"
+            aoConcluir={() =>
+              qc.invalidateQueries({ queryKey: ['fornecedores'] })
+            }
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
+            Novo fornecedor
+          </Button>
+        </Space>
       }
     >
       <Tabela

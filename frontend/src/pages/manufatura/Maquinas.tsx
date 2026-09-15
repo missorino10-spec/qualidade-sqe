@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
 import Tabela, { filtrosDe } from '../../components/Tabela';
+import ImportarPlanilha from '../../components/ImportarPlanilha';
 
 // Cadastro das maquinas/linhas. O lancamento da producao diaria e o PPM ficam
 // na tela "Produção diária / PPM".
@@ -110,9 +111,19 @@ export default function Maquinas() {
       <Card
         title="Cadastro de máquinas e linhas"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-            Nova máquina
-          </Button>
+          <Space wrap>
+            <ImportarPlanilha
+              cadastro="maquinas"
+              aoConcluir={() => qc.invalidateQueries({ queryKey: ['maquinas'] })}
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => abrir()}
+            >
+              Nova máquina
+            </Button>
+          </Space>
         }
       >
         <Tabela

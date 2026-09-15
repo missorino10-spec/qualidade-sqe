@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
 import Tabela from '../../components/Tabela';
+import ImportarPlanilha from '../../components/ImportarPlanilha';
 import {
   MODULOS,
   ROTULO_MODULO,
@@ -254,9 +255,15 @@ export default function Colaboradores() {
     <Card
       title="Colaboradores e Acessos"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
-          Novo colaborador
-        </Button>
+        <Space wrap>
+          <ImportarPlanilha
+            cadastro="colaboradores"
+            aoConcluir={() => qc.invalidateQueries({ queryKey: ['usuarios'] })}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => abrir()}>
+            Novo colaborador
+          </Button>
+        </Space>
       }
     >
       <Tabela

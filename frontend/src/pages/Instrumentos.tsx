@@ -23,6 +23,7 @@ import { api, abrirPdfEmNovaAba, queryDeFiltro } from '../api';
 import { useAuth } from '../auth';
 import Tabela, { filtrosDe } from '../components/Tabela';
 import FiltroPeriodo, { usarPeriodo } from '../components/FiltroPeriodo';
+import ImportarPlanilha from '../components/ImportarPlanilha';
 import { ExportarLista } from '../design/acoes';
 import { COR } from '../design/tokens';
 
@@ -259,6 +260,12 @@ export default function Instrumentos() {
           >
             PDF do inventário
           </Button>
+          <ImportarPlanilha
+            cadastro="instrumentos"
+            aoConcluir={() =>
+              qc.invalidateQueries({ queryKey: ['instrumentos'] })
+            }
+          />
           {podeEditar && (
             <Button
               type="primary"
