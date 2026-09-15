@@ -1,6 +1,7 @@
-// Geracao do calendario de um ano: nacionais + estaduais de SP + municipais de
-// Araraquara. E so um ponto de partida - o que a fabrica realmente para (ponte,
-// recesso, manutencao) a Qualidade acrescenta a mao na tela.
+// Calendario de um ano: nacionais + estaduais de SP + municipais de Araraquara.
+// Calculado na hora, sem banco e sem internet, para qualquer ano - e por isso
+// que nao existe "ano que alguem esqueceu de gerar". O que a fabrica para alem
+// da lei (ponte, recesso, manutencao) a Qualidade acrescenta a mao na tela.
 //
 // Carnaval e Corpus Christi sao ponto FACULTATIVO por lei, nao feriado, mas
 // entram porque a fabrica para. Ficam com tipo FACULTATIVO so para quem olha a

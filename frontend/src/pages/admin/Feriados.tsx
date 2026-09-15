@@ -15,7 +15,7 @@ import {
   Tag,
   message,
 } from 'antd';
-import { CalendarOutlined, PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api';
@@ -29,17 +29,19 @@ import { BotaoExcluir } from '../../design/acoes';
  * prazo da R.O, os prazos do SQD e os indicadores de prazo do painel do SQE
  * usam para não vencer um prazo com a fábrica fechada.
  *
- * O botão "Gerar calendário" traz os feriados de lei (nacionais, estaduais de
- * SP e municipais de Araraquara, mais Carnaval e Corpus Christi, que a fábrica
- * para). O que é da casa — recesso de fim de ano, parada de manutenção, ponte —
- * a Qualidade acrescenta à mão.
+ * Os feriados de lei (nacionais, estaduais de SP e municipais de Araraquara,
+ * mais Carnaval e Corpus Christi, que a fábrica para) não se cadastram: o
+ * servidor calcula na hora, para qualquer ano, sem consultar nada na internet.
+ * O que se acrescenta aqui é só o que nenhuma conta adivinha — recesso de fim
+ * de ano, parada de manutenção, ponte.
  */
 
 interface Feriado {
-  id: number;
+  id: number | null;
   data: string;
   descricao: string;
   tipo: string;
+  origem: 'lei' | 'empresa';
 }
 
 const TIPOS: Record<string, { rotulo: string; cor: string }> = {
@@ -88,7 +90,7 @@ export default function Feriados() {
   const criar = useMutation({
     mutationFn: async (v: any) => api.post('/feriados', v),
     onSuccess: () => {
-      message.success('Feriado incluído.');
+      message.success('Dia incluído no calendário.');
       invalidar();
       setOpen(false);
       form.resetFields();
@@ -99,26 +101,13 @@ export default function Feriados() {
       ),
   });
 
-  const gerar = useMutation({
-    mutationFn: async () => (await api.post(`/feriados/gerar/${ano}`)).data,
-    onSuccess: (r: any) => {
-      invalidar();
-      message.success(
-        r.criados
-          ? `${r.criados} feriado(s) incluído(s) em ${ano}.`
-          : `Nada a incluir: o calendário de ${ano} já está completo.`,
-      );
-    },
-    onError: () => message.error('Não foi possível gerar o calendário.'),
-  });
-
   const excluir = useMutation({
     mutationFn: async (f: Feriado) => api.delete(`/feriados/${f.id}`),
     onSuccess: () => {
-      message.success('Feriado excluído.');
+      message.success('Dia excluído.');
       invalidar();
     },
-    onError: () => message.error('Não foi possível excluir o feriado.'),
+    onError: () => message.error('Não foi possível excluir o dia.'),
   });
 
   const lista = data ?? [];
@@ -142,13 +131,6 @@ export default function Feriados() {
             style={{ width: 100 }}
           />
           <Button
-            icon={<CalendarOutlined />}
-            loading={gerar.isPending}
-            onClick={() => gerar.mutate()}
-          >
-            Gerar calendário de {ano}
-          </Button>
-          <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => {
@@ -157,7 +139,7 @@ export default function Feriados() {
               setOpen(true);
             }}
           >
-            Novo dia
+            Dia de fábrica parada
           </Button>
         </Space>
       }
@@ -167,13 +149,16 @@ export default function Feriados() {
         showIcon
         style={{ marginBottom: 16 }}
         message="Tudo o que está nesta lista é dia não trabalhado."
-        description="Os prazos em dias úteis do sistema — conclusão da R.O, homologações do SQD e os indicadores de prazo do painel do SQE — pulam estes dias. Gerar o ano traz só os feriados de lei; recesso, ponte e parada de manutenção você inclui aqui."
+        description="Os prazos em dias úteis do sistema — conclusão da R.O, homologações do SQD e os indicadores de prazo do painel do SQE — pulam estes dias. Os feriados de lei já vêm prontos para qualquer ano, sem precisar gerar nada. Acrescente aqui só o que é da casa: recesso de fim de ano, ponte e parada de manutenção."
       />
 
       <Row gutter={12} style={{ marginBottom: 16 }}>
         <Col xs={12}>
           <Card size="small">
-            <Statistic title={`Dias cadastrados em ${ano}`} value={lista.length} />
+            <Statistic
+              title={`Dias não trabalhados em ${ano}`}
+              value={lista.length}
+            />
           </Card>
         </Col>
         <Col xs={12}>
@@ -189,7 +174,7 @@ export default function Feriados() {
 
       <Tabela
         busca="Buscar por descrição..."
-        rowKey="id"
+        rowKey="data"
         loading={isFetching}
         dataSource={lista}
         columns={[
@@ -224,21 +209,24 @@ export default function Feriados() {
           {
             title: 'Ações',
             width: 100,
-            render: (_: any, f: Feriado) => (
-              <BotaoExcluir
-                emTabela
-                motivo="Excluir este dia do calendário"
-                titulo={`Excluir ${dataBR(f.data)} — ${f.descricao}?`}
-                descricao="O dia volta a contar como dia útil nos prazos calculados daqui para a frente. Registros já gravados não mudam."
-                onConfirm={() => excluir.mutateAsync(f)}
-              />
-            ),
+            // Feriado de lei nao tem o que excluir: nao esta guardado em lugar
+            // nenhum, sai da conta toda vez que a lista e pedida.
+            render: (_: any, f: Feriado) =>
+              f.origem === 'empresa' ? (
+                <BotaoExcluir
+                  emTabela
+                  motivo="Excluir este dia do calendário"
+                  titulo={`Excluir ${dataBR(f.data)} — ${f.descricao}?`}
+                  descricao="O dia volta a contar como dia útil nos prazos calculados daqui para a frente. Registros já gravados não mudam."
+                  onConfirm={() => excluir.mutateAsync(f)}
+                />
+              ) : null,
           },
         ]}
       />
 
       <Modal
-        title="Novo dia não trabalhado"
+        title="Dia em que a fábrica não trabalha"
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
@@ -267,10 +255,12 @@ export default function Feriados() {
             <Input placeholder="Recesso de fim de ano" />
           </Form.Item>
           <Form.Item name="tipo" label="Tipo">
+            {/* So os dois que a empresa decide: feriado de lei ja entra
+                sozinho e nao se cadastra aqui. */}
             <Select
-              options={Object.entries(TIPOS).map(([k, t]) => ({
+              options={['PARADA', 'FACULTATIVO'].map((k) => ({
                 value: k,
-                label: t.rotulo,
+                label: TIPOS[k].rotulo,
               }))}
             />
           </Form.Item>

@@ -20,6 +20,7 @@ import { Roles } from '../auth/roles.decorator';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { FeriadosService } from './feriados.service';
 import { calendarioDoAno } from './calendario';
+import { chaveDia } from '../comum/dias-uteis';
 
 /**
  * Calendario de feriados - configuracao do sistema inteiro.
@@ -28,6 +29,10 @@ import { calendarioDoAno } from './calendario';
  * relogio que conta os prazos da R.O, do SQD e do painel do SQE. Mexer aqui
  * muda prazo em toda a casa, entao fica com o admin, no mesmo lugar de
  * Colaboradores e Acessos.
+ *
+ * O feriado de lei nao se cadastra: sai calculado de calendarioDoAno() toda vez
+ * que a lista e pedida. O que se cadastra aqui e so o que a empresa decide -
+ * recesso, ponte, parada de manutencao.
  */
 
 const TIPOS = [
@@ -55,6 +60,11 @@ function dataDoTexto(texto: string): Date {
   return d;
 }
 
+function emBR(data: Date): string {
+  const [ano, mes, dia] = chaveDia(data).split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @Controller('feriados')
@@ -64,18 +74,52 @@ export class FeriadosController {
     private feriados: FeriadosService,
   ) {}
 
+  /**
+   * A lista do ano = feriados de lei calculados na hora + os dias que a empresa
+   * acrescentou. Só os da empresa vêm com id; os de lei não se apagam porque
+   * não estão guardados em lugar nenhum.
+   */
   @Get()
-  listar(@Query('ano') ano?: string) {
+  async listar(@Query('ano') ano?: string) {
     const n = Number(ano);
-    const where = Number.isInteger(n)
-      ? {
-          data: {
-            gte: new Date(Date.UTC(n, 0, 1)),
-            lte: new Date(Date.UTC(n, 11, 31)),
-          },
-        }
-      : {};
-    return this.prisma.feriado.findMany({ where, orderBy: { data: 'asc' } });
+    const alvo =
+      Number.isInteger(n) && n >= 2000 && n <= 2100
+        ? n
+        : new Date().getUTCFullYear();
+
+    const lei = calendarioDoAno(alvo).map((f) => ({
+      id: null as number | null,
+      data: chaveDia(f.data),
+      descricao: f.descricao,
+      tipo: f.tipo,
+      origem: 'lei',
+    }));
+    const jaCalculadas = new Set(lei.map((f) => f.data));
+
+    const daEmpresa = await this.prisma.feriado.findMany({
+      where: {
+        data: {
+          gte: new Date(Date.UTC(alvo, 0, 1)),
+          lte: new Date(Date.UTC(alvo, 11, 31)),
+        },
+      },
+      orderBy: { data: 'asc' },
+    });
+
+    // Sobra da epoca em que o calendario de lei era gravado no banco pelo botao
+    // "Gerar calendario": se a data ja vem calculada, a linha velha e absorvida
+    // em vez de aparecer duas vezes na tela.
+    const extras = daEmpresa
+      .filter((f) => !jaCalculadas.has(chaveDia(f.data)))
+      .map((f) => ({
+        id: f.id as number | null,
+        data: chaveDia(f.data),
+        descricao: f.descricao,
+        tipo: f.tipo as string,
+        origem: 'empresa',
+      }));
+
+    return [...lei, ...extras].sort((a, b) => a.data.localeCompare(b.data));
   }
 
   @Post()
@@ -83,10 +127,20 @@ export class FeriadosController {
     if (!dto.descricao?.trim())
       throw new BadRequestException('Informe a descrição do feriado.');
     const data = dataDoTexto(dto.data);
+
+    const naLei = calendarioDoAno(data.getUTCFullYear()).find(
+      (f) => f.data.getTime() === data.getTime(),
+    );
+    if (naLei)
+      throw new BadRequestException(
+        `${emBR(data)} já é feriado: ${naLei.descricao}. O calendário de lei ` +
+          'já entra sozinho, não precisa cadastrar.',
+      );
+
     const existente = await this.prisma.feriado.findUnique({ where: { data } });
     if (existente)
       throw new BadRequestException(
-        `Já existe feriado nessa data: ${existente.descricao}.`,
+        `Já existe dia cadastrado nessa data: ${existente.descricao}.`,
       );
 
     const criado = await this.prisma.feriado.create({
@@ -99,46 +153,6 @@ export class FeriadosController {
     });
     this.feriados.invalidar();
     return criado;
-  }
-
-  /**
-   * Gera o calendario do ano (nacionais + SP + Araraquara + Carnaval e Corpus
-   * Christi). Nao mexe no que ja existe: quem foi lancado a mao continua como
-   * esta, e rodar duas vezes no mesmo ano nao duplica nada.
-   */
-  @Post('gerar/:ano')
-  async gerar(
-    @Param('ano', ParseIntPipe) ano: number,
-    @CurrentUser() user: AuthUser,
-  ) {
-    if (ano < 2000 || ano > 2100)
-      throw new BadRequestException('Ano fora do intervalo aceito.');
-
-    const gerados = calendarioDoAno(ano);
-    const jaExistem = await this.prisma.feriado.findMany({
-      where: {
-        data: {
-          gte: new Date(Date.UTC(ano, 0, 1)),
-          lte: new Date(Date.UTC(ano, 11, 31)),
-        },
-      },
-      select: { data: true },
-    });
-    const ocupadas = new Set(jaExistem.map((f) => f.data.getTime()));
-    const novos = gerados.filter((g) => !ocupadas.has(g.data.getTime()));
-
-    if (novos.length)
-      await this.prisma.feriado.createMany({
-        data: novos.map((n) => ({
-          data: n.data,
-          descricao: n.descricao,
-          tipo: n.tipo as TipoFeriado,
-          criadoPorId: user.id,
-        })),
-      });
-
-    this.feriados.invalidar();
-    return { ano, criados: novos.length, jaExistiam: ocupadas.size };
   }
 
   @Delete(':id')
