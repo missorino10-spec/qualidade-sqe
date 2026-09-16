@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Button, Card, Col, DatePicker, Row, Space, Tag } from 'antd';
+import {
+  Button,
+  Card,
+  Col,
+  DatePicker,
+  Row,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import {
   CabecalhoPagina,
   CartaoIndicador,
@@ -25,9 +34,9 @@ import { useNavigate } from 'react-router-dom';
 import { Dayjs } from 'dayjs';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import Tabela from '../components/Tabela';
-import { numeroBR } from '../formatos';
-import { corClasse } from '../fornecedor';
+import Tabela, { filtrosDe } from '../components/Tabela';
+import { dataBR, numeroBR } from '../formatos';
+import { corClasse, ROTULO_CLASSE } from '../fornecedor';
 import { COR, MARCA, TEXTO } from '../design/tokens';
 
 const { RangePicker } = DatePicker;
@@ -46,6 +55,13 @@ function tendenciaTag(t: string) {
       </Tag>
     );
   return <Tag icon={<MinusOutlined />}>Estável</Tag>;
+}
+
+// A ordem das classes e alfabetica e A e a melhor: quem sai de D para A
+// melhorou. Nao existe classe fora de A..D.
+function movimentoDaClasse(de?: string | null, para?: string | null) {
+  if (!de || !para || de === para) return 'ESTAVEL';
+  return para < de ? 'UPGRADE' : 'DOWNGRADE';
 }
 
 export default function Dashboard() {
@@ -68,6 +84,17 @@ export default function Dashboard() {
       (await api.get('/dashboard/evolucao-fornecedores')).data,
   });
 
+  // O que o fechamento do trimestre escreveu no cadastro. E o unico registro de
+  // que a classe de um fornecedor mudou - e com ela a periodicidade de inspecao
+  // no recebimento.
+  const { data: reclassificacoes, isLoading: loadingReclass } = useQuery<any[]>(
+    {
+      queryKey: ['historico-classificacao'],
+      queryFn: async () =>
+        (await api.get('/dashboard/historico-classificacao')).data,
+    },
+  );
+
   const ind = kpis?.indicadores ?? {};
   const cont = kpis?.contadores ?? {};
   const base = kpis?.bases ?? {};
@@ -75,6 +102,12 @@ export default function Dashboard() {
 
   const podeAdmin =
     usuario?.papel === 'ADMIN' || usuario?.papel === 'QUALIDADE';
+
+  const reclass = reclassificacoes ?? [];
+  const mudaram = reclass.filter(
+    (r) => r.classificacaoInicial !== r.classificacaoApurada,
+  ).length;
+  const ultimoTrimestre = reclass[0]?.trimestreFiscal;
 
   // Os indicadores do painel, na ordem e com os nomes definidos pela
   // Qualidade. Cada um traz a metrica no tooltip e os numeros crus embaixo.
@@ -284,6 +317,138 @@ export default function Dashboard() {
             },
           ]}
         />
+      </Card>
+
+      {/* O fechamento do trimestre e o momento em que a classe do fornecedor e
+          reescrita no cadastro - e com ela muda a periodicidade de inspecao no
+          recebimento. Ate aqui isso acontecia sem deixar rastro em tela
+          nenhuma: so a mensagem do fechamento dizia "N com mudanca de classe",
+          e ela some assim que o usuario sai da pagina. */}
+      <Card
+        title="Reclassificações no fechamento do trimestre"
+        extra={
+          <Typography.Text type="secondary">
+            {loadingReclass
+              ? 'Carregando…'
+              : reclass.length
+                ? `${mudaram} de ${reclass.length} apuração(ões) mudaram a classe do fornecedor`
+                : 'Nenhum trimestre fechado ainda'}
+          </Typography.Text>
+        }
+      >
+        <Tabela
+          busca="Buscar fornecedor"
+          rowKey="id"
+          size="small"
+          loading={loadingReclass}
+          dataSource={reclass}
+          pagination={false}
+          scroll={{ x: 'max-content', y: 400 }}
+          columns={[
+            {
+              title: 'Trimestre',
+              dataIndex: 'trimestreFiscal',
+              width: 110,
+              filters: filtrosDe(reclass.map((r) => r.trimestreFiscal)),
+              onFilter: (v: any, r: any) => r.trimestreFiscal === v,
+            },
+            {
+              title: 'Código',
+              width: 100,
+              render: (_: any, r: any) => r.fornecedor?.codigo,
+            },
+            {
+              title: 'Fornecedor',
+              render: (_: any, r: any) => r.fornecedor?.nome,
+            },
+            {
+              // De onde saiu e para onde foi. Sem os dois lados nao da para
+              // saber se o fechamento mexeu em alguma coisa.
+              title: 'Classe',
+              width: 150,
+              align: 'center',
+              render: (_: any, r: any) => (
+                <Space size={4}>
+                  <Tag
+                    color={corClasse[r.classificacaoInicial]}
+                    title={ROTULO_CLASSE[r.classificacaoInicial]}
+                  >
+                    {r.classificacaoInicial ?? '—'}
+                  </Tag>
+                  <span style={{ color: TEXTO.suave }}>→</span>
+                  <Tag
+                    color={corClasse[r.classificacaoApurada]}
+                    title={ROTULO_CLASSE[r.classificacaoApurada]}
+                  >
+                    {r.classificacaoApurada ?? '—'}
+                  </Tag>
+                </Space>
+              ),
+            },
+            {
+              title: 'Movimento',
+              width: 130,
+              align: 'center',
+              filters: [
+                { text: 'Melhorou', value: 'UPGRADE' },
+                { text: 'Piorou', value: 'DOWNGRADE' },
+                { text: 'Manteve', value: 'ESTAVEL' },
+              ],
+              onFilter: (v: any, r: any) =>
+                movimentoDaClasse(
+                  r.classificacaoInicial,
+                  r.classificacaoApurada,
+                ) === v,
+              render: (_: any, r: any) => {
+                const m = movimentoDaClasse(
+                  r.classificacaoInicial,
+                  r.classificacaoApurada,
+                );
+                return m === 'ESTAVEL' ? (
+                  <Tag icon={<MinusOutlined />}>Manteve</Tag>
+                ) : (
+                  tendenciaTag(m)
+                );
+              },
+            },
+            {
+              title: 'Lotes insp.',
+              dataIndex: 'lotesInspecionados',
+              width: 100,
+              align: 'center',
+            },
+            {
+              title: 'Reprovados',
+              dataIndex: 'lotesReprovados',
+              width: 100,
+              align: 'center',
+            },
+            {
+              title: 'Conformidade',
+              dataIndex: 'pctConformidade',
+              width: 120,
+              align: 'center',
+              render: (v: number, r: any) =>
+                r.lotesInspecionados ? `${numeroBR(v, 1)}%` : '—',
+            },
+            {
+              title: 'Aplicada em',
+              dataIndex: 'createdAt',
+              width: 110,
+              render: (v: string) => dataBR(v),
+            },
+          ]}
+        />
+        <div style={{ marginTop: 12 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Quem reclassifica é o fechamento do <b>trimestre</b>, não o do mês.
+            Fornecedor sem nenhum lote inspecionado no trimestre não é
+            reclassificado: ele não aparece aqui e mantém a classe que já tinha.
+            {ultimoTrimestre
+              ? ` Último trimestre apurado: ${ultimoTrimestre}.`
+              : ''}
+          </Typography.Text>
+        </div>
       </Card>
     </Space>
   );

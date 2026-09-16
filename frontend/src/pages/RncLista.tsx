@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -25,7 +26,7 @@ import { useFornecedores, opcoesFornecedor } from '../hooks';
 import { semanaAno } from '../semana';
 import { FILTROS_DESVIO, situacaoDesvio } from '../components/DesvioQualidade';
 import Tabela from '../components/Tabela';
-import { CamposItem } from '../components/CamposItem';
+import { CamposItem, ItemDaBase } from '../components/CamposItem';
 import { CampoValorTotal, useValorTotal } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { numeroBR } from '../formatos';
@@ -72,6 +73,11 @@ export default function RncLista() {
   const [filtroFornecedor, setFiltroFornecedor] = useState<number | undefined>();
   const { data: fornecedores } = useFornecedores();
 
+  // O formulario guarda codigo e descricao do item, nao o id. O id so aparece
+  // quando o codigo e encontrado na base, e e ele que a consulta de
+  // reincidencia precisa.
+  const [itemRnc, setItemRnc] = useState<ItemDaBase | null>(null);
+
   // O recorte vale para a lista e para a exportacao: o PDF e a planilha saem
   // com exatamente o que esta na tela.
   const periodo = usarPeriodo();
@@ -115,12 +121,36 @@ export default function RncLista() {
     (data ?? []).map((r) => rotuloTipoDesvio(r.tipoDesvio)),
   );
 
+  // Reincidencia ANTES de abrir a RNC: este fornecedor ja teve este mesmo
+  // desvio neste item? Muda o que se pede a ele - a segunda vez nao se resolve
+  // com retrabalho, pede analise de causa. Depois de aberta a RNC a tela do
+  // registro refaz a mesma checagem; aqui e para quem ainda esta digitando.
+  const fornecedorDaRnc = Form.useWatch('fornecedorId', form);
+  const tipoDaRnc = Form.useWatch('tipoDesvio', form);
+  const { data: reincidencia } = useQuery<any>({
+    queryKey: ['rnc-reincidencia', fornecedorDaRnc, itemRnc?.id, tipoDaRnc],
+    // Sem tipo de desvio nao ha o que comparar: e ele que diz o modo de falha
+    // de uma RNC aberta a mao.
+    enabled: open && !!fornecedorDaRnc && !!itemRnc && !!tipoDaRnc,
+    queryFn: async () =>
+      (
+        await api.get('/rnc/reincidencia', {
+          params: {
+            fornecedorId: fornecedorDaRnc,
+            itemId: itemRnc?.id,
+            tipoDesvio: tipoDaRnc,
+          },
+        })
+      ).data,
+  });
+
   const salvar = useMutation({
     mutationFn: async (v: any) => (await api.post('/rnc', v)).data,
     onSuccess: (rnc: any) => {
       message.success(`RNC ${rnc.numero} aberta.`);
       qc.invalidateQueries({ queryKey: ['rnc'] });
       setOpen(false);
+      setItemRnc(null);
       form.resetFields();
       navigate(`/rnc/${rnc.id}`);
     },
@@ -313,7 +343,10 @@ export default function RncLista() {
       <Modal
         title="Abrir RNC (Registro de Não Conformidade)"
         open={open}
-        onCancel={() => setOpen(false)}
+        onCancel={() => {
+          setOpen(false);
+          setItemRnc(null);
+        }}
         onOk={() => form.submit()}
         confirmLoading={salvar.isPending}
         okText="Abrir RNC"
@@ -362,6 +395,7 @@ export default function RncLista() {
             descricaoObrigatoria
             permitirCadastro
             aoResolver={(item) => {
+              setItemRnc(item);
               if (item?.custoUnitario == null) return;
               form.setFieldValue('valorUnitario', item.custoUnitario);
               // setFieldValue nao passa pelo onValuesChange: refaz o total.
@@ -392,6 +426,33 @@ export default function RncLista() {
               options={TIPOS_DESVIO.map((t) => ({ value: t, label: t }))}
             />
           </Form.Item>
+          {/* Aparece so quando fornecedor, item e tipo ja estao preenchidos -
+              antes disso nao ha o que comparar. */}
+          {reincidencia?.reincidencia && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Reincidência: este fornecedor já teve este desvio neste item"
+              description={
+                <>
+                  <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                    {reincidencia.anteriores.map((a: any) => (
+                      <li key={a.id}>
+                        <b>{a.numero}</b> (
+                        {dayjs(a.dataAbertura).format('DD/MM/YYYY')}) —{' '}
+                        {a.modos.join('; ')}
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ marginTop: 6 }}>
+                    Reincidência não se resolve com retrabalho: cobre análise de
+                    causa e verificação de eficácia da ação anterior.
+                  </div>
+                </>
+              }
+            />
+          )}
           <Form.Item
             name="descricaoDesvio"
             label="Descrição do desvio"

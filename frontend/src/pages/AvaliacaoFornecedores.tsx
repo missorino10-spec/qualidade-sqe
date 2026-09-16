@@ -29,7 +29,7 @@ import {
 import { CabecalhoPagina } from '../design/painel';
 import { BotaoEditar, ExportarLista } from '../design/acoes';
 import { COR, ESPACO, TEXTO } from '../design/tokens';
-import { numeroBR } from '../formatos';
+import { dataBR, numeroBR } from '../formatos';
 import { ACAO_CLASSE } from '../fornecedor';
 import { useAuth } from '../auth';
 
@@ -91,6 +91,9 @@ export default function AvaliacaoFornecedores() {
   const [ano, setAno] = useState(hoje.getFullYear());
   const [mes, setMes] = useState(hoje.getMonth() + 1);
   const [editando, setEditando] = useState<any | null>(null);
+  // Fornecedor cujo historico esta aberto. A tela mostra uma competencia por
+  // vez; aqui e a trajetoria dele, ano a ano.
+  const [historicoDe, setHistoricoDe] = useState<any | null>(null);
   const [form] = Form.useForm();
 
   const { data, isLoading } = useQuery<any>({
@@ -104,6 +107,19 @@ export default function AvaliacaoFornecedores() {
     queryFn: async () =>
       (await api.get('/avaliacao-fornecedores/consolidado', { params: { ano } }))
         .data,
+  });
+
+  // Historico do fornecedor: so competencias FECHADAS, de todos os anos. E a
+  // unica leitura do sistema que atravessa o ano - o consolidado para em 31/12.
+  const { data: historico, isFetching: carregandoHistorico } = useQuery<any[]>({
+    queryKey: ['avaliacao-historico', historicoDe?.fornecedorId],
+    enabled: !!historicoDe,
+    queryFn: async () =>
+      (
+        await api.get(
+          `/avaliacao-fornecedores/fornecedor/${historicoDe.fornecedorId}`,
+        )
+      ).data,
   });
 
   function recarregar() {
@@ -394,7 +410,22 @@ export default function AvaliacaoFornecedores() {
           scroll={{ x: 'max-content' }}
           columns={[
             { title: 'Código', dataIndex: 'codigo', width: 100 },
-            { title: 'Fornecedor', dataIndex: 'nome' },
+            {
+              // O nome abre a trajetoria do fornecedor. A tabela mostra uma
+              // competencia; quem decide se o fornecedor melhorou ou piorou
+              // precisa ver a sequencia.
+              title: 'Fornecedor',
+              dataIndex: 'nome',
+              render: (v: string, r: any) => (
+                <Button
+                  type="link"
+                  style={{ padding: 0, height: 'auto', textAlign: 'left' }}
+                  onClick={() => setHistoricoDe(r)}
+                >
+                  {v}
+                </Button>
+              ),
+            },
             {
               title: 'Lotes insp.',
               dataIndex: 'lotesInspecionados',
@@ -704,6 +735,127 @@ export default function AvaliacaoFornecedores() {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Trajetoria do fornecedor. O consolidado ao lado mostra 12 meses de UM
+          ano e so o numero; aqui vem todo o historico fechado, com C1/C2/C3 ao
+          lado - que e o que responde "piorou por que?". */}
+      <Modal
+        title={`Histórico do IDF — ${historicoDe?.nome ?? ''}`}
+        open={!!historicoDe}
+        onCancel={() => setHistoricoDe(null)}
+        footer={null}
+        width={980}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: ESPACO.lg }}
+          // Enquanto carrega nao se afirma nada: "nenhuma competencia" antes da
+          // resposta chegar seria mentira, e a media vazia nao pode sair como
+          // 0,00 - zero e nota valida, e a pior de todas.
+          message={
+            carregandoHistorico || !historico
+              ? 'Buscando o histórico…'
+              : historico.length
+                ? `${historico.length} competência(s) fechada(s) · IDF médio ${
+                    mediaIdf(historico.map((h) => h.idf)) === null
+                      ? 'sem nota no período'
+                      : numeroBR(mediaIdf(historico.map((h) => h.idf)), 2)
+                  }`
+                : 'Nenhuma competência fechada ainda'
+          }
+          description="Só entram competências já fechadas — são os números congelados, os mesmos que valeram para classificar o fornecedor. O mês em aberto não aparece aqui porque ainda muda a cada consulta."
+        />
+        <Tabela
+          rowKey="id"
+          size="small"
+          loading={carregandoHistorico}
+          dataSource={historico ?? []}
+          pagination={false}
+          scroll={{ x: 'max-content', y: 420 }}
+          columns={[
+            {
+              title: 'Competência',
+              width: 130,
+              render: (_: any, r: any) => `${MESES[r.mes - 1]}/${r.ano}`,
+            },
+            {
+              title: 'Lotes insp.',
+              dataIndex: 'lotesInspecionados',
+              width: 100,
+              align: 'center',
+            },
+            {
+              title: 'Reprov.',
+              dataIndex: 'lotesReprovados',
+              width: 90,
+              align: 'center',
+            },
+            {
+              title: 'Conformidade',
+              dataIndex: 'pctConformidade',
+              width: 120,
+              align: 'center',
+              render: (v: number, r: any) =>
+                r.lotesInspecionados ? `${numeroBR(v, 1)}%` : '—',
+            },
+            {
+              title: 'C1 (50%)',
+              width: 95,
+              align: 'center',
+              render: (_: any, r: any) => (
+                <Nota auto={r.notaC1Auto} manual={r.notaC1Manual} />
+              ),
+            },
+            {
+              title: 'C2 (30%)',
+              width: 95,
+              align: 'center',
+              render: (_: any, r: any) => (
+                <Nota auto={r.notaC2Auto} manual={r.notaC2Manual} />
+              ),
+            },
+            {
+              title: 'C3 (20%)',
+              width: 95,
+              align: 'center',
+              render: (_: any, r: any) => (
+                <Nota auto={r.notaC3Auto} manual={r.notaC3Manual} />
+              ),
+            },
+            {
+              title: 'IDF',
+              dataIndex: 'idf',
+              width: 110,
+              align: 'center',
+              render: (v: number | null, r: any) => (
+                <NotaIdf valor={v} classe={r.classificacao} tamanho="lg" />
+              ),
+            },
+            {
+              title: 'Fechada em',
+              dataIndex: 'fechadaEm',
+              width: 110,
+              render: (v: string | null) => (v ? dataBR(v) : '—'),
+            },
+            {
+              // So aparece quando alguem digitou nota a mao - e a unica coisa
+              // aqui que nao saiu de conta nenhuma.
+              title: 'Justificativa da nota manual',
+              dataIndex: 'justificativa',
+              render: (v: string | null) =>
+                v ? (
+                  <Typography.Text style={{ fontSize: 12 }}>{v}</Typography.Text>
+                ) : (
+                  <Typography.Text type="secondary">—</Typography.Text>
+                ),
+            },
+          ]}
+        />
+        <div style={{ marginTop: ESPACO.md }}>
+          <LegendaIdf />
+        </div>
       </Modal>
     </Space>
   );

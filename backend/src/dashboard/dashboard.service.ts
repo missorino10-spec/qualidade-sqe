@@ -289,10 +289,20 @@ export class DashboardService {
     });
   }
 
-  // Historico de classificacao: uma linha por competencia fechada.
+  // Reclassificacoes aplicadas no cadastro: uma linha por fornecedor a cada
+  // fechamento de TRIMESTRE.
+  //
+  // So o trimestre ("3T/2026") reclassifica. A tabela guarda registros de
+  // regras que nao valem mais - por mes ("2026-09") e o antigo trimestre fiscal
+  // ("FY26-Q3") - e eles contam outra historia: o mesmo Brastil aparece D->A
+  // pela regra mensal e A->B pela trimestral. Misturar os dois faria o painel
+  // se contradizer, entao aqui vale o mesmo filtro da tela de Fornecedores.
   async historicoClassificacao(fornecedorId?: number) {
     return this.prisma.historicoClassificacao.findMany({
-      where: fornecedorId ? { fornecedorId } : undefined,
+      where: {
+        trimestreFiscal: { contains: 'T/' },
+        ...(fornecedorId ? { fornecedorId } : {}),
+      },
       include: { fornecedor: { select: { nome: true, codigo: true } } },
       orderBy: { createdAt: 'desc' },
     });
