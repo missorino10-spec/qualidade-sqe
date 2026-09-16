@@ -117,12 +117,6 @@ function resultadoHomologacao(h: any): string {
 export class HomologacoesController {
   constructor(private service: HomologacoesService) {}
 
-  // Catalogo das perguntas (blocos, pesos e pontos) para montar a tela.
-  @Get('formulario')
-  formulario() {
-    return this.service.formulario();
-  }
-
   @Get()
   listar(
     @Query('ano') ano?: string,

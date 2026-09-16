@@ -47,12 +47,6 @@ function texto(v: unknown): string | null {
 export class AuditoriasService {
   constructor(private prisma: PrismaService) {}
 
-  // O checklist em branco: e daqui que a tela monta os 12 blocos e as 46
-  // perguntas, com os pesos da planilha.
-  formulario() {
-    return BLOCOS_AUDITORIA;
-  }
-
   // Prazo de reavaliacao, em dias corridos, contado da data da rodada que
   // gerou o resultado. So vale enquanto a auditoria esta em andamento: quando
   // a Qualidade encerra o registro, o relogio some da tela.

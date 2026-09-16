@@ -63,11 +63,6 @@ export class HomologacoesItensService {
     private feriados: FeriadosService,
   ) {}
 
-  // O checklist VISUAL em branco: e daqui que a tela monta os 12 grupos.
-  formulario() {
-    return CHECKLIST_VISUAL;
-  }
-
   // O recorte de periodo e pela DATA DA SOLICITACAO: e ela que numera o
   // registro e e o marco zero dos prazos. Recortar pela inspecao tiraria da
   // lista justamente o que ainda esta aguardando as amostras.

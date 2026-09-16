@@ -54,7 +54,6 @@ const ROTAS = [
   '/registros-entrada',
   '/rnc',
   '/rnc/reincidencia',
-  '/avaliacao-fornecedores/competencia-atual',
   '/avaliacao-fornecedores',
   '/avaliacao-fornecedores/consolidado',
   '/dashboard/kpis-sqe',
@@ -74,11 +73,8 @@ const ROTAS = [
   '/manufatura/painel/evolucao-maquinas',
 
   // SQD
-  '/sqd/homologacoes/formulario',
   '/sqd/homologacoes',
-  '/sqd/homologacoes-itens/formulario',
   '/sqd/homologacoes-itens',
-  '/sqd/auditorias/formulario',
   '/sqd/auditorias',
   '/sqd/painel/kpis',
   '/sqd/painel/ultimas',
@@ -118,12 +114,11 @@ const DETALHES = [
   { lista: '/sqd/homologacoes-itens', detalhe: (id) => `/sqd/homologacoes-itens/${id}` },
   { lista: '/sqd/auditorias', detalhe: (id) => `/sqd/auditorias/${id}` },
   { lista: '/ro/reclamacoes', detalhe: (id) => `/ro/reclamacoes/${id}` },
+  // A inspecao de recebimento tem duas tabelas por baixo (visual e lote), mas o
+  // id da lista e o do REGISTRO, nao o da tabela do formulario: quem junta as
+  // duas e o /inspecoes/:id, a mesma rota que a tela de detalhe abre.
+  { lista: '/inspecoes', detalhe: (id) => `/inspecoes/${id}` },
 ];
-
-// A inspecao de recebimento tem duas tabelas por baixo e a lista devolve o tipo
-// junto do id, entao a URL do detalhe depende da linha inteira, nao so do id.
-const DETALHES_INSPECAO = (linha) =>
-  linha.tipo === 'LOTE' ? `/inspecoes/lote/${linha.id}` : `/inspecoes/visual/${linha.id}`;
 
 // Exportacoes: PDF e Excel sao binarios gerados na hora. O que da para conferir
 // e que a rota responde e devolve o tipo certo — o conteudo ja esta coberto
@@ -237,11 +232,6 @@ async function coletar() {
       const rota = detalhe(linha.id);
       foto[rota] = await ler(rota);
     }
-  }
-
-  for (const linha of amostraDe('/inspecoes')) {
-    const rota = DETALHES_INSPECAO(linha);
-    foto[rota] = await ler(rota);
   }
 
   for (const base of EXPORTACOES) {

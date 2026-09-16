@@ -9,8 +9,8 @@ import {
 import Tabela from '../../components/Tabela';
 
 // Checklist de Auditoria de Fornecedores. Os 12 blocos, os pesos e as 46
-// perguntas vem do backend (GET /sqd/auditorias/formulario), que le a mesma
-// lista da planilha "Checklist Auditoria".
+// perguntas vem do backend junto com o registro, no campo "checklist", que le a
+// mesma lista da planilha "Checklist Auditoria".
 //
 // A conta e a mesma do backend (auditorias-utils.ts) — aqui ela roda so para a
 // tela mostrar a nota enquanto a Qualidade preenche. Quem manda e o servidor.

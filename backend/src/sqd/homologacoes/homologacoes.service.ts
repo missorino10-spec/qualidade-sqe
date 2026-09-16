@@ -38,11 +38,6 @@ export class HomologacoesService {
     private feriados: FeriadosService,
   ) {}
 
-  // O formulario em branco: e daqui que a tela monta os 10 blocos.
-  formulario() {
-    return BLOCOS_AUTOAVALIACAO;
-  }
-
   // O recorte de periodo e pela DATA DA SOLICITACAO: e ela que numera o
   // registro e e o marco zero dos prazos. Recortar pela finalizacao tiraria da
   // lista justamente o que ainda esta aguardando o fornecedor.

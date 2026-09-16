@@ -188,12 +188,6 @@ export class HomologacoesItensController {
     private storage: StorageService,
   ) {}
 
-  // Catalogo do checklist VISUAL (12 grupos) para montar a tela.
-  @Get('formulario')
-  formulario() {
-    return this.service.formulario();
-  }
-
   @Get()
   listar(
     @Query('ano') ano?: string,

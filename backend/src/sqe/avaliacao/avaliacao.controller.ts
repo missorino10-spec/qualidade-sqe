@@ -84,11 +84,6 @@ const doisDigitos = (v: number) =>
 export class AvaliacaoController {
   constructor(private service: AvaliacaoService) {}
 
-  @Get('competencia-atual')
-  competenciaAtual() {
-    return this.service.competenciaAtual();
-  }
-
   @Get()
   listar(@Query('ano') ano?: string, @Query('mes') mes?: string) {
     const atual = this.service.competenciaAtual();

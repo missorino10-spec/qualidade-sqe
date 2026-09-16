@@ -107,12 +107,6 @@ function textoReavaliacao(r: any): string {
 export class AuditoriasController {
   constructor(private service: AuditoriasService) {}
 
-  // Catalogo do checklist (12 blocos, 46 perguntas) para montar a tela.
-  @Get('formulario')
-  formulario() {
-    return this.service.formulario();
-  }
-
   @Get()
   listar(
     @Query('ano') ano?: string,

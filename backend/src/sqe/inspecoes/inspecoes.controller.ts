@@ -10,7 +10,6 @@ import {
   Query,
   Res,
   UseGuards,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   IsArray,
@@ -249,36 +248,6 @@ export class InspecoesController {
   @Get('avaliar')
   avaliar(@Query('fornecedorId', ParseIntPipe) fornecedorId: number) {
     return this.service.avaliarRecebimento(fornecedorId);
-  }
-
-  @Get('visual/:id')
-  async findVisual(@Param('id', ParseIntPipe) id: number) {
-    const insp = await this.prisma.inspecaoVisual.findUnique({
-      where: { id },
-      include: {
-        fornecedor: { select: { id: true, nome: true, codigo: true } },
-        item: { select: { id: true, descricao: true, codigo: true } },
-        inspetor: { select: { id: true, nome: true } },
-        rncs: { select: { id: true, numero: true, status: true } },
-      },
-    });
-    if (!insp) throw new NotFoundException('Inspeção não encontrada');
-    return { ...insp, tipoFormulario: 'VISUAL' };
-  }
-
-  @Get('lote/:id')
-  async findLote(@Param('id', ParseIntPipe) id: number) {
-    const insp = await this.prisma.inspecaoLote.findUnique({
-      where: { id },
-      include: {
-        fornecedor: { select: { id: true, nome: true, codigo: true } },
-        item: { select: { id: true, descricao: true, codigo: true } },
-        inspetor: { select: { id: true, nome: true } },
-        rncs: { select: { id: true, numero: true, status: true } },
-      },
-    });
-    if (!insp) throw new NotFoundException('Inspeção não encontrada');
-    return { ...insp, tipoFormulario: 'LOTE' };
   }
 
   // Detalhe da inspecao (um recebimento) com os formularios como foram

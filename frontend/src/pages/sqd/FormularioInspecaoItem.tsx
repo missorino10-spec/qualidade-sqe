@@ -59,8 +59,8 @@ export function normaDoRelatorio(valor: unknown): NormaTolerancia {
   return texto ? (texto as NormaTolerancia) : 'ISO2768';
 }
 
-// Checklist em branco a partir do catalogo que o backend devolve em
-// GET /sqd/homologacoes-itens/formulario.
+// Checklist em branco a partir do catalogo que o backend devolve junto com o
+// registro, no campo "checklistVisual".
 export function checklistInicial(
   catalogo: { grupo: string; itens: string[] }[],
 ): GrupoVisual[] {

@@ -97,18 +97,6 @@ export class ItensController {
     });
   }
 
-  // Consulta exata usada pelo campo de codigo dos formularios: digitou o
-  // codigo, devolve descricao e custo unitario para preencher a tela.
-  @Get('por-codigo/:codigo')
-  async porCodigo(@Param('codigo') codigo: string) {
-    const item = await this.prisma.item.findUnique({
-      where: { codigo: codigo.trim() },
-      include: { fornecedor: { select: { id: true, nome: true } } },
-    });
-    if (!item) throw new NotFoundException('Código não encontrado na base.');
-    return item;
-  }
-
   @Roles('QUALIDADE', 'ADMIN')
   @Post()
   create(@Body() dto: CreateItemDto) {
