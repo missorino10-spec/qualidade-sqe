@@ -24,22 +24,45 @@ export const PESO = { c1: 0.5, c2: 0.3, c3: 0.2 } as const;
 export const DIA_CORTE = 26;
 
 // Janela da competencia: 27 do mes anterior ate 26 do mes, inclusive.
+//
+// Tudo em UTC, de proposito. Data pura (sem hora) e gravada a meia-noite UTC,
+// entao a janela precisa ser desenhada na MESMA regua. Montar a janela com o
+// construtor local faria a borda deslizar o tanto do fuso do servidor - e como
+// as datas estao cravadas em 00:00Z, as 3 horas de um servidor em UTC-3 movem
+// um DIA INTEIRO em cada ponta: a competencia comecaria em 28 e terminaria em
+// 27, jogando os lancamentos do dia 27 para o mes errado. O IDF mudaria de
+// valor so por trocar a maquina de lugar.
 export function competencia(
   ano: number,
   mes: number,
 ): { inicio: Date; fim: Date; label: string } {
-  const inicio = new Date(ano, mes - 2, DIA_CORTE + 1, 0, 0, 0, 0);
-  const fim = new Date(ano, mes - 1, DIA_CORTE, 23, 59, 59, 999);
+  const inicio = new Date(Date.UTC(ano, mes - 2, DIA_CORTE + 1, 0, 0, 0, 0));
+  const fim = new Date(Date.UTC(ano, mes - 1, DIA_CORTE, 23, 59, 59, 999));
   return { inicio, fim, label: `${ano}-${String(mes).padStart(2, '0')}` };
 }
 
 // Competencia em que uma data cai: ate o dia 26 e o mes corrente, depois o
 // seguinte (virando o ano quando for dezembro).
+//
+// Le em UTC pelo mesmo motivo de competencia(): quem chega aqui e a data
+// GRAVADA da inspecao ou da RNC, que vale meia-noite UTC. Para perguntar em que
+// competencia cai o dia de HOJE, use hojeComoDataPura() - nao "new Date()".
 export function competenciaDe(d: Date): { ano: number; mes: number } {
-  const ano = d.getFullYear();
-  const mes = d.getMonth() + 1;
-  if (d.getDate() <= DIA_CORTE) return { ano, mes };
+  const ano = d.getUTCFullYear();
+  const mes = d.getUTCMonth() + 1;
+  if (d.getUTCDate() <= DIA_CORTE) return { ano, mes };
   return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
+}
+
+// O "hoje" de quem esta olhando a tela, convertido para data pura (meia-noite
+// UTC) - a mesma forma com que o dia e gravado. Sem isso, das 21h a meia-noite
+// em UTC-3 o servidor ja estaria no dia seguinte em UTC e viraria a competencia
+// tres horas antes da hora no dia 26.
+export function hojeComoDataPura(): Date {
+  const agora = new Date();
+  return new Date(
+    Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate()),
+  );
 }
 
 // C1 - conformidade. Sem lote inspecionado no mes o fornecedor nao pontua:

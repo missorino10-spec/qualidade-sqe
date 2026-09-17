@@ -76,8 +76,16 @@ export function trimestreFiscal(d: Date): {
     inicioMes = 6;
     inicioAno = ano;
   }
-  const inicio = new Date(inicioAno, inicioMes, 1);
-  const fim = new Date(inicioAno, inicioMes + 3, 0, 23, 59, 59); // ultimo dia do trimestre
+  // Qual trimestre e o de agora sai do relogio LOCAL (acima), mas as bordas vao
+  // em UTC: elas sao comparadas com datas gravadas, e data pura vale meia-noite
+  // UTC. Com o construtor local, num servidor em UTC-3 o trimestre comecaria as
+  // 03:00Z do dia 1 e terminaria as 02:59Z do dia 1 do mes seguinte - perdendo
+  // o que foi lancado no primeiro dia e pegando o primeiro dia do trimestre
+  // seguinte.
+  const inicio = new Date(Date.UTC(inicioAno, inicioMes, 1));
+  const fim = new Date(
+    Date.UTC(inicioAno, inicioMes + 3, 0, 23, 59, 59, 999), // ultimo dia do trimestre
+  );
   const label = `FY${String(fy).slice(-2)}-Q${q}`;
   return { label, inicio, fim };
 }

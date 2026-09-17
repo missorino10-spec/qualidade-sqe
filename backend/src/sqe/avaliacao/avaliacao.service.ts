@@ -8,6 +8,7 @@ import {
   classificarPorIdf,
   competencia,
   competenciaDe,
+  hojeComoDataPura,
   media,
   mesesDoTrimestre,
   notaConformidade,
@@ -114,9 +115,10 @@ function compsEntre(de: Comp, ate: Comp, teto = 60): Comp[] {
 export class AvaliacaoService {
   constructor(private prisma: PrismaService) {}
 
-  // Competencia corrente pela regra do dia 26.
+  // Competencia corrente pela regra do dia 26. Vai pelo dia de HOJE no fuso de
+  // quem esta olhando, convertido para data pura - competenciaDe() le em UTC.
   competenciaAtual() {
-    const { ano, mes } = competenciaDe(new Date());
+    const { ano, mes } = competenciaDe(hojeComoDataPura());
     return { ano, mes, ...competencia(ano, mes) };
   }
 
