@@ -24,7 +24,24 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-qualidade}:${POSTGRES_PASSWORD:-qualidade}@postgres:5432/${POSTGRES_DB:-qualidade}?schema=public
+      # DIRECT_URL e obrigatoria no schema.prisma e sem ela o "prisma db push"
+      # do docker-entrypoint.sh nem comeca. Aqui ela e igual a DATABASE_URL: o
+      # Postgres e local, sem pooler no meio, entao a mesma conexao ja serve
+      # para DDL. Na nuvem as duas diferem (6543 com pgbouncer x 5432 direta).
+      DIRECT_URL: postgresql://${POSTGRES_USER:-qualidade}:${POSTGRES_PASSWORD:-qualidade}@postgres:5432/${POSTGRES_DB:-qualidade}?schema=public
       JWT_SECRET: ${JWT_SECRET:-troque-esta-chave-secreta}
+      # Sem estas duas o seed aborta de proposito e o container nao sobe. Nao
+      # tem valor padrao aqui: senha de admin com default viraria a senha real.
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      # Vazia = aceita qualquer origem (comportamento historico). Preenchida,
+      # a API passa a atender so os enderecos da lista.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # O relogio do container e UTC por padrao. O sistema le a data GRAVADA em
+      # UTC, mas pergunta "que dia e hoje" no relogio local - alerta de prazo,
+      # vencimento de calibracao e a competencia corrente do IDF. Sem isto, das
+      # 21h a meia-noite a fabrica veria o dia seguinte.
+      TZ: ${TZ:-America/Sao_Paulo}
       UPLOAD_DIR: /app/uploads
       PORT: 3000
     volumes:
