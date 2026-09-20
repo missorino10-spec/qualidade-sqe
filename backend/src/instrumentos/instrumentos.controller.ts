@@ -77,8 +77,14 @@ function dataOuNulo(texto?: string | null) {
 }
 
 // Dias que faltam para a proxima calibracao, na mesma conta da tela: em dias
-// cheios e em UTC, porque a data vem gravada como meia-noite UTC e comparar no
-// fuso do servidor faria a calibracao de hoje aparecer como vencida ontem.
+// cheios, subtraindo duas datas puras.
+//
+// Os dois lados sao lidos de formas diferentes, e e proposital. O ALVO vem
+// gravado como meia-noite UTC, entao se le com getUTC*. O HOJE nao esta
+// gravado em lugar nenhum: e o dia de quem esta olhando a tela, e por isso sai
+// do relogio LOCAL. Ler o "hoje" em UTC, como era antes, adiantava o dia num
+// servidor a oeste de Greenwich: das 21h a meia-noite em UTC-3 ja era o dia
+// seguinte em UTC, e o instrumento que vence hoje aparecia "vencido ha 1 dia".
 function diasParaVencer(proxima?: Date | null): number | null {
   if (!proxima) return null;
   const dia = 24 * 60 * 60 * 1000;
@@ -89,9 +95,9 @@ function diasParaVencer(proxima?: Date | null): number | null {
   );
   const agora = new Date();
   const hoje = Date.UTC(
-    agora.getUTCFullYear(),
-    agora.getUTCMonth(),
-    agora.getUTCDate(),
+    agora.getFullYear(),
+    agora.getMonth(),
+    agora.getDate(),
   );
   return Math.round((alvo - hoje) / dia);
 }

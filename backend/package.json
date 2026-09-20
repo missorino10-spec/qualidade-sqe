@@ -8,11 +8,11 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main.js",
+    "start:prod": "node dist/src/main.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
+    "prisma:push": "prisma db push --skip-generate",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "db:setup": "prisma migrate deploy && ts-node prisma/seed.ts"
+    "db:setup": "prisma db push --skip-generate && ts-node prisma/seed.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
