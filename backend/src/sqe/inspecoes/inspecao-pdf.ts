@@ -33,9 +33,12 @@ const LABEL_STATUS: Record<string, string> = {
   NAO_APLICAVEL: 'N/A',
 };
 
+// Data PURA, gravada como meia-noite UTC: tem que ser lida em UTC. Sem o
+// timeZone, o Node formata no fuso do servidor - em UTC-3 a meia-noite do dia
+// 20 vira 21h do dia 19 e o laudo sai impresso com a data de ontem.
 function fmtData(d?: Date | string | null): string {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('pt-BR');
+  return new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
 function txt(v: any): string {

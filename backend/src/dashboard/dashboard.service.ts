@@ -201,11 +201,28 @@ export class DashboardService {
     // Previsto = instrumento ativo com proxima calibracao definida. Sem data de
     // vencimento nao ha o que controlar, e o instrumento fica fora dos dois
     // lados da conta.
-    const hoje = new Date();
+    // Vencido e so DEPOIS da data de vencimento: quem vence exatamente hoje
+    // ainda esta em dia (a tela de Instrumentos diz "Vence em 0 dia(s)" para
+    // ele, e as duas precisam contar a mesma coisa).
+    //
+    // Por isso a comparacao e de DATA PURA, sem hora. O alvo vem gravado como
+    // meia-noite UTC e se le com getUTC*; o "hoje" nao esta gravado em lugar
+    // nenhum - e o dia de quem esta olhando a tela - e sai do relogio LOCAL.
+    // Comparando o alvo (meia-noite) com a hora corrente, o instrumento que
+    // vence hoje ja aparecia como vencido a partir de 00:01.
+    const agora = new Date();
+    const hoje = Date.UTC(
+      agora.getFullYear(),
+      agora.getMonth(),
+      agora.getDate(),
+    );
     const previstos = instrumentos.filter((i) => i.proximaCalibracao);
-    const calibradosEmDia = previstos.filter(
-      (i) => (i.proximaCalibracao as Date).getTime() >= hoje.getTime(),
-    ).length;
+    const calibradosEmDia = previstos.filter((i) => {
+      const p = i.proximaCalibracao as Date;
+      return (
+        Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), p.getUTCDate()) >= hoje
+      );
+    }).length;
 
     return {
       periodo: { de: de ?? null, ate: ate ?? null },

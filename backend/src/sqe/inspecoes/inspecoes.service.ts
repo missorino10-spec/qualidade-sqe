@@ -9,6 +9,7 @@ import { RncService } from '../rnc/rnc.service';
 import { TIPO_DESVIO } from '../../comum/tipo-desvio';
 import { proximoSequencial } from '../../comum/numeracao';
 import {
+  hojeComoDataPura,
   numeroDocumento,
   semanaAno,
   semanaReferencia,
@@ -286,7 +287,11 @@ export class InspecoesService {
       !fornecedor.eventual && novoContador >= frequenciaN;
     const extra = !noCiclo && !!dto.extra;
 
-    const data = dto.dataEntrega ? new Date(dto.dataEntrega) : new Date();
+    // Sem data informada vale HOJE - mas hoje como DATA PURA, nunca "new Date()".
+    // dataEntrega e campo de data, e o que entra por ele tem que ter a mesma
+    // forma do que vem digitado: meia-noite UTC. Guardando o instante cru, um
+    // recebimento lancado as 22h em UTC-3 ficaria gravado no dia seguinte.
+    const data = dto.dataEntrega ? new Date(dto.dataEntrega) : hojeComoDataPura();
     const { semana, ano } = semanaAno(data);
     const entrega = await this.prisma.entregaPortaria.create({
       data: {
@@ -581,7 +586,10 @@ export class InspecoesService {
     });
     if (atual.numeroInspecao) return atual;
 
-    const ano = dataInsp.getFullYear();
+    // O ano do numero (INSP0001/2026) sai da data da inspecao, que e data pura:
+    // le-se em UTC. Com o getter local, uma inspecao do dia 01/01 em UTC-3
+    // seria numerada no ano anterior - e o sequencial reinicia por ano.
+    const ano = dataInsp.getUTCFullYear();
     for (let tentativa = 0; tentativa < 5; tentativa++) {
       const ultima = await this.prisma.entregaPortaria.findFirst({
         where: { inspecaoAno: ano },
@@ -617,7 +625,9 @@ export class InspecoesService {
   // contabilizar a inspecao uma unica vez e reaproveitar a RNC ja aberta.
   private async prepararInspecao(dto: any, usuarioId: number) {
     const itemId = await this.resolverItemId(dto);
-    const dataInsp = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
+    const dataInsp = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : hojeComoDataPura();
     const { semana, ano } = semanaAno(dataInsp);
     const entregaJaExistia = !!dto.entregaId;
     const entregaId = await this.entregaDaInspecao(

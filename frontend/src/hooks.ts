@@ -74,7 +74,16 @@ export function rotuloInstrumento(i: any): string {
 }
 
 export function opcoesInstrumento(lista?: any[]) {
-  const hoje = new Date();
+  // Vencido e so DEPOIS da data de vencimento: quem vence exatamente hoje
+  // ainda esta em dia, igual ao que a tela de Instrumentos e o Dashboard dizem.
+  // Comparar com a hora corrente marcaria como vencido ja na madrugada do
+  // proprio dia, porque a data gravada e meia-noite UTC e nao carrega hora.
+  const agora = new Date();
+  const hoje = Date.UTC(
+    agora.getFullYear(),
+    agora.getMonth(),
+    agora.getDate(),
+  );
   const vistos = new Set<string>();
   const opcoes: { value: string; label: string }[] = [];
 
@@ -89,8 +98,10 @@ export function opcoesInstrumento(lista?: any[]) {
 
     // Instrumento com calibracao vencida continua na lista, mas avisado: some-lo
     // faria o inspetor achar que o instrumento sumiu do cadastro.
+    const p = i.proximaCalibracao ? new Date(i.proximaCalibracao) : null;
     const vencido =
-      !!i.proximaCalibracao && new Date(i.proximaCalibracao) < hoje;
+      !!p &&
+      Date.UTC(p.getUTCFullYear(), p.getUTCMonth(), p.getUTCDate()) < hoje;
     opcoes.push({
       value: rotulo,
       label: vencido ? `${rotulo} (calibração vencida)` : rotulo,

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { numeroManufatura } from '../manufatura-utils';
+import { hojeComoDataPura } from '../../sqe/sqe-utils';
 
 const includeCnq = {
   maquina: { select: { id: true, codigo: true, nome: true, area: true } },
@@ -82,8 +83,11 @@ export class CnqService {
   }
 
   async criar(dto: any, usuarioId: number) {
-    const data = dto.data ? new Date(dto.data) : new Date();
-    const ano = data.getFullYear();
+    // Campo de data: sem informar vale HOJE como data pura, e o ano do numero
+    // se le em UTC. Com o getter local, um lancamento de 01/01 em UTC-3 seria
+    // numerado no ano anterior - e o sequencial reinicia a cada ano.
+    const data = dto.data ? new Date(dto.data) : hojeComoDataPura();
+    const ano = data.getUTCFullYear();
     const valores = this.calcular(dto);
 
     // Retry: dois lancamentos simultaneos podem cair no mesmo sequencial.

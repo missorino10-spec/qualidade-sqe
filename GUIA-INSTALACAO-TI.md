@@ -25,9 +25,14 @@ Ninguém instala nada no próprio PC.
    APP_PORT=8090                 # porta de acesso (mude se 8090 estiver em uso)
    POSTGRES_PASSWORD=...         # troque por uma senha forte
    JWT_SECRET=...                # troque por um texto longo e aleatório
+   SEED_ADMIN_EMAIL=...          # e-mail do administrador (o 1º e único usuário)
+   SEED_ADMIN_PASSWORD=...       # senha dele, mínimo 12 caracteres
    ```
 
    > A senha do banco e a JWT_SECRET **só precisam ser definidas uma vez**, antes de subir.
+   >
+   > As duas `SEED_ADMIN_*` são **obrigatórias**: sem elas o contêiner do backend
+   > para no boot de propósito, para o sistema nunca subir sem usuário nenhum.
 
 ---
 
@@ -63,8 +68,11 @@ http://IP-DO-SERVIDOR:8090
 
 **Primeiro login (admin):**
 
-- Usuário: `admin@bigdutchman.com.br`
-- Senha: `123456`  → **trocar após o primeiro acesso.**
+- Usuário: o `SEED_ADMIN_EMAIL` que foi posto no `.env`
+- Senha: o `SEED_ADMIN_PASSWORD` do mesmo arquivo
+
+Não existe senha padrão. Esse é o **único** usuário que a instalação cria; as
+demais pessoas entram depois, cadastradas na tela de **Colaboradores**.
 
 > Se o acesso pela rede não abrir, liberar a porta (ex.: 8090) no **firewall** do servidor.
 

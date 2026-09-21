@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { checklist5G, restauracoesPendentes } from '../../comum/cincog';
 import { numeroManufatura } from '../manufatura-utils';
+import { hojeComoDataPura } from '../../sqe/sqe-utils';
 
 const includeCincoG = {
   inspecao: {
@@ -107,8 +108,13 @@ export class CincoGService {
   }
 
   async criar(dto: any, usuarioId: number) {
-    const data = dto.dataAbertura ? new Date(dto.dataAbertura) : new Date();
-    const ano = data.getFullYear();
+    // Campo de data: sem informar vale HOJE como data pura, e o ano do numero
+    // se le em UTC. Com o getter local, um 5G aberto em 01/01 num servidor em
+    // UTC-3 seria numerado no ano anterior - e o sequencial reinicia por ano.
+    const data = dto.dataAbertura
+      ? new Date(dto.dataAbertura)
+      : hojeComoDataPura();
+    const ano = data.getUTCFullYear();
 
     for (let i = 0; i < 5; i++) {
       const ultimo = await this.prisma.cincoG.findFirst({

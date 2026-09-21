@@ -1,5 +1,31 @@
 # PROMPT-MESTRE — Sistema de Qualidade Big Dutchman Brasil (Módulo SQE)
 
+> ## ⚠️ FOTOGRAFIA DE 25/07/2026 — NÃO É A FONTE DA VERDADE DE HOJE
+>
+> Este documento retrata o sistema **como ele era em 25 de julho de 2026**, quando
+> só existia o módulo SQE. Ele não acompanhou o sistema desde então e **não serve
+> para conferir o que o código faz hoje**.
+>
+> O que mudou depois desta data e que aqui está errado ou ausente:
+>
+> - **MANUFATURA, SQD e R.O** saíram de "EM DESENVOLVIMENTO" e estão no ar.
+> - O **IDF** substituiu a classificação A/B/C/D manual e passou a comandar a amostragem.
+> - Entraram **importação em massa por planilha**, **calendário de feriados** e
+>   **controle de acesso por módulo**.
+> - Versões e scripts do `package.json` mudaram (Prisma, `start:prod`, `db:setup`) —
+>   a cópia verbatim no Anexo A está vencida.
+> - As regras de **fuso horário** foram reescritas: data gravada se lê em UTC,
+>   "hoje" sai do relógio local.
+>
+> **Para saber o que o sistema faz hoje, leia o código.** Para instalar, valem o
+> `DEPLOY.md` (nuvem) e o `GUIA-INSTALACAO-TI.md` (servidor da empresa). Este
+> arquivo fica guardado como registro do ponto de partida; documentação
+> atualizada é assunto da ação 7.
+>
+> O texto abaixo é o original de 25/07/2026, preservado como estava.
+
+---
+
 > Este documento é um **prompt de reprodução fiel**. Entregue-o a uma IA de código (ou a um dev) e a aplicação deve sair **idêntica** à original: mesma stack, mesmo modelo de dados, mesmos endpoints, mesmas telas, mesmas cores, mesmo layout, mesmas regras de negócio. Onde houver código literal (schema, tema, checklist, seed, fórmulas), **copie exatamente, sem alterar uma vírgula**. Escopo deste prompt: **aplicação (banco, telas, links, imagens) + design (frontend)**. Deploy/servidor está fora deste documento.
 >
 > **IMPORTANTE — fonte da verdade:** as seções §0–§11 abaixo descrevem e explicam o sistema; o **ANEXO A** (ao final) contém **todos os arquivos-fonte reais, verbatim**. Para reproduzir o sistema idêntico, recrie cada arquivo do Anexo A com seu conteúdo exato. Em qualquer divergência entre a descrição e o Anexo A, **o Anexo A prevalece** (é o código real que roda).
@@ -9326,4 +9352,6 @@ export default function Planejamento() {
 
 ---
 
-**Fim do Anexo A.** Todos os arquivos-fonte acima são a fonte da verdade para reprodução idêntica.
+**Fim do Anexo A.** Os arquivos acima reproduzem o código **como ele estava em
+25/07/2026**. Vários já mudaram (ver o aviso no topo). Para o conteúdo atual de
+qualquer um deles, abra o arquivo no repositório — não copie daqui.

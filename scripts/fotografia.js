@@ -262,8 +262,19 @@ function gravarArquivos(foto, hoje) {
   );
 }
 
+// O dia de quem esta rodando o teste, no relogio LOCAL. Com toISOString() o
+// script anunciava o dia seguinte a partir das 21h em UTC-3 e o aviso de
+// "referencia de outro dia" aparecia sem motivo - ou, pior, nao aparecia
+// quando devia.
+function hojeLocal() {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 async function gravar() {
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeLocal();
   const foto = await coletar();
   gravarArquivos(foto, hoje);
   const rotas = Object.keys(foto);
@@ -277,7 +288,7 @@ async function gravar() {
 
 async function conferir() {
   const indice = JSON.parse(fs.readFileSync(path.join(PASTA, '_indice.json'), 'utf8'));
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeLocal();
   if (indice.capturadoEm !== hoje) {
     // Varios numeros do sistema andam com o calendario (prazo de RNC, alerta
     // vencido, competencia em aberto). Comparar com a fotografia de outro dia

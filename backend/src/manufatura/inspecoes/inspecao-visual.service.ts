@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { semanaAno } from '../../sqe/sqe-utils';
+import { hojeComoDataPura, semanaAno } from '../../sqe/sqe-utils';
 import { numeroManufatura } from '../manufatura-utils';
 import { proximoSequencial } from '../../comum/numeracao';
 
@@ -66,8 +66,13 @@ export class InspecaoVisualManufaturaService {
     });
     if (!maquina) throw new NotFoundException('Máquina não encontrada');
 
-    const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
-    const ano = data.getFullYear();
+    // Campo de data: sem informar vale HOJE como data pura, e o ano do numero
+    // (SETV0001/2026) se le em UTC. Com o getter local, um registro de 01/01
+    // em UTC-3 seria numerado no ano anterior.
+    const data = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : hojeComoDataPura();
+    const ano = data.getUTCFullYear();
     const { semana } = semanaAno(data);
     const prefixo = tipo === 'SETUP' ? 'SETV' : 'PRODV';
 

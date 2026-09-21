@@ -5,13 +5,28 @@
 // e ficam em src/comum/inspecao.ts.
 
 import { montarNumero } from '../comum/numeracao';
+import { hojeComoDataPura } from './avaliacao/idf';
 
 export type Classificacao = 'A' | 'B' | 'C' | 'D';
 
+// Reexportado daqui porque quem precisa da semana de HOJE e quem mais cai na
+// armadilha: "agora" nao e data pura e nao pode entrar direto na conta abaixo.
+export { hojeComoDataPura };
+
 // Semana no formato "YYYY-Www", contando semanas de DOMINGO a SABADO.
 // Ex: 05/07/2026 (dom) ate 11/07/2026 (sab) = 2026-W28.
+//
+// Le em UTC, pela mesma regra do resto do sistema: quem chega aqui e uma DATA
+// PURA (o dia do lancamento), e data pura vale meia-noite UTC. Com o getter
+// local, num servidor em UTC-3 a meia-noite UTC de domingo e sabado a noite:
+// a entrega de domingo caia na semana anterior.
+//
+// Para perguntar a semana de HOJE use hojeComoDataPura(), nunca "new Date()":
+// depois das 21h em UTC-3 o "agora" ja esta no dia seguinte em UTC.
 export function semanaReferencia(d: Date): string {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const date = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
   const year = date.getUTCFullYear();
   const jan1 = new Date(Date.UTC(year, 0, 1));
   const dayOfYear = Math.floor((date.getTime() - jan1.getTime()) / 86400000);

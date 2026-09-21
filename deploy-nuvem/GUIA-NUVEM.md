@@ -112,17 +112,24 @@ O Caddy emite e renova o certificado sozinho — o sistema passa a abrir em `htt
 
 ---
 
-## 5. ⚠️ Primeira coisa depois de instalar: trocar as senhas
+## 5. ⚠️ Primeira coisa depois de instalar: guardar a senha do admin
 
-O sistema nasce com 3 usuários de senha **`123456`**:
+O sistema nasce com **um único usuário**, o administrador. O e-mail e a senha
+são sorteados pelo instalador e aparecem **uma só vez**, no resumo final:
 
-| E-mail | Papel |
-|---|---|
-| `admin@bigdutchman.com.br` | ADMIN |
-| `qualidade@bigdutchman.com.br` | QUALIDADE |
-| `producao@bigdutchman.com.br` | PRODUCAO |
+```
+  Usuario ADMIN criado na instalacao:
+    E-mail: admin@qualidade.local
+    Senha:  <sorteada na hora>
+```
 
-Numa rede interna isso era tolerável. **Na internet, não é** — qualquer pessoa que descubra o endereço entra como administrador. Entre como `admin`, vá em **Usuários** e troque as três senhas imediatamente.
+Se esse resumo se perder, a senha continua no `.env` da raiz
+(`SEED_ADMIN_PASSWORD`), que só o root lê. Para escolher o e-mail do admin,
+rode o instalador com `SEED_ADMIN_EMAIL=voce@suaempresa.com.br`.
+
+Entre com ele e cadastre as pessoas reais em **Colaboradores**, cada uma com a
+própria senha. Não existe mais senha padrão: o backend se recusa a subir sem
+essas duas variáveis, justamente para nunca haver um `123456` exposto na internet.
 
 **Sem domínio/HTTPS, as senhas trafegam sem criptografia.** Priorize apontar um domínio.
 

@@ -127,6 +127,11 @@ if [ -f "$ENV_FILE" ]; then
 else
   SENHA_BANCO="$(openssl rand -hex 24)"
   CHAVE_JWT="$(openssl rand -hex 48)"
+  # O seed so cria o administrador, e aborta se estas duas faltarem. A senha e
+  # sorteada aqui e aparece UMA vez no resumo final: senha fixa em instalador
+  # que vai para a internet e senha publica.
+  EMAIL_ADMIN="${SEED_ADMIN_EMAIL:-admin@qualidade.local}"
+  SENHA_ADMIN="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)"
   cat > "$ENV_FILE" <<EOF
 # ===== Sistema de Qualidade (SQE) - PRODUCAO =====
 # Gerado automaticamente em $(date '+%d/%m/%Y %H:%M')
@@ -138,10 +143,30 @@ POSTGRES_DB=qualidade
 
 JWT_SECRET=$CHAVE_JWT
 
+# Unico usuario criado na instalacao. Trocar a senha pelo sistema, nao aqui:
+# o seed so usa estes valores quando o usuario ainda nao existe.
+SEED_ADMIN_EMAIL=$EMAIL_ADMIN
+SEED_ADMIN_PASSWORD=$SENHA_ADMIN
+
+# Fuso do servidor. O sistema le a data gravada em UTC, mas pergunta "que dia
+# e hoje" no relogio local.
+TZ=America/Sao_Paulo
+
 DOMINIO=$DOMINIO
 EOF
   chmod 600 "$ENV_FILE"
   ok "Senhas fortes e aleatorias geradas."
+fi
+
+# O resumo final precisa mostrar o login, e o .env pode ser de uma instalacao
+# anterior (o bloco acima e pulado quando ele ja existe).
+EMAIL_ADMIN="$(grep -E '^SEED_ADMIN_EMAIL=' "$ENV_FILE" | cut -d= -f2-)"
+SENHA_ADMIN="$(grep -E '^SEED_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
+if [ -z "$EMAIL_ADMIN" ] || [ -z "$SENHA_ADMIN" ]; then
+  erro "O .env nao tem SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD."
+  erro "Sem elas o backend aborta no boot. Acrescente as duas em $ENV_FILE"
+  erro "e rode o instalador de novo."
+  exit 1
 fi
 
 # ------------------------------------------------------------
@@ -211,14 +236,16 @@ cat <<EOF
 
   Acesse o sistema em:   $ENDERECO
 
-  Usuarios iniciais (senha padrao: 123456):
-    admin@bigdutchman.com.br       (ADMIN)
-    qualidade@bigdutchman.com.br   (QUALIDADE)
-    producao@bigdutchman.com.br    (PRODUCAO)
+  Usuario ADMIN criado na instalacao:
+    E-mail: $EMAIL_ADMIN
+    Senha:  $SENHA_ADMIN
+
+  Esta senha foi sorteada agora e NAO aparece de novo. Anote.
+  Ela tambem esta em $ENV_FILE (so o root le).
 
   *** ATENCAO - SEGURANCA ***
-  O servidor esta na INTERNET. Troque a senha dos 3 usuarios
-  AGORA, no primeiro acesso. A senha padrao 123456 e publica.
+  O servidor esta na INTERNET. Entre e cadastre os usuarios reais
+  pela tela de Colaboradores; cada um com a sua propria senha.
 
   Comandos uteis:
     Ver status:      docker compose -f deploy-nuvem/docker-compose.nuvem.yml ps

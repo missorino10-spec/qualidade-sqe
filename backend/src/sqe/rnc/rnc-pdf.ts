@@ -16,9 +16,12 @@ const X0 = M;
 const X1 = 555; // borda direita (A4 595 - 40)
 const W = X1 - X0; // largura util (515)
 
+// Data PURA, gravada como meia-noite UTC: tem que ser lida em UTC. Sem o
+// timeZone, o Node formata no fuso do servidor - em UTC-3 a meia-noite do dia
+// 20 vira 21h do dia 19 e a RNC sai impressa com a data de ontem.
 function fmtData(d?: Date | null): string {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('pt-BR');
+  return new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
 function simNao(v?: boolean | null): string {

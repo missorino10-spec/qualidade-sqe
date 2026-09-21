@@ -78,6 +78,11 @@ const doisDigitos = (v: number) =>
     maximumFractionDigits: 2,
   });
 
+// Mesma regra do resto do sistema (ver relatorio-lista.ts): data pura e gravada
+// como meia-noite UTC e so pode ser formatada em UTC.
+const fmtDataUTC = (d: Date | string) =>
+  new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+
 @UseGuards(JwtAuthGuard, PermissaoGuard)
 @Modulo(ModuloSistema.SQE)
 @Controller('avaliacao-fornecedores')
@@ -135,10 +140,13 @@ export class AvaliacaoController {
             valor: `${MESES[mesSel - 1]}/${anoSel}`,
           },
           {
+            // Datas PURAS (meia-noite UTC): sem o timeZone o Node formata no
+            // fuso do servidor e, em UTC-3, o periodo inteiro sai impresso um
+            // dia antes do que a tela mostra.
             rotulo: 'Apuração',
-            valor: `${new Date(dados.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(
+            valor: `${fmtDataUTC(dados.periodoInicio)} a ${fmtDataUTC(
               dados.periodoFim,
-            ).toLocaleDateString('pt-BR')}`,
+            )}`,
           },
           {
             rotulo: 'Situação',

@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { semanaAno } from '../../sqe/sqe-utils';
+import { hojeComoDataPura, semanaAno } from '../../sqe/sqe-utils';
 import { numeroManufatura, statusPorResultado } from '../manufatura-utils';
 import { proximoSequencial } from '../../comum/numeracao';
 import {
@@ -92,8 +92,13 @@ export class InspecoesManufaturaService {
     dto: any,
     usuarioId: number,
   ) {
-    const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
-    const ano = data.getFullYear();
+    // Campo de data: sem informar vale HOJE como data pura, e o ano do numero
+    // (SET0001/2026) se le em UTC. Com o getter local, um relatorio de 01/01
+    // em UTC-3 seria numerado no ano anterior.
+    const data = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : hojeComoDataPura();
+    const ano = data.getUTCFullYear();
     const prefixo = tipo === 'SETUP' ? 'SET' : 'PROD';
     // O calculo das cotas e refeito aqui: o que a tela mostrou tem que ser
     // exatamente o que vai para o banco e para o PDF.
@@ -167,7 +172,9 @@ export class InspecoesManufaturaService {
     });
     if (!maquina) throw new NotFoundException('Máquina não encontrada');
 
-    const data = dto.dataInspecao ? new Date(dto.dataInspecao) : new Date();
+    const data = dto.dataInspecao
+      ? new Date(dto.dataInspecao)
+      : hojeComoDataPura();
     const { semana, ano } = semanaAno(data);
 
     const inspecao = await this.prisma.inspecaoManufatura.create({

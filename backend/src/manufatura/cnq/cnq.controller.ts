@@ -42,14 +42,18 @@ class CnqDto {
   @IsOptional() @IsString() acao?: string;
 }
 
-// A semana sai do trecho ISO da data, e nao da Date crua: o lancamento de
-// 28/07 chega como meia-noite UTC e cairia na semana de 27/07 em qualquer
-// servidor a oeste de Greenwich.
+// A semana sai do trecho ISO da data, e nao da Date crua: aqui a data pode
+// chegar como texto vindo da tela ou como Date vinda do banco, e o trecho ISO
+// e o unico jeito de tratar os dois casos do mesmo jeito.
+//
+// A Date e remontada com Date.UTC porque semanaAno/semanaReferencia leem em
+// UTC. Com o construtor local, o lancamento de 28/07 cairia na semana de 27/07
+// em qualquer servidor a leste de Greenwich.
 function semanaDaData(d?: Date | string | null): string {
   if (!d) return '';
   const iso = (typeof d === 'string' ? d : d.toISOString()).slice(0, 10);
   const [ano, mes, dia] = iso.split('-').map(Number);
-  return semanaAno(new Date(ano, mes - 1, dia)).semana;
+  return semanaAno(new Date(Date.UTC(ano, mes - 1, dia))).semana;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissaoGuard)

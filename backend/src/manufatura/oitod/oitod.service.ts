@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { acoesPendentes, planoAcaoNormalizado } from '../../comum/oitod';
 import { numeroManufatura } from '../manufatura-utils';
+import { hojeComoDataPura } from '../../sqe/sqe-utils';
 
 const includeOitoD = {
   inspecao: {
@@ -131,8 +132,13 @@ export class OitoDService {
   }
 
   async criar(dto: any, usuarioId: number) {
-    const data = dto.dataAbertura ? new Date(dto.dataAbertura) : new Date();
-    const ano = data.getFullYear();
+    // Campo de data: sem informar vale HOJE como data pura, e o ano do numero
+    // se le em UTC. Com o getter local, um 8D aberto em 01/01 num servidor em
+    // UTC-3 seria numerado no ano anterior - e o sequencial reinicia por ano.
+    const data = dto.dataAbertura
+      ? new Date(dto.dataAbertura)
+      : hojeComoDataPura();
+    const ano = data.getUTCFullYear();
 
     for (let i = 0; i < 5; i++) {
       const ultimo = await this.prisma.oitoD.findFirst({

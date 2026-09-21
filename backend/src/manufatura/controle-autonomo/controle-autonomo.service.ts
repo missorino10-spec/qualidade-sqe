@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { numeroManufatura } from '../manufatura-utils';
+import { hojeComoDataPura } from '../../sqe/sqe-utils';
 import { FOTO_ICAQ } from '../../comum/icaq';
 import { montarItensIcaq } from './icaq-utils';
 
@@ -49,9 +50,12 @@ export class ControleAutonomoService {
   // Campos do cabecalho, comuns a criacao e edicao.
   private cabecalho(dto: any) {
     return {
+      // Campo de data: sem informar vale HOJE como DATA PURA, nao o instante
+      // cru - senao a auditoria lancada as 22h em UTC-3 ficaria gravada no dia
+      // seguinte, que e como o banco enxerga a meia-noite UTC.
       dataAuditoria: dto.dataAuditoria
         ? new Date(dto.dataAuditoria)
-        : new Date(),
+        : hojeComoDataPura(),
       turno: dto.turno ?? 'COMERCIAL',
       maquinaId: dto.maquinaId,
       itemId: dto.itemId ?? null,
@@ -67,7 +71,9 @@ export class ControleAutonomoService {
   // de assinatura do sistema.
   async criar(dto: any, usuarioId: number) {
     const cabecalho = this.cabecalho(dto);
-    const ano = cabecalho.dataAuditoria.getFullYear();
+    // Ano do numero (ICAQ0001/2026): data pura se le em UTC. Com o getter
+    // local, a auditoria de 01/01 em UTC-3 cairia no ano anterior.
+    const ano = cabecalho.dataAuditoria.getUTCFullYear();
     const { itens, nota, classificacao } = montarItensIcaq(dto.itens);
 
     // Retry: duas auditorias simultaneas podem cair no mesmo sequencial.

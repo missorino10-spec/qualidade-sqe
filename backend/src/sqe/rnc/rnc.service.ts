@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HistoricoService } from '../../historico/historico.service';
-import { numeroDocumento, semanaAno } from '../sqe-utils';
+import { hojeComoDataPura, numeroDocumento, semanaAno } from '../sqe-utils';
 import { proximoSequencial } from '../../comum/numeracao';
 import {
   DESVIO,
@@ -343,7 +343,10 @@ export class RncService {
           ? data.quantidadePecas * data.valorUnitario
           : null;
 
-    const { semana } = semanaAno(new Date());
+    // A semana da abertura e a de HOJE, e "hoje" vira data pura antes de entrar
+    // na conta: semanaAno le em UTC, entao passar o instante cru jogaria a RNC
+    // aberta as 22h em UTC-3 para a semana seguinte no fim de semana.
+    const { semana } = semanaAno(hojeComoDataPura());
 
     const rnc = await this.prisma.rnc.create({
       data: {

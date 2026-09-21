@@ -225,14 +225,40 @@ export default function ImportarPlanilha({
                     </Tag>
                   )}
                   <Tag>{resultado.iguais} sem alteração</Tag>
-                  {resultado.recusadas.length > 0 && (
+                  {/* "recusadas" cai na conferencia, antes de gravar; "falhas"
+                      e a linha que o banco rejeitou na hora de gravar. As duas
+                      apareciam juntas na tabela de baixo, mas so a primeira
+                      tinha etiqueta aqui - somando errado para quem so olha o
+                      resumo. */}
+                  {resultado.recusadas.length + resultado.falhas.length > 0 && (
                     <Tag color="red">
-                      {resultado.recusadas.length} recusada(s)
+                      {resultado.recusadas.length + resultado.falhas.length} não
+                      gravada(s)
                     </Tag>
                   )}
                 </Space>
               }
             />
+            {/* A gravacao e linha a linha, de proposito: uma linha ruim no meio
+                da planilha nao pode derrubar as boas. O efeito colateral e que
+                a importacao pode terminar pela metade - e isso precisa estar
+                dito na tela, senao a pessoa reenvia a planilha inteira achando
+                que nada entrou. */}
+            {(resultado.recusadas.length > 0 || resultado.falhas.length > 0) && (
+              <Alert
+                type="warning"
+                showIcon
+                message="Parte da planilha não entrou"
+                description={
+                  <>
+                    O que deu certo <b>já está gravado</b> e não precisa ser
+                    enviado de novo. Corrija só as linhas listadas abaixo e
+                    envie a planilha outra vez: as linhas que já entraram vão
+                    aparecer como “sem alteração”.
+                  </>
+                }
+              />
+            )}
             {resultado.senhas.length > 0 && (
               <Alert
                 type="warning"
@@ -434,6 +460,18 @@ export default function ImportarPlanilha({
                     Envie o arquivo aqui. O sistema mostra o que vai acontecer e
                     só grava depois que você confirmar.
                   </li>
+                  {/* Unico cadastro que aponta para outro: item traz o codigo
+                      do fornecedor e a linha e recusada se ele ainda nao
+                      existir. Nos demais nao ha ordem a respeitar, por isso o
+                      aviso so aparece aqui - avisar em todas as telas seria
+                      decorativo e treinaria a pessoa a ignorar. */}
+                  {cadastro === 'itens' && (
+                    <li>
+                      <b>Importe os Fornecedores antes dos Itens.</b> Cada item
+                      aponta para o código de um fornecedor: se esse fornecedor
+                      ainda não estiver cadastrado, a linha do item é recusada.
+                    </li>
+                  )}
                 </ol>
               }
             />
