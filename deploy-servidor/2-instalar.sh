@@ -163,6 +163,12 @@ else
   ok "Ja rodando de dentro de $ALVO."
 fi
 
+# A permissao de execucao nao atravessa o disco do Windows: vinda de la, a
+# rotina de backup e a de restauracao chegariam aqui sem poder rodar, e o
+# erro so apareceria meses depois, na noite em que alguem precisasse do
+# backup. Devolver a permissao agora custa uma linha.
+chmod +x "$ALVO"/deploy-servidor/*.sh 2>/dev/null || true
+
 cd "$ALVO"
 
 # ------------------------------------------------------------
