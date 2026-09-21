@@ -1,12 +1,33 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # Mesma versao do banco em que o sistema foi validado (Supabase roda
+    # PostgreSQL 17). Com a 16 o proprio backup da nuvem nem abre aqui: o
+    # arquivo gerado pela 17 traz ajustes que a 16 nao conhece e a carga para
+    # na primeira linha. Manter a mesma versao dos dois lados evita isso e
+    # tira uma diferenca entre o que foi testado e o que vai rodar na fabrica.
+    #
+    # NAO trocar pela variante "-alpine". O Alpine usa outra biblioteca de
+    # sistema (musl), que nao sabe ordenar texto por idioma - ela compara letra
+    # por letra pelo codigo do caractere. Na pratica a lista de fornecedores
+    # saia assim: "MM PLAST" antes de "Metalurgica", e "teste2" depois de "Weg".
+    image: postgres:17
     container_name: qualidade-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-qualidade}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qualidade}
       POSTGRES_DB: ${POSTGRES_DB:-qualidade}
+      LANG: en_US.utf8
+      # Quem manda na ORDEM ALFABETICA de toda lista e todo relatorio do
+      # sistema. Tem de ser exatamente o mesmo da nuvem onde o sistema foi
+      # validado (PostgreSQL 17.6, provedor ICU, idioma en-US), senao muda
+      # coisa que a fabrica ve: com a ordenacao do sistema operacional o
+      # instrumento "PAQ009" vinha antes de "PAQ.015" e o micrometro
+      # "(Lamina)" caia no fim do grupo, em vez do comeco. Mesmo dado, ordem
+      # diferente da que foi conferida.
+      #
+      # Isto so vale na CRIACAO do banco: mudar depois nao reordena nada.
+      POSTGRES_INITDB_ARGS: '--locale-provider=icu --icu-locale=en-US --locale=en_US.utf8 --encoding=UTF8'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
