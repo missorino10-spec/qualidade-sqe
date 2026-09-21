@@ -24,6 +24,7 @@ import Tabela from '../components/Tabela';
 import ImportarPlanilha from '../components/ImportarPlanilha';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
 import { opcoesUnidadeItem } from '../unidades';
+import { opcoesFornecedor } from '../hooks';
 
 /**
  * Base de codigos e custo (planilha "Base de Codigos e Custo.xlsx").
@@ -325,10 +326,9 @@ export default function Itens() {
                   showSearch
                   optionFilterProp="label"
                   placeholder="Selecione"
-                  options={fornecedores?.map((f) => ({
-                    value: f.id,
-                    label: f.nome,
-                  }))}
+                  options={opcoesFornecedor(fornecedores, {
+                    bloquearInativo: true,
+                  })}
                 />
               </Form.Item>
             </Col>

@@ -175,9 +175,22 @@ export class FornecedoresController {
   // Excluir de verdade e so do ADMIN. Fornecedor com inspecao, RNC ou
   // homologacao apontando para ele nao sai: o banco recusa e a tela mostra o
   // motivo, o caminho nesse caso e inativar.
+  //
+  // A avaliacao mensal do IDF precisa ser conferida AQUI, a mao, porque ela e a
+  // unica excecao do schema: AvaliacaoFornecedor esta com onDelete Cascade e
+  // por isso nao chega a disparar o P2003 - ela seria apagada junto, calada. E
+  // apuracao fechada, registro proprio que ninguem mais reescreve, entao vale a
+  // mesma regra dos outros: fornecedor com historico nao se exclui, se inativa.
   @Roles('ADMIN')
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
+    const avaliacoes = await this.prisma.avaliacaoFornecedor.count({
+      where: { fornecedorId: id },
+    });
+    if (avaliacoes > 0)
+      throw new BadRequestException(
+        'Este fornecedor já tem avaliação de desempenho (IDF) apurada e não pode ser excluído. Use "Inativar".',
+      );
     try {
       await this.prisma.contato.deleteMany({ where: { fornecedorId: id } });
       await this.prisma.fornecedor.delete({ where: { id } });

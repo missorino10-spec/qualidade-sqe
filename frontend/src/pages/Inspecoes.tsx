@@ -1280,7 +1280,9 @@ export default function Inspecoes() {
                   showSearch
                   optionFilterProp="label"
                   disabled={passoIdx > 0 || daEntrada || !!edicao}
-                  options={opcoesFornecedor(fornecedores)}
+                  options={opcoesFornecedor(fornecedores, {
+                    bloquearInativo: true,
+                  })}
                 />
               </Form.Item>
             </Col>

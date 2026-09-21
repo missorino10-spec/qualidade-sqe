@@ -19,8 +19,29 @@ export function useFornecedores() {
 // Quem precisa escolher um item usa o SelectItem/CamposItem, que buscam no
 // servidor conforme o usuario digita.
 
-export function opcoesFornecedor(lista?: any[]) {
-  return (lista ?? []).map((f) => ({ value: f.id, label: `${f.codigo} — ${f.nome}` }));
+// O fornecedor inativo NUNCA some da lista, so muda de papel conforme o Select.
+//
+// Sumir com ele seria pior em qualquer caso: a RNC e a inspecao antigas guardam
+// so o id, e sem a opcao correspondente a tela mostraria o numero cru no lugar
+// do nome. Ele aparece sempre marcado "(inativo)".
+//
+// Em FILTRO de busca ele continua selecionavel - e justamente por ele ter sido
+// desativado que se quer olhar o historico dele.
+//
+// Em formulario de LANCAMENTO passa-se { bloquearInativo: true } e a opcao fica
+// desabilitada: a apuracao do IDF filtra ativo: true, entao um lancamento novo
+// contra fornecedor inativo gravaria normalmente e nunca entraria em indicador
+// nenhum. O padrao e NAO bloquear, para que qualquer ponto que use este helper
+// sem dizer nada siga se comportando como sempre.
+export function opcoesFornecedor(
+  lista?: any[],
+  opcoes?: { bloquearInativo?: boolean },
+) {
+  return (lista ?? []).map((f) => ({
+    value: f.id,
+    label: `${f.codigo} — ${f.nome}${f.ativo === false ? ' (inativo)' : ''}`,
+    disabled: opcoes?.bloquearInativo ? f.ativo === false : undefined,
+  }));
 }
 
 /**

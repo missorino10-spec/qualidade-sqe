@@ -481,7 +481,9 @@ export default function RegistrosEntrada() {
                   showSearch
                   optionFilterProp="label"
                   placeholder="Escolha o fornecedor"
-                  options={opcoesFornecedor(fornecedores)}
+                  options={opcoesFornecedor(fornecedores, {
+                    bloquearInativo: true,
+                  })}
                 />
               </Form.Item>
             </Col>

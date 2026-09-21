@@ -385,7 +385,7 @@ export default function RncLista() {
             <Select
               showSearch
               optionFilterProp="label"
-              options={opcoesFornecedor(fornecedores)}
+              options={opcoesFornecedor(fornecedores, { bloquearInativo: true })}
             />
           </Form.Item>
           {/* Codigo primeiro: achando na base, a descricao e o valor unitario
