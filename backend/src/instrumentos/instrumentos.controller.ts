@@ -151,9 +151,14 @@ export class InstrumentosController {
     }
     // Mesma ordem da planilha impressa: pelo codigo, e as linhas sem codigo
     // ("-") no fim, agrupadas pelo equipamento.
+    //
+    // O "id" no fim e so desempate. Ha instrumentos sem codigo e com o mesmo
+    // nome de equipamento: nesses casos o banco podia devolver um antes do
+    // outro a cada consulta, e a lista trocava de ordem sozinha entre um F5 e
+    // outro. Com o id a ordem fica sempre a mesma.
     return this.prisma.instrumento.findMany({
       where,
-      orderBy: [{ codigo: 'asc' }, { equipamento: 'asc' }],
+      orderBy: [{ codigo: 'asc' }, { equipamento: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -262,7 +267,9 @@ export class InstrumentosController {
   ) {
     const lista = await this.prisma.instrumento.findMany({
       where: incluirInativos === 'true' ? {} : { ativo: true },
-      orderBy: [{ codigo: 'asc' }, { equipamento: 'asc' }],
+      // Mesmo desempate por id usado em buscar(): senao duas impressoes do
+      // mesmo inventario podiam sair com as linhas trocadas de lugar.
+      orderBy: [{ codigo: 'asc' }, { equipamento: 'asc' }, { id: 'asc' }],
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(

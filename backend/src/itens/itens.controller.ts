@@ -92,7 +92,15 @@ export class ItensController {
       include: { fornecedor: { select: { id: true, nome: true } } },
       // Codigo primeiro: quem digita "8000" quer ver os codigos que comecam
       // assim, nao a descricao em ordem alfabetica.
-      orderBy: termo ? { codigo: 'asc' } : { descricao: 'asc' },
+      //
+      // O "id" no fim e o desempate. Ha 170 descricoes repetidas no cadastro e
+      // a lista corta nos primeiros registros: sem desempate o banco pode
+      // devolver qualquer uma das repetidas primeiro, e ate QUAIS itens cabem
+      // no corte mudava de uma consulta para a outra. Com o id a lista fica
+      // sempre igual.
+      orderBy: termo
+        ? [{ codigo: 'asc' }, { id: 'asc' }]
+        : [{ descricao: 'asc' }, { id: 'asc' }],
       take,
     });
   }

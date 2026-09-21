@@ -33,7 +33,11 @@ export class ControleAutonomoService {
               }
             : undefined,
       },
-      orderBy: { dataAuditoria: 'desc' },
+      // Mais recente primeiro. O "id" e o desempate: varias auditorias sao
+      // feitas no MESMO dia (a data nao tem hora), e sem ele a lista trocava
+      // de ordem entre uma consulta e outra. Id decrescente tambem deixa a
+      // ultima lancada no topo dentro do mesmo dia.
+      orderBy: [{ dataAuditoria: 'desc' }, { id: 'desc' }],
       include: includeIcaq,
     });
   }
