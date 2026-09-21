@@ -12,4 +12,10 @@ echo "Aplicando o seed inicial..."
 node dist/prisma/seed.js
 
 echo "Iniciando o backend..."
-node dist/src/main.js
+# "exec" e obrigatorio: sem ele o node fica sendo FILHO deste shell, e quem
+# recebe o pedido de desligar (SIGTERM) e o shell, que nao repassa nada. O
+# resultado era o servidor ser desligado no grito depois de 10 segundos de
+# espera, cortando no meio qualquer gravacao em andamento - uma importacao de
+# planilha, por exemplo. Com "exec" o node vira o processo principal, recebe o
+# sinal e fecha as conexoes e as gravacoes antes de sair.
+exec node dist/src/main.js

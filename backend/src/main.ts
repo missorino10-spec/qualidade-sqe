@@ -50,6 +50,12 @@ async function bootstrap() {
     }),
   );
 
+  // Quando o servidor e desligado ou reiniciado, o sistema recebe um pedido
+  // para encerrar (SIGTERM). Sem isto o Node morre na hora, no meio do que
+  // estivesse fazendo. Com isto ele para de aceitar chamadas novas, deixa as
+  // que ja estavam em andamento terminarem de gravar e so entao fecha o banco.
+  app.enableShutdownHooks();
+
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`Backend rodando na porta ${port}`);
