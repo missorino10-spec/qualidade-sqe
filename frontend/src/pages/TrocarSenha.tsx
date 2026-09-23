@@ -18,6 +18,11 @@ export default function TrocarSenha() {
 
   if (!usuario) return <Navigate to="/login" replace />;
 
+  // Duas situacoes chegam nesta tela: quem RECEBEU uma senha provisoria (e
+  // nao consegue usar o sistema antes de trocar) e quem veio pelo menu so
+  // porque quis. O formulario e o mesmo; os textos e a saida, nao.
+  const provisoria = usuario.precisaTrocarSenha === true;
+
   async function onFinish(v: { senhaAtual: string; novaSenha: string }) {
     setSalvando(true);
     try {
@@ -26,7 +31,9 @@ export default function TrocarSenha() {
         novaSenha: v.novaSenha,
       });
       await recarregar();
-      message.success('Senha alterada. Bem-vindo!');
+      message.success(
+        provisoria ? 'Senha alterada. Bem-vindo!' : 'Senha alterada.',
+      );
       navigate('/');
     } catch (e: any) {
       message.error(
@@ -55,23 +62,32 @@ export default function TrocarSenha() {
             style={{ height: 36, objectFit: 'contain', marginBottom: 12 }}
           />
           <Typography.Title level={4} style={{ marginBottom: 0 }}>
-            Defina sua senha
+            {provisoria ? 'Defina sua senha' : 'Trocar minha senha'}
           </Typography.Title>
           <Typography.Text type="secondary">{usuario.email}</Typography.Text>
         </div>
 
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="Você entrou com uma senha provisória. Escolha uma senha só sua para continuar."
-        />
+        {provisoria && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Você entrou com uma senha provisória. Escolha uma senha só sua para continuar."
+          />
+        )}
 
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
             name="senhaAtual"
-            label="Senha provisória"
-            rules={[{ required: true, message: 'Informe a senha provisória.' }]}
+            label={provisoria ? 'Senha provisória' : 'Senha atual'}
+            rules={[
+              {
+                required: true,
+                message: provisoria
+                  ? 'Informe a senha provisória.'
+                  : 'Informe a senha atual.',
+              },
+            ]}
           >
             <Input.Password prefix={<LockOutlined />} size="large" />
           </Form.Item>
@@ -102,18 +118,27 @@ export default function TrocarSenha() {
             <Input.Password prefix={<LockOutlined />} size="large" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block size="large" loading={salvando}>
-            Salvar e entrar
+            {provisoria ? 'Salvar e entrar' : 'Salvar nova senha'}
           </Button>
-          <Button
-            type="link"
-            block
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-          >
-            Sair
-          </Button>
+          {/* Com senha provisoria a unica saida e sair do sistema, porque a
+              pessoa nao pode usa-lo antes de trocar. Quem veio pelo menu so
+              mudou de ideia: devolve para onde estava, sem desconectar. */}
+          {provisoria ? (
+            <Button
+              type="link"
+              block
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+            >
+              Sair
+            </Button>
+          ) : (
+            <Button type="link" block onClick={() => navigate(-1)}>
+              Cancelar
+            </Button>
+          )}
         </Form>
       </Card>
     </div>

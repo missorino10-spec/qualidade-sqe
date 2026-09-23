@@ -5,6 +5,7 @@ import {
   AuditOutlined,
   WarningOutlined,
   LogoutOutlined,
+  LockOutlined,
   UserOutlined,
   SlidersOutlined,
   DashboardOutlined,
@@ -353,6 +354,20 @@ export function AppLayout({ children }: { children: ReactNode }) {
             trigger={['click']}
             menu={{
               items: [
+                // A tela de trocar senha ja existia, mas so aparecia sozinha
+                // para quem estava com senha provisoria. Quem quisesse trocar
+                // a sua depois nao tinha por onde: dependia de pedir um reset
+                // ao administrador. E o administrador, que nao tem a quem
+                // pedir, ficava sem saida - justamente ele, que no servidor da
+                // fabrica recebe uma senha sorteada na instalacao e precisa
+                // troca-la por uma dele no primeiro dia.
+                {
+                  key: 'senha',
+                  icon: <LockOutlined />,
+                  label: 'Trocar minha senha',
+                  onClick: () => navigate('/trocar-senha'),
+                },
+                { type: 'divider' },
                 {
                   key: 'logout',
                   icon: <LogoutOutlined />,

@@ -278,18 +278,30 @@ cat <<EOF
 EOF
 
 if [ -n "$SENHA_ADMIN" ]; then
-  cat > "$ALVO/PRIMEIRO-ACESSO.txt" <<EOF
+  # Gravado no disco do WINDOWS, nao dentro do Linux: quem instala e o TI,
+  # que trabalha no Windows. Deixar o arquivo em /opt obrigaria a abrir o
+  # WSL so para ler a propria senha, e no aperto da instalacao e onde se
+  # perde a senha. A pasta e a mesma dos backups e dos logs.
+  ACESSO='/mnt/c/QualidadeSQE/PRIMEIRO-ACESSO.txt'
+  mkdir -p "$(dirname "$ACESSO")"
+  cat > "$ACESSO" <<EOF
 Sistema de Qualidade (SQE) - acesso principal
 Gerado em $(date '+%d/%m/%Y %H:%M')
 
-  Usuario: $EMAIL_ADMIN
-  Senha  : $SENHA_ADMIN
+  Endereco: http://$(hostname -I | awk '{print $1}'):$PORTA
+            (use o IP do SERVIDOR que o passo 1 mostrou, nao este)
+  Usuario : $EMAIL_ADMIN
+  Senha   : $SENHA_ADMIN
 
-Entre com este acesso e cadastre os usuarios da Qualidade em
-Configuracoes > Usuarios. Depois guarde esta senha no cofre de
-senhas do TI e apague este arquivo.
+Este e o unico usuario que existe. Entre com ele e cadastre o pessoal
+da Qualidade em "Administracao > Colaboradores e Acessos".
+
+Para trocar esta senha por uma sua, use o menu do seu nome no canto
+superior direito, opcao "Trocar minha senha".
+
+Depois guarde esta senha no cofre de senhas do TI e apague este arquivo.
 EOF
-  chmod 600 "$ALVO/PRIMEIRO-ACESSO.txt"
+  chmod 600 "$ACESSO"
   cat <<EOF
 
   ------------------------------------------------------------
