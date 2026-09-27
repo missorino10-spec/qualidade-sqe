@@ -15,11 +15,9 @@
 #  COMO USAR (depois do passo 1, no PowerShell do Windows):
 #     wsl -d Ubuntu-22.04 -u root
 #     curl -fsSL https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh -o /tmp/instalar.sh
-#     GITHUB_TOKEN=<token-de-leitura> bash /tmp/instalar.sh
+#     bash /tmp/instalar.sh
 #
-#  O repositorio e PRIVADO, entao o token e obrigatorio. Ele so serve para
-#  baixar o codigo: e apagado do disco assim que o download termina (veja a
-#  secao 3). Se preferir, rode sem a variavel que o script pergunta na hora.
+#  O repositorio e publico: nao e preciso senha nem token para baixar.
 #
 #  Tambem funciona a partir de uma copia da pasta do projeto: se houver um
 #  docker-compose.yml ao lado do script, ele instala dessa pasta e nem toca
@@ -174,38 +172,20 @@ if [ "$FONTE" = 'github' ]; then
     apt-get update -qq && apt-get install -y -qq git >/dev/null
   }
 
-  # O repositorio e privado. O token entra so aqui dentro, nunca em arquivo:
-  # se ele fosse gravado na configuracao do repositorio (que e o que um
-  # "git clone https://TOKEN@..." faz), ficaria em texto puro no servidor
-  # para sempre. Por isso o endereco com token vai apenas nesta chamada e a
-  # origem e reescrita sem ele logo em seguida.
-  if [ -z "${GITHUB_TOKEN:-}" ]; then
-    echo
-    echo "  O repositorio e privado. Cole o token de leitura do GitHub"
-    echo "  (nao aparece na tela enquanto voce digita):"
-    read -r -s -p "  Token: " GITHUB_TOKEN
-    echo
-  fi
-  [ -n "${GITHUB_TOKEN:-}" ] || { erro "Sem token nao da para baixar o codigo."; exit 1; }
-
-  URL_AUTENTICADA="$(printf '%s' "$REPO" | sed "s#https://#https://x-access-token:${GITHUB_TOKEN}@#")"
-
   if [ -d "$ALVO/.git" ]; then
-    # Atualizacao. O "reset --hard" e proposital: no servidor o codigo tem de
-    # ser exatamente o do GitHub, sem remendo local. Ele mexe apenas no que
-    # esta versionado - o .env nao esta (fica de fora pelo .gitignore) e as
-    # fotos moram num volume do Docker, nao nesta pasta.
-    git -C "$ALVO" fetch --quiet "$URL_AUTENTICADA" "$RAMO"
+    # Atualizacao. O checkout -B em cima do FETCH_HEAD e proposital: no
+    # servidor o codigo tem de ser exatamente o do GitHub, sem remendo local.
+    # Ele mexe apenas no que esta versionado - o .env nao esta (fica de fora
+    # pelo .gitignore) e as fotos moram num volume do Docker, nao nesta pasta.
+    git -C "$ALVO" fetch --quiet "$REPO" "$RAMO"
     git -C "$ALVO" checkout --quiet -B "$RAMO" FETCH_HEAD
     ok "Codigo atualizado para o ramo $RAMO."
   else
     rm -rf "$ALVO"
-    git clone --quiet --branch "$RAMO" --depth 1 "$URL_AUTENTICADA" "$ALVO"
-    git -C "$ALVO" remote set-url origin "$REPO"
+    git clone --quiet --branch "$RAMO" --depth 1 "$REPO" "$ALVO"
     ok "Codigo baixado do GitHub (ramo $RAMO)."
   fi
 
-  unset GITHUB_TOKEN URL_AUTENTICADA
   echo "  Versao: $(git -C "$ALVO" log -1 --format='%h %s')"
 else
   mkdir -p "$ALVO"

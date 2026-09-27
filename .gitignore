@@ -15,6 +15,11 @@ uploads/
 # Dumps tirados antes de limpeza no banco: contem dado real, nao versionar
 backup/
 
+# Saida do importar-base-itens.js: sao os 14 mil codigos reais da fabrica COM
+# custo unitario. E dado comercial da empresa, nao codigo. O script regera o
+# arquivo a partir da planilha quando for preciso.
+backend/prisma/seed-base-itens.sql
+
 # Fotografia da API (scripts/fotografia.js): e a resposta crua das telas com
 # dado de producao e so vale para a maquina e o dia em que foi tirada.
 scripts/fotografia/
@@ -30,6 +35,11 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+# Configuracao local do assistente. Guarda o historico de comandos liberados,
+# que inclui endereco de banco e senha digitada na linha de comando: nao pode
+# ser versionado. O launch.json tambem e local (caminho absoluto desta maquina).
+.claude/
 
 # Pacotes/arquivos grandes
 *.zip

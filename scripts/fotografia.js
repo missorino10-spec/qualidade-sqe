@@ -13,10 +13,14 @@
  * SO FAZ LEITURA. Nenhuma rota de POST/PATCH/PUT/DELETE e chamada: o backend
  * local aponta para o banco de producao e nao existe margem para escrever nada.
  *
- * Variaveis de ambiente (todas opcionais):
- *   API    endereco da API      (padrao http://localhost:3000/api)
- *   EMAIL  usuario do login     (padrao admin@qualidade-sqe.com)
- *   SENHA  senha do login
+ * Variaveis de ambiente:
+ *   API    endereco da API   (opcional, padrao http://localhost:3000/api)
+ *   EMAIL  usuario do login  (opcional, padrao admin@qualidade-sqe.com)
+ *   SENHA  senha do login    (OBRIGATORIA)
+ *
+ * A SENHA nao tem valor padrao de proposito: este arquivo e versionado, e
+ * senha embutida em arquivo versionado fica no historico do Git para sempre,
+ * mesmo depois de apagada.
  */
 
 const fs = require('fs');
@@ -24,8 +28,13 @@ const path = require('path');
 
 const API = process.env.API || 'http://localhost:3000/api';
 const EMAIL = process.env.EMAIL || 'admin@qualidade-sqe.com';
-const SENHA = process.env.SENHA || 'SENHA-REMOVIDA-DO-HISTORICO';
+const SENHA = process.env.SENHA;
 const PASTA = path.join(__dirname, 'fotografia');
+
+if (!SENHA) {
+  console.error('Defina a senha antes de rodar:  SENHA="..." node scripts/fotografia.js conferir');
+  process.exit(1);
+}
 
 // Quantos registros de detalhe conferir por lista. O detalhe e onde moram os
 // calculos pesados (cotas, notas, 8D), entao vale a pena varrer varios; mas

@@ -67,19 +67,37 @@ canto superior direito.
 
 ---
 
-## Como está organizado
+## Mapa do repositório — o que é o quê
 
-```
-backend/            NestJS + Prisma + PostgreSQL (regras de negocio e banco)
-  prisma/           desenho do banco e o seed do acesso principal
-  src/              nucleo (auth, fornecedores, itens, anexos, historico) + modulos
-frontend/           React + Ant Design (as telas)
-  src/pages/        uma pasta por modulo
-deploy-servidor/    instalacao no servidor da fabrica + backup e restauracao
-scripts/            ferramentas de conferencia (rede de regressao das 170 rotas)
-docker-compose.yml  liga banco + backend + telas num comando so
-.env.example        modelo de configuracao
-```
+Tudo o que está aqui está **em uso**. Não há pasta antiga, versão anterior nem
+rascunho: o que sai de circulação é apagado e fica no histórico do Git.
+
+| Pasta / arquivo | O que é | Quando você mexe nisso |
+|---|---|---|
+| `backend/` | NestJS + Prisma + PostgreSQL — as regras de negócio e o banco | ao mudar cálculo, regra ou API |
+| `backend/prisma/` | desenho do banco (`schema.prisma`), os DDLs aplicados e o seed do acesso principal | ao mudar uma tabela |
+| `frontend/` | React + Ant Design — as telas (`src/pages/`, uma pasta por módulo) | ao mudar tela |
+| `deploy-servidor/` | **instalar no servidor da fábrica**, backup e restauração | na instalação e na atualização |
+| `scripts/` | `fotografia.js`, a rede de regressão: grava o que as 170 rotas devolvem e confere depois | antes de dizer que uma mudança não quebrou nada |
+| `docker-compose.yml` | sobe banco + API + telas num comando só | raramente |
+| `.env.example` | modelo de configuração (o `.env` de verdade nunca é versionado) | ao criar um ambiente novo |
+| `DEPLOY.md` | como o protótipo em nuvem foi montado (Render + Supabase) | só para a nuvem |
+| `PROMPT-MESTRE-SQE.md` | **registro histórico** — fotografia do sistema em 25/07/2026, quando só existia o SQE | nunca; está desatualizado de propósito |
+
+### Os três caminhos — o que pegar em cada um
+
+| Você quer… | Leia só isto |
+|---|---|
+| **Instalar no servidor da fábrica** | [`deploy-servidor/LEIA-ME.md`](deploy-servidor/LEIA-ME.md) |
+| **Entender/mexer no código** | `backend/src/` e `frontend/src/` |
+| **Saber como a nuvem foi montada** | [`DEPLOY.md`](DEPLOY.md) |
+
+### Os dois ramos
+
+| Ramo | Para que serve |
+|---|---|
+| **`main`** | a versão validada. É daqui que o servidor da fábrica baixa. |
+| `deploy/cloud` | o que o Render acompanha para o protótipo de demonstração. Aponta para o mesmo commit do `main`. |
 
 O **frontend** (nginx) é a única porta exposta na rede e encaminha `/api` para
 o **backend**. O **PostgreSQL** não fica exposto para fora.

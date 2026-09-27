@@ -19,11 +19,6 @@ depende de nuvem, e os dados não saem da empresa.
 | Porta na rede | 8080 (pode ser trocada) |
 | Conta | Uma conta de serviço no domínio, **com senha que não expira** |
 | Internet | Só **durante a instalação** (baixar o código e o Docker). Depois o sistema funciona sem ela |
-| Token do GitHub | Token de leitura do repositório, no cofre de senhas do TI |
-
-**Sobre o token:** o código fica num repositório **privado** no GitHub —
-`missorino10-spec/qualidade-sqe`. Para baixá-lo é preciso um token de
-leitura. Ele é usado só na instalação e **não fica gravado no servidor**.
 
 **Sobre a conta:** faça os três passos logado com a **mesma conta** que vai
 rodar o sistema depois. O WSL registra a distribuição Linux por usuário —
@@ -38,7 +33,9 @@ seguinte. Marque "a senha nunca expira" no Active Directory.
 ## Instalação — três passos
 
 Não é preciso copiar pasta nenhuma para o servidor: **o código é baixado do
-GitHub** pelo próprio instalador. Guarde o token de leitura à mão.
+GitHub** pelo próprio instalador, de
+`github.com/missorino10-spec/qualidade-sqe` (ramo `main`, repositório
+público — não pede senha nem token).
 
 ### Passo 1 — preparar o Windows
 
@@ -46,7 +43,7 @@ PowerShell **como administrador**:
 
 ```powershell
 mkdir C:\QualidadeSQE -Force; cd C:\QualidadeSQE
-curl.exe -fsSL -H "Authorization: token SEU_TOKEN" -o 1-preparar-windows.ps1 `
+curl.exe -fsSL -o 1-preparar-windows.ps1 `
   https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/1-preparar-windows.ps1
 powershell -ExecutionPolicy Bypass -File .\1-preparar-windows.ps1
 ```
@@ -67,13 +64,10 @@ Ainda no PowerShell:
 
 ```powershell
 wsl -d Ubuntu-22.04 -u root
-curl -fsSL -H "Authorization: token SEU_TOKEN" -o /tmp/instalar.sh \
+curl -fsSL -o /tmp/instalar.sh \
   https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
 bash /tmp/instalar.sh
 ```
-
-Ele pede o token de novo (agora para baixar o código inteiro). Digite e
-tecle Enter — não aparece na tela.
 
 Instala o Docker, **baixa o código do GitHub** para `/opt/qualidade-sqe`,
 sorteia as senhas do banco e do acesso principal, e sobe o sistema.
@@ -235,7 +229,7 @@ que está no GitHub e reconstrói.
 
 ```powershell
 wsl -d Ubuntu-22.04 -u root
-curl -fsSL -H "Authorization: token SEU_TOKEN" -o /tmp/instalar.sh \
+curl -fsSL -o /tmp/instalar.sh \
   https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
 bash /tmp/instalar.sh
 ```
@@ -272,7 +266,7 @@ Na ordem, do mais comum para o mais raro:
 
 | Caminho | O que é |
 |---|---|
-| `github.com/missorino10-spec/qualidade-sqe`, ramo `main` | o código de onde tudo vem (privado) |
+| `github.com/missorino10-spec/qualidade-sqe`, ramo `main` | o código de onde tudo vem |
 | `/opt/qualidade-sqe` (dentro do WSL) | o sistema instalado |
 | `/opt/qualidade-sqe/.env` | senhas do banco e do acesso principal — **não versionar, não compartilhar** |
 | `C:\QualidadeSQE\backups\` | os backups diários |
