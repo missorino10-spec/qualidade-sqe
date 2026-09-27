@@ -59,9 +59,17 @@ foreach ($p in @($destino, "$destino\backups", "$destino\logs")) {
   if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
 }
 
+# Desde que o codigo passou a vir do GitHub, o passo 2 ja deixa estes scripts
+# em C:\QualidadeSQE - e e de la que o TI roda este arquivo. Nesse caso origem
+# e destino sao a mesma pasta, e copiar um arquivo sobre ele mesmo e erro no
+# Windows. So copia quando veio de outro lugar.
 $origem = $PSScriptRoot
-Copy-Item "$origem\iniciar.ps1" "$destino\iniciar.ps1" -Force
-Ok "$destino\iniciar.ps1"
+if ((Resolve-Path $origem).Path -ne (Resolve-Path $destino).Path) {
+  Copy-Item "$origem\iniciar.ps1" "$destino\iniciar.ps1" -Force
+  Ok "$destino\iniciar.ps1"
+} else {
+  Ok "$destino\iniciar.ps1 (ja estava no lugar)"
+}
 
 $scriptIniciar = "$destino\iniciar.ps1"
 

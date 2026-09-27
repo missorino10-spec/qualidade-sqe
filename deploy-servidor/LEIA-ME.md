@@ -18,6 +18,12 @@ depende de nuvem, e os dados não saem da empresa.
 | Disco livre | 20 GB |
 | Porta na rede | 8080 (pode ser trocada) |
 | Conta | Uma conta de serviço no domínio, **com senha que não expira** |
+| Internet | Só **durante a instalação** (baixar o código e o Docker). Depois o sistema funciona sem ela |
+| Token do GitHub | Token de leitura do repositório, no cofre de senhas do TI |
+
+**Sobre o token:** o código fica num repositório **privado** no GitHub —
+`missorino10-spec/qualidade-sqe`. Para baixá-lo é preciso um token de
+leitura. Ele é usado só na instalação e **não fica gravado no servidor**.
 
 **Sobre a conta:** faça os três passos logado com a **mesma conta** que vai
 rodar o sistema depois. O WSL registra a distribuição Linux por usuário —
@@ -31,15 +37,17 @@ seguinte. Marque "a senha nunca expira" no Active Directory.
 
 ## Instalação — três passos
 
-Copie a pasta do projeto inteira para o servidor (por exemplo
-`C:\instalacao\qualidade-sqe`). Os três scripts estão em `deploy-servidor\`.
+Não é preciso copiar pasta nenhuma para o servidor: **o código é baixado do
+GitHub** pelo próprio instalador. Guarde o token de leitura à mão.
 
 ### Passo 1 — preparar o Windows
 
 PowerShell **como administrador**:
 
 ```powershell
-cd C:\instalacao\qualidade-sqe\deploy-servidor
+mkdir C:\QualidadeSQE -Force; cd C:\QualidadeSQE
+curl.exe -fsSL -H "Authorization: token SEU_TOKEN" -o 1-preparar-windows.ps1 `
+  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/1-preparar-windows.ps1
 powershell -ExecutionPolicy Bypass -File .\1-preparar-windows.ps1
 ```
 
@@ -59,12 +67,16 @@ Ainda no PowerShell:
 
 ```powershell
 wsl -d Ubuntu-22.04 -u root
-cd /mnt/c/instalacao/qualidade-sqe
-bash deploy-servidor/2-instalar.sh
+curl -fsSL -H "Authorization: token SEU_TOKEN" -o /tmp/instalar.sh \
+  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
+bash /tmp/instalar.sh
 ```
 
-Instala o Docker, copia o projeto para `/opt/qualidade-sqe`, sorteia as
-senhas do banco e do acesso principal, e sobe o sistema.
+Ele pede o token de novo (agora para baixar o código inteiro). Digite e
+tecle Enter — não aparece na tela.
+
+Instala o Docker, **baixa o código do GitHub** para `/opt/qualidade-sqe`,
+sorteia as senhas do banco e do acesso principal, e sobe o sistema.
 
 Demora: a primeira vez leva alguns minutos (ele monta o sistema do zero).
 
@@ -77,9 +89,11 @@ em `C:\QualidadeSQE\PRIMEIRO-ACESSO.txt`.
 PowerShell **como administrador**:
 
 ```powershell
-cd C:\instalacao\qualidade-sqe\deploy-servidor
+cd C:\QualidadeSQE
 powershell -ExecutionPolicy Bypass -File .\3-ativar-inicio-automatico.ps1
 ```
+
+(o passo 2 já deixou este script nessa pasta)
 
 Ele pede a senha da conta de serviço e cria três tarefas agendadas:
 
@@ -213,6 +227,30 @@ passos 1 e 3 com `-Porta <nova>` (para refazer firewall e tarefas).
 
 ---
 
+## Atualizar o sistema para uma versão nova
+
+Rode o passo 2 de novo. Ele reconhece que já existe instalação:
+**não sorteia senha nova, não apaga dado nenhum** — só troca o código pelo
+que está no GitHub e reconstrói.
+
+```powershell
+wsl -d Ubuntu-22.04 -u root
+curl -fsSL -H "Authorization: token SEU_TOKEN" -o /tmp/instalar.sh \
+  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
+bash /tmp/instalar.sh
+```
+
+**Tire um backup antes** (comando na seção anterior). É a rede de segurança
+para voltar atrás se a versão nova não agradar.
+
+Para saber qual versão está instalada:
+
+```powershell
+wsl -d Ubuntu-22.04 -u root -e bash -lc "git -C /opt/qualidade-sqe log -1 --format='%h %ad %s' --date=short"
+```
+
+---
+
 ## Se alguém não consegue abrir o sistema
 
 Na ordem, do mais comum para o mais raro:
@@ -234,6 +272,7 @@ Na ordem, do mais comum para o mais raro:
 
 | Caminho | O que é |
 |---|---|
+| `github.com/missorino10-spec/qualidade-sqe`, ramo `main` | o código de onde tudo vem (privado) |
 | `/opt/qualidade-sqe` (dentro do WSL) | o sistema instalado |
 | `/opt/qualidade-sqe/.env` | senhas do banco e do acesso principal — **não versionar, não compartilhar** |
 | `C:\QualidadeSQE\backups\` | os backups diários |

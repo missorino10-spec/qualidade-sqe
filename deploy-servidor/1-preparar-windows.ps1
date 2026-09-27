@@ -10,8 +10,12 @@
 #    5. Cria as pastas de backup e de log em C:\QualidadeSQE
 #
 #  COMO USAR (PowerShell "Executar como administrador"):
-#     cd <pasta-do-projeto>\deploy-servidor
+#     mkdir C:\QualidadeSQE -Force; cd C:\QualidadeSQE
+#     curl.exe -fsSL -H "Authorization: token SEU_TOKEN" -o 1-preparar-windows.ps1 `
+#       https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/1-preparar-windows.ps1
 #     powershell -ExecutionPolicy Bypass -File .\1-preparar-windows.ps1
+#
+#  O repositorio e privado; o token de leitura esta no cofre de senhas do TI.
 #
 #  IMPORTANTE: faca login com a MESMA conta que vai rodar o sistema depois
 #  (a conta de servico). O WSL registra a distribuicao por usuario: se voce
@@ -193,6 +197,9 @@ Write-Host "  O sistema vai atender em: http://$ipServidor`:$Porta"
 Write-Host ''
 Write-Host '  PROXIMO PASSO (passo 2) - instalar o sistema dentro do Linux:' -ForegroundColor Cyan
 Write-Host "     wsl -d $Distro -u root"
-Write-Host '     cd /mnt/c/<caminho-da-pasta-do-projeto>'
-Write-Host '     bash deploy-servidor/2-instalar.sh'
+Write-Host '     curl -fsSL -H "Authorization: token SEU_TOKEN" -o /tmp/instalar.sh \'
+Write-Host '       https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh'
+Write-Host '     bash /tmp/instalar.sh'
+Write-Host ''
+Write-Host '  (o mesmo token de leitura usado para baixar este script)'
 Write-Host ''

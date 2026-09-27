@@ -6,7 +6,7 @@ Sistema de Qualidade (módulo SQE) no ar como **protótipo navegável**.
 Este documento descreve o **protótipo**, não a instalação definitiva. A casa
 final do sistema continua sendo um servidor interno da empresa — o objetivo
 aqui é ter um link público para demonstrar à área da Qualidade e sustentar a
-conversa com o TI. Para a instalação on-premise, ver `GUIA-INSTALACAO-TI.md`.
+conversa com o TI. Para a instalação on-premise, ver `deploy-servidor/LEIA-ME.md`.
 
 ---
 
@@ -29,10 +29,12 @@ Auto-deploy ligado: qualquer push na `deploy/cloud` reconstrói os dois serviço
 
 ## 2. Por que Render + Supabase, e não um VPS
 
-O plano anterior era um VPS único com `docker compose` (ver `deploy-nuvem/`).
-Ele continua válido e é o plano B. A troca aconteceu porque, para um protótipo
-de demonstração, Render + Supabase não cobra nada, não exige administrar
-servidor e sobe em minutos.
+O plano anterior era um VPS único com `docker compose`. A troca aconteceu
+porque, para um protótipo de demonstração, Render + Supabase não cobra nada,
+não exige administrar servidor e sobe em minutos. O guia do VPS foi retirado
+do repositório em 27/09/2026, quando a instalação definitiva passou a ser o
+servidor da fábrica (`deploy-servidor/`); se um dia fizer falta, está no
+histórico do Git.
 
 O preço dessa escolha é o **disco efêmero**: o Render apaga o sistema de
 arquivos do contêiner a cada deploy. Foi isso que obrigou a migrar os anexos
@@ -43,7 +45,7 @@ fotos das RNCs sumiriam sozinhas.
 
 ## 3. Regras que guiaram o trabalho
 
-Do `PLANO_DEPLOY.md`, e que continuam valendo para qualquer mexida futura:
+Continuam valendo para qualquer mexida futura:
 
 1. **Nenhum dado real da empresa na nuvem.** O banco tem 1 usuário admin e os
    4 parâmetros de periodicidade. Nada mais.

@@ -18,7 +18,7 @@
 >   "hoje" sai do relógio local.
 >
 > **Para saber o que o sistema faz hoje, leia o código.** Para instalar, valem o
-> `DEPLOY.md` (nuvem) e o `GUIA-INSTALACAO-TI.md` (servidor da empresa). Este
+> `DEPLOY.md` (nuvem) e o `deploy-servidor/LEIA-ME.md` (servidor da fábrica). Este
 > arquivo fica guardado como registro do ponto de partida; documentação
 > atualizada é assunto da ação 7.
 >

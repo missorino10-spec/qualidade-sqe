@@ -31,18 +31,6 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# Kit portatil montado (binarios Node/PostgreSQL ~1.9GB - NAO versionar)
-deploy-portatil/_cache/
-deploy-portatil/Qualidade-SQE/
-
-# deploy-portatil/runtime/ FICA versionada de proposito: sao os .bat de
-# instalacao, start, backup e restauracao do servidor da empresa, ou seja,
-# codigo-fonte (22 KB de texto). A pasta Qualidade-SQE e so a copia gerada,
-# que a montagem sobrescreve a partir daqui.
-
-# Pasta criada por engano (typo de comando)
-backend;C/
-
 # Pacotes/arquivos grandes
 *.zip
 *.7z

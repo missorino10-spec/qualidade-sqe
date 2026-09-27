@@ -7,15 +7,23 @@
 #    1. Confere que esta rodando dentro do WSL2, como root
 #    2. Liga o systemd na distribuicao (faz o Docker voltar sozinho)
 #    3. Instala o Docker Engine (sem Docker Desktop, sem licenca)
-#    4. Copia o projeto para dentro do Linux (/opt/qualidade-sqe)
+#    4. BAIXA O CODIGO DO GITHUB para dentro do Linux (/opt/qualidade-sqe)
 #    5. Gera o .env com senhas fortes e aleatorias
 #    6. Monta e sobe o sistema (banco + API + telas)
 #    7. Espera o sistema responder e mostra a senha do acesso principal
 #
-#  COMO USAR (no PowerShell do Windows, depois do passo 1):
+#  COMO USAR (depois do passo 1, no PowerShell do Windows):
 #     wsl -d Ubuntu-22.04 -u root
-#     cd /mnt/c/<caminho-da-pasta-do-projeto>
-#     bash deploy-servidor/2-instalar.sh
+#     curl -fsSL https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh -o /tmp/instalar.sh
+#     GITHUB_TOKEN=<token-de-leitura> bash /tmp/instalar.sh
+#
+#  O repositorio e PRIVADO, entao o token e obrigatorio. Ele so serve para
+#  baixar o codigo: e apagado do disco assim que o download termina (veja a
+#  secao 3). Se preferir, rode sem a variavel que o script pergunta na hora.
+#
+#  Tambem funciona a partir de uma copia da pasta do projeto: se houver um
+#  docker-compose.yml ao lado do script, ele instala dessa pasta e nem toca
+#  no GitHub.
 #
 #  Pode ser executado varias vezes: NAO sobrescreve o .env nem apaga dados.
 # ============================================================
@@ -26,6 +34,8 @@ ALVO="${ALVO:-/opt/qualidade-sqe}"
 PORTA="${APP_PORT:-8080}"
 FUSO="${TZ:-America/Sao_Paulo}"
 EMAIL_ADMIN="${SEED_ADMIN_EMAIL:-admin@qualidade-sqe.com}"
+REPO="${REPO_GIT:-https://github.com/missorino10-spec/qualidade-sqe.git}"
+RAMO="${REPO_RAMO:-main}"
 
 azul()  { printf '\n\033[1;34m==> %s\033[0m\n' "$1"; }
 ok()    { printf '\033[1;32m  [OK] %s\033[0m\n' "$1"; }
@@ -41,7 +51,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 if ! grep -qi microsoft /proc/version 2>/dev/null; then
-  aviso "Nao parece ser WSL. Se este for um Linux de verdade, use o deploy-nuvem/."
+  aviso "Nao parece ser WSL. Este instalador foi validado em Windows Server + WSL2."
 fi
 
 if ! command -v apt-get >/dev/null 2>&1; then
@@ -51,8 +61,21 @@ fi
 
 ORIGEM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# De onde vem o codigo. O caminho normal e o GitHub; instalar de uma pasta so
+# acontece quando alguem roda o script de dentro de uma copia do projeto (foi
+# assim que o pacote foi validado, e continua servindo para testar sem rede).
+if [ -f "$ORIGEM/docker-compose.yml" ] && [ "$ORIGEM" != "$ALVO" ]; then
+  FONTE='pasta'
+else
+  FONTE='github'
+fi
+
 azul "Instalador do Sistema de Qualidade (SQE) - Windows Server + WSL2"
-echo "  Origem  : $ORIGEM"
+if [ "$FONTE" = 'github' ]; then
+  echo "  Origem  : $REPO (ramo $RAMO)"
+else
+  echo "  Origem  : $ORIGEM (pasta local)"
+fi
 echo "  Destino : $ALVO"
 echo "  Porta   : $PORTA"
 echo "  Fuso    : $FUSO"
@@ -140,27 +163,61 @@ fi
 [ -d /run/systemd/system ] && systemctl enable docker >/dev/null 2>&1 || true
 
 # ------------------------------------------------------------
-# 3. Copiar o projeto para dentro do Linux
-#    Rodar a partir de /mnt/c (disco do Windows) funciona, mas e varias
-#    vezes mais lento e mistura permissoes. Dentro do Linux o sistema
-#    roda no mesmo desempenho do que foi validado na nuvem.
+# 3. Trazer o codigo para dentro do Linux
+#    Sempre para /opt, nunca rodando de /mnt/c: o disco do Windows visto
+#    pelo WSL e varias vezes mais lento e nao carrega permissao de Linux.
 # ------------------------------------------------------------
-azul "Copiando o projeto para $ALVO"
+azul "Trazendo o codigo para $ALVO"
 
-if [ "$ORIGEM" != "$ALVO" ]; then
+if [ "$FONTE" = 'github' ]; then
+  command -v git >/dev/null 2>&1 || {
+    apt-get update -qq && apt-get install -y -qq git >/dev/null
+  }
+
+  # O repositorio e privado. O token entra so aqui dentro, nunca em arquivo:
+  # se ele fosse gravado na configuracao do repositorio (que e o que um
+  # "git clone https://TOKEN@..." faz), ficaria em texto puro no servidor
+  # para sempre. Por isso o endereco com token vai apenas nesta chamada e a
+  # origem e reescrita sem ele logo em seguida.
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo
+    echo "  O repositorio e privado. Cole o token de leitura do GitHub"
+    echo "  (nao aparece na tela enquanto voce digita):"
+    read -r -s -p "  Token: " GITHUB_TOKEN
+    echo
+  fi
+  [ -n "${GITHUB_TOKEN:-}" ] || { erro "Sem token nao da para baixar o codigo."; exit 1; }
+
+  URL_AUTENTICADA="$(printf '%s' "$REPO" | sed "s#https://#https://x-access-token:${GITHUB_TOKEN}@#")"
+
+  if [ -d "$ALVO/.git" ]; then
+    # Atualizacao. O "reset --hard" e proposital: no servidor o codigo tem de
+    # ser exatamente o do GitHub, sem remendo local. Ele mexe apenas no que
+    # esta versionado - o .env nao esta (fica de fora pelo .gitignore) e as
+    # fotos moram num volume do Docker, nao nesta pasta.
+    git -C "$ALVO" fetch --quiet "$URL_AUTENTICADA" "$RAMO"
+    git -C "$ALVO" checkout --quiet -B "$RAMO" FETCH_HEAD
+    ok "Codigo atualizado para o ramo $RAMO."
+  else
+    rm -rf "$ALVO"
+    git clone --quiet --branch "$RAMO" --depth 1 "$URL_AUTENTICADA" "$ALVO"
+    git -C "$ALVO" remote set-url origin "$REPO"
+    ok "Codigo baixado do GitHub (ramo $RAMO)."
+  fi
+
+  unset GITHUB_TOKEN URL_AUTENTICADA
+  echo "  Versao: $(git -C "$ALVO" log -1 --format='%h %s')"
+else
   mkdir -p "$ALVO"
   tar -cf - \
     --exclude=node_modules \
     --exclude=.git \
     --exclude=dist \
     --exclude=build \
-    --exclude=deploy-portatil \
     --exclude=scripts/fotografia \
     --exclude=.env \
     -C "$ORIGEM" . | tar -xf - -C "$ALVO"
-  ok "Projeto copiado (o .env existente foi preservado)."
-else
-  ok "Ja rodando de dentro de $ALVO."
+  ok "Projeto copiado da pasta (o .env existente foi preservado)."
 fi
 
 # A permissao de execucao nao atravessa o disco do Windows: vinda de la, a
@@ -170,6 +227,13 @@ fi
 chmod +x "$ALVO"/deploy-servidor/*.sh 2>/dev/null || true
 
 cd "$ALVO"
+
+# Os scripts do passo 3 rodam no PowerShell, do lado do Windows. Depois que o
+# codigo passou a vir do GitHub, eles so existiriam dentro do Linux, e o TI
+# teria de garimpar \\wsl$\... para achar. Copiar para a pasta que ele ja usa
+# resolve.
+mkdir -p /mnt/c/QualidadeSQE
+cp -f "$ALVO"/deploy-servidor/*.ps1 /mnt/c/QualidadeSQE/ 2>/dev/null || true
 
 # ------------------------------------------------------------
 # 4. .env com senhas fortes
@@ -310,7 +374,7 @@ EOF
     Usuario: $EMAIL_ADMIN
     Senha  : $SENHA_ADMIN
 
-  Guardado tambem em: $ALVO/PRIMEIRO-ACESSO.txt
+  Guardado tambem em: C:\\QualidadeSQE\\PRIMEIRO-ACESSO.txt
   Apague esse arquivo depois de guardar a senha no cofre do TI.
   ------------------------------------------------------------
 EOF
@@ -334,8 +398,10 @@ fi
 cat <<EOF
 
   PROXIMO PASSO (passo 3) - no PowerShell como administrador:
-     cd <pasta-do-projeto>\\deploy-servidor
+     cd C:\\QualidadeSQE
      powershell -ExecutionPolicy Bypass -File .\\3-ativar-inicio-automatico.ps1
+
+  (os scripts do passo 3 ja foram copiados para essa pasta)
 
 ============================================================
 EOF
