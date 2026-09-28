@@ -169,8 +169,9 @@ if ($respondeu) {
   Write-Host ''
   Write-Host "  Endereco para a fabrica:  http://$ipServidor`:$Porta" -ForegroundColor Cyan
   Write-Host ''
-  Write-Host '  Acesso principal (usuario e senha): veja o final do passo 2,'
-  Write-Host "  ou dentro do Linux em $Pasta/PRIMEIRO-ACESSO.txt"
+  Write-Host "  Acesso principal (usuario e senha): $destino\PRIMEIRO-ACESSO.txt" -ForegroundColor Cyan
+  Write-Host '  (a mesma senha apareceu na tela, no final do passo 2)'
+  Write-Host '  Apague esse arquivo depois de guardar a senha no cofre do TI.'
   Write-Host ''
   Write-Host '  O sistema volta sozinho se: o conteiner morrer, o Docker cair,'
   Write-Host '  o Linux desligar ou o servidor reiniciar.'
