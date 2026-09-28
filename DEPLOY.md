@@ -19,8 +19,8 @@ conversa com o TI. Para a instalação on-premise, ver `deploy-servidor/LEIA-ME.
 | Banco | Supabase — projeto `qualidade-sqe` (Canada Central) | pooler `aws-0-ca-central-1.pooler.supabase.com` |
 | Anexos | Supabase Storage — bucket privado `anexos` | via backend, nunca por URL pública |
 
-Branch de trabalho: **`deploy/cloud`**. A `main` não foi tocada.
-Auto-deploy ligado: qualquer push na `deploy/cloud` reconstrói os dois serviços.
+Ramo: **`main`** — o único do repositório.
+Auto-deploy ligado: qualquer push na `main` reconstrói os dois serviços.
 
 **Acesso de teste:** `admin@qualidade-sqe.com` — a senha está em `backend/.env`
 (arquivo local, fora do Git).
@@ -49,7 +49,9 @@ Continuam valendo para qualquer mexida futura:
 
 1. **Nenhum dado real da empresa na nuvem.** O banco tem 1 usuário admin e os
    4 parâmetros de periodicidade. Nada mais.
-2. **Branch separada `deploy/cloud`.** A `main` permanece intacta.
+2. **Um ramo só (`main`).** A `deploy/cloud`, que existiu enquanto a nuvem era
+   um experimento, foi apagada em 27/09/2026: ter dois ramos idênticos só
+   criava dúvida sobre de qual se baixa o código.
 3. **Mudar só o estritamente necessário.** Nenhuma refatoração oportunista.
 4. **Nenhuma credencial no repositório.** `backend/.env` está no `.gitignore`.
 
@@ -260,7 +262,7 @@ curl -H "Authorization: Bearer $K" \
   "https://api.render.com/v1/services/<srv-id>/deploys/<dep-id>"
 ```
 
-**Backend** (`type: web_service`): repo + `branch: deploy/cloud`,
+**Backend** (`type: web_service`): repo + `branch: main`,
 `autoDeploy: yes`, `env: docker`, `region: virginia`, `plan: free`,
 `dockerfilePath: ./backend/Dockerfile`, `dockerContext: ./backend`, mais as 8
 variáveis da seção 5.
@@ -322,8 +324,8 @@ Coisas que são aceitáveis para demonstrar e **inaceitáveis** para produção:
 
 Nada do que foi feito aqui impede o caminho on-premise. Quando o TI liberar:
 
-1. Suba pela `main` (ou faça o merge da `deploy/cloud`, o que traz de brinde o
-   seed sem senha embutida e a configuração de anexos por Storage).
+1. Suba pela `main` — é onde está tudo, inclusive o seed sem senha embutida e a
+   configuração de anexos por Storage.
 2. Se for usar disco local de novo, o `StorageService` precisa de uma
    implementação alternativa — ou aponte para um MinIO interno, que fala o
    mesmo protocolo S3.

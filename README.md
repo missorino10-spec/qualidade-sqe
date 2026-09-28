@@ -35,8 +35,7 @@ para dentro do servidor. Não é preciso copiar pasta nenhuma.
 ### Na nuvem (Render + Supabase) — o protótipo de demonstração
 
 O que está no ar hoje para demonstração, e como foi feito, está em
-[`DEPLOY.md`](DEPLOY.md). Deploy automático a cada push na branch
-`deploy/cloud`.
+[`DEPLOY.md`](DEPLOY.md). Deploy automático a cada push na `main`.
 
 ### Na sua máquina, para desenvolver
 
@@ -92,12 +91,13 @@ rascunho: o que sai de circulação é apagado e fica no histórico do Git.
 | **Entender/mexer no código** | `backend/src/` e `frontend/src/` |
 | **Saber como a nuvem foi montada** | [`DEPLOY.md`](DEPLOY.md) |
 
-### Os dois ramos
+### Um ramo só
 
-| Ramo | Para que serve |
-|---|---|
-| **`main`** | a versão validada. É daqui que o servidor da fábrica baixa. |
-| `deploy/cloud` | o que o Render acompanha para o protótipo de demonstração. Aponta para o mesmo commit do `main`. |
+**`main`.** É a versão validada, é de onde o servidor da fábrica baixa e é o
+que o Render publica na nuvem. Não existe segundo ramo para conferir nem
+escolher.
+
+A versão provada no servidor está marcada como **[`v1.0.0`](../../releases/tag/v1.0.0)**.
 
 O **frontend** (nginx) é a única porta exposta na rede e encaminha `/api` para
 o **backend**. O **PostgreSQL** não fica exposto para fora.
