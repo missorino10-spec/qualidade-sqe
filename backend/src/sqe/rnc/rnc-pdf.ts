@@ -218,7 +218,7 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   const reprovadas = cotas.filter((c) => c?.conforme === false);
 
   const tipo = rotuloTipoDesvio(rnc.tipoDesvio);
-  const desvio = (tipo ? `[${tipo}] ` : '') + (rnc.descricaoDesvio ?? '');
+  const desvio = (tipo ? `[${tipo}] ` : '') + (rnc.descricaoDesvio ?? '').replace(/\t/g, ' ').trimEnd();
 
   // Cotas que nao couberam na folha 1 e continuam na pagina seguinte.
   let sobraCotas: any[] = [];
@@ -288,7 +288,7 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
   }
 
   // ---------- Disposicao ----------
-  y = secao(y, 'Disposição', 'Disposition', rnc.disposicao ?? '', 80);
+  y = secao(y, 'Disposição', 'Disposition', (rnc.disposicao ?? '').replace(/\t/g, ' ').trimEnd(), 80);
 
   // ---------- Registro fotografico ----------
   doc.lineWidth(0.8).strokeColor(PRETO).rect(X0, y, W, 16).stroke();
