@@ -107,6 +107,9 @@ export class RncService {
       // nao precisa carregar a tabela inteira.
       include: {
         ...includePadrao,
+        inspecaoVisual: {
+          select: { id: true, resultado: true, checklist: true },
+        },
         inspecaoLote: {
           select: { id: true, resultado: true, cotas: true },
         },

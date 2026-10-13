@@ -360,6 +360,16 @@ export default function RncDetalhe() {
   const cotasReprovadas: any[] = (
     Array.isArray(rnc.inspecaoLote?.cotas) ? rnc.inspecaoLote.cotas : []
   ).filter((c: any) => c?.conforme === false);
+  const itensVisuaisReprovados = (
+    Array.isArray(rnc.inspecaoVisual?.checklist) ? rnc.inspecaoVisual.checklist : []
+  ).flatMap((grupo: any) =>
+    (Array.isArray(grupo?.itens) ? grupo.itens : [])
+      .filter((item: any) => item?.status === 'REPROVADO')
+      .map((item: any) => ({
+        numero: String(grupo.grupo ?? '').match(/^\s*(\d+)/)?.[1],
+        texto: item.texto,
+      })),
+  );
 
   function pedirExclusao() {
     confirmarExclusao({
@@ -612,6 +622,18 @@ export default function RncDetalhe() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
+
+          {itensVisuaisReprovados.length > 0 && (
+            <Card title="Itens reprovados na inspeção visual" style={{ marginTop: 16 }}>
+              <ul style={{ marginBottom: 0 }}>
+                {itensVisuaisReprovados.map((item: any, indice: number) => (
+                  <li key={indice}>
+                    {item.numero ? `${item.numero} - ` : ''}{item.texto} - REPROVADO
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {/* Cotas lidas da inspecao vinculada, na mesma tabela do formulario
               dimensional. Se a inspecao for corrigida depois, a RNC mostra a

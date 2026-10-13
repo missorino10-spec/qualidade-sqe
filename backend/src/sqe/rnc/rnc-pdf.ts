@@ -216,17 +216,65 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
     ? rnc.inspecaoLote.cotas
     : [];
   const reprovadas = cotas.filter((c) => c?.conforme === false);
+  const checklist: any[] = Array.isArray(rnc.inspecaoVisual?.checklist)
+    ? rnc.inspecaoVisual.checklist
+    : [];
+  const itensVisuais = checklist.flatMap((grupo) =>
+    (Array.isArray(grupo?.itens) ? grupo.itens : [])
+      .filter((item: any) => item?.status === 'REPROVADO')
+      .map((item: any) => ({ grupo: grupo.grupo, texto: item.texto })),
+  );
 
   const tipo = rotuloTipoDesvio(rnc.tipoDesvio);
-  const desvio = (tipo ? `[${tipo}] ` : '') + (rnc.descricaoDesvio ?? '').replace(/\t/g, ' ').trimEnd();
+  const linhasVisuais = itensVisuais.map((item) => {
+    const numero = String(item.grupo ?? '').match(/^\s*(\d+)/)?.[1];
+    return { numero: numero ?? '', texto: String(item.texto ?? '').replace(/\t/g, ' ').trim() };
+  });
+  const desvio = ((tipo ? `[${tipo}] ` : '') +
+    (rnc.descricaoDesvio ?? '').replace(/\t/g, ' ').trimEnd()).trim();
+  doc.font('Helvetica').fontSize(9);
+  const alturaDesvio = desvio ? doc.heightOfString(desvio, { width: W - 10 }) : 0;
+  const larguraItem = W - 150;
+  const alturasVisuais = linhasVisuais.map((item) =>
+    Math.max(13, Math.ceil(doc.heightOfString(item.texto, { width: larguraItem }) + 3)),
+  );
+  const alturaConteudo = Math.max(
+    46,
+    Math.ceil(alturaDesvio + (desvio && linhasVisuais.length ? 4 : 0) +
+      alturasVisuais.reduce((soma, altura) => soma + altura, 0) + 10),
+  );
+  const escreverDesvio = (topo: number) => {
+    let linhaY = topo + 5;
+    doc.font('Helvetica').fontSize(9).fillColor(PRETO);
+    if (desvio) {
+      doc.text(desvio, X0 + 5, linhaY, { width: W - 10 });
+      linhaY += alturaDesvio + 4;
+    }
+    linhasVisuais.forEach((item, indice) => {
+      doc.text(item.numero ? `${item.numero} -` : '-', X0 + 5, linhaY, {
+        width: 27, lineBreak: false,
+      });
+      doc.text(item.texto, X0 + 35, linhaY, { width: larguraItem });
+      doc.text('- REPROVADO', X1 - 108, linhaY, {
+        width: 103, align: 'right', lineBreak: false,
+      });
+      linhaY += alturasVisuais[indice];
+    });
+  };
 
   // Cotas que nao couberam na folha 1 e continuam na pagina seguinte.
   let sobraCotas: any[] = [];
 
   if (!reprovadas.length) {
-    y = secao(y, 'Descrição do Desvio', 'Deviation Description', desvio, 95);
+    if (!linhasVisuais.length) {
+      y = secao(y, 'Descrição do Desvio', 'Deviation Description', desvio, 95);
+    } else {
+      const topo = y;
+      y = secao(y, 'Descrição do Desvio', 'Deviation Description', '', Math.max(95, alturaConteudo));
+      escreverDesvio(topo + 16);
+    }
   } else {
-    const ALTURA_TEXTO = 46;
+    const ALTURA_TEXTO = alturaConteudo;
     const ALT_CAB = 22; // cabecalho da tabela de cotas
     const ALT_LINHA = 16;
     const AREA_FOTO_MIN = 120;
@@ -259,14 +307,7 @@ export function gerarPdfRnc(rnc: any, fotos: Buffer[] = []): PDFKit.PDFDocument 
       .fillColor(CINZA)
       .text('   Deviation Description');
     doc.lineWidth(0.8).strokeColor(PRETO).rect(X0, y + 16, W, altura).stroke();
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor(PRETO)
-      .text(desvio || '', X0 + 5, y + 21, {
-        width: W - 10,
-        height: ALTURA_TEXTO - 8,
-      });
+    escreverDesvio(y + 16);
     doc
       .font('Helvetica-Bold')
       .fontSize(7)

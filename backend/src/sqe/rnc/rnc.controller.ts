@@ -289,6 +289,7 @@ export class RncController {
         // As cotas reprovadas saem no PDF lidas da inspecao, e nao de uma
         // copia: o papel sempre reflete o dimensional como ele esta hoje.
         inspecaoLote: { select: { cotas: true } },
+        inspecaoVisual: { select: { checklist: true } },
       },
     });
     if (!rnc) throw new NotFoundException('RNC não encontrada');
