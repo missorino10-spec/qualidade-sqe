@@ -16,6 +16,7 @@ import {
   notaTempoResposta,
   trimestreCalendario,
 } from './idf';
+import { diasRespostaRnc } from '../../comum/tempo-resposta-rnc';
 
 // Numeros de um criterio dentro da competencia, antes de qualquer nota manual.
 type Apuracao = {
@@ -352,10 +353,11 @@ export class AvaliacaoService {
         daComp.set(r.fornecedorId, acc);
       }
       if (r.dataRetorno) {
-        const h =
-          (r.dataRetorno.getTime() - r.dataEnvioFornecedor.getTime()) / 3600000;
-        acc.horas.push(Math.max(0, h));
-        acc.notasC2.push(notaTempoResposta(Math.max(0, h)));
+        // O retorno e uma data escolhida no formulario; a hora em que a
+        // notificacao foi salva nao deve alterar o degrau de C2.
+        const horas = diasRespostaRnc(r.dataEnvioFornecedor, r.dataRetorno)! * 24;
+        acc.horas.push(horas);
+        acc.notasC2.push(notaTempoResposta(horas));
       } else {
         // Sem resposta ate o fechamento: perde o indicador do mes.
         acc.notasC2.push(0);

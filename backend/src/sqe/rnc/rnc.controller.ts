@@ -173,6 +173,7 @@ export class RncController {
     @Query('ate') ate?: string,
   ) {
     const id = fornecedorId ? Number(fornecedorId) : undefined;
+    const excel = formato === 'excel' || formato === 'xlsx';
     const rncs = await this.service.findAll({ status, fornecedorId: id, de, ate });
     const fornecedor = id
       ? (rncs[0] as any)?.fornecedor?.nome
@@ -191,12 +192,12 @@ export class RncController {
           { rotulo: 'Fornecedor', valor: fornecedor ?? 'Todos' },
         ],
         totais: [
-          {
+          ...(excel ? [{
             rotulo: 'Custo total',
             valor: `R$ ${rncs
               .reduce((t: number, r: any) => t + Number(r.valorTotal ?? 0), 0)
               .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-          },
+          }] : []),
           {
             rotulo: 'Em andamento',
             valor: String(
@@ -223,7 +224,7 @@ export class RncController {
           { titulo: 'Tipo de desvio', peso: 70, valor: (r: any) => r.tipoDesvio },
           { titulo: 'Descrição do desvio', peso: 120, valor: (r: any) => r.descricaoDesvio },
           { titulo: 'Qtd. peças', peso: 40, valor: (r: any) => r.quantidadePecas, tipo: 'numero' },
-          { titulo: 'Custo', peso: 55, valor: (r: any) => r.valorTotal, tipo: 'moeda', negrito: true },
+          ...(excel ? [{ titulo: 'Custo', peso: 55, valor: (r: any) => r.valorTotal, tipo: 'moeda' as const, negrito: true }] : []),
           {
             titulo: 'Enviada em',
             peso: 45,

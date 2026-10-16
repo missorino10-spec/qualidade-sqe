@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FeriadosService } from '../feriados/feriados.service';
 import { Feriados, somarDiasUteis } from '../comum/dias-uteis';
 import { AvaliacaoService } from '../sqe/avaliacao/avaliacao.service';
+import { diasRespostaRnc } from '../comum/tempo-resposta-rnc';
 
 function pct(parte: number, total: number): number {
   if (!total) return 0;
@@ -14,12 +15,6 @@ function pct(parte: number, total: number): number {
 // politica da Qualidade - mudar o prazo e mudar estas tres linhas.
 const PRAZO_PLANO_RNC_DIAS = 5; // do recebimento da notificacao pelo fornecedor
 const PRAZO_ENCERRAMENTO_RNC_DIAS = 7; // da abertura ate encerrar
-
-// Diferenca em dias corridos entre duas datas (usada so no tempo de resposta,
-// que e um tempo medido, nao um prazo cobrado).
-function diasCorridos(inicio: Date, fim: Date): number {
-  return Math.round((fim.getTime() - inicio.getTime()) / 86400000);
-}
 
 // Mediana: o valor do meio da lista ordenada. Com quantidade par, a media dos
 // dois centrais. Diferente da media, nao se desloca por uma RNC que ficou meses
@@ -145,12 +140,11 @@ export class DashboardService {
     const totalRnc = rncs.length;
 
     // 03 - Tempo medio de resposta a RNC (mediana)
-    // Dias entre a emissao (abertura) e a resposta do fornecedor. So entram as
-    // RNCs que ja tiveram resposta - as que ainda esperam nao tem tempo.
+    // Dias entre o envio ao fornecedor e a data de retorno informada. RNCs
+    // ainda nao enviadas ou sem resposta nao entram na mediana.
     const temposResposta = rncs
-      .filter((r) => r.dataRetorno)
-      .map((r) => diasCorridos(r.dataAbertura, r.dataRetorno as Date))
-      .filter((d) => d >= 0);
+      .map((r) => diasRespostaRnc(r.dataEnvioFornecedor, r.dataRetorno))
+      .filter((d): d is number => d !== null);
     const medianaResposta = mediana(temposResposta);
 
     // 04 - Savings por bloqueio de lotes com RNC

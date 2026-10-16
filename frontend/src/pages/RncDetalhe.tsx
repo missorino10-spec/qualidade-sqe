@@ -612,6 +612,11 @@ export default function RncDetalhe() {
               </Descriptions.Item>
               <Descriptions.Item label="Valor unitário (R$)">
                 {moeda(rnc.valorUnitario)}
+                {rnc.unitarioSugeridoDaBase && (
+                  <Typography.Text type="secondary" style={{ display: 'block' }}>
+                    Custo atual da base; confirme e salve para registrar.
+                  </Typography.Text>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Valor total (R$)" span={2}>
                 <strong>{moeda(rnc.valorTotal)}</strong>
@@ -677,7 +682,7 @@ export default function RncDetalhe() {
                   ? dayjs(rnc.dataRetorno).format('DD/MM/YYYY')
                   : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Tempo de retorno">
+              <Descriptions.Item label="Tempo de retorno (envio até retorno)">
                 {rnc.tempoRetornoDias != null
                   ? `${rnc.tempoRetornoDias} dia(s)`
                   : '-'}

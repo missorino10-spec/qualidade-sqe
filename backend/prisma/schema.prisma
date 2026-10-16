@@ -609,7 +609,7 @@ model Rnc {
   disposicao            String? // texto livre
   houveRetorno          Boolean?
   dataRetorno           DateTime?
-  tempoRetornoDias      Int? // = dataRetorno - dataAbertura
+  tempoRetornoDias      Int? // dias entre envio ao fornecedor e retorno informado
   fornecedorAceitou     String? // "Sim" / "Nao (Ver observacoes)"
   fornecedorEnviouPlano Boolean?
   nivelPlano            NivelPlano?

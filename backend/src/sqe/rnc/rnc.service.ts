@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { HistoricoService } from '../../historico/historico.service';
 import { hojeComoDataPura, numeroDocumento, semanaAno } from '../sqe-utils';
 import { proximoSequencial } from '../../comum/numeracao';
+import { diasRespostaRnc } from '../../comum/tempo-resposta-rnc';
 import {
   DESVIO,
   dadosAberturaDesvio,
@@ -28,9 +29,13 @@ function dataBr(d: Date): string {
 // Lead time INTERNO da Qualidade: da abertura da RNC ate o dia em que o
 // documento saiu para o fornecedor. E calculado na leitura, nunca gravado -
 // assim uma correcao de data corrige o indicador na hora.
-function comLeadTimeEnvio<T extends { dataAbertura: Date; dataEnvioFornecedor: Date | null }>(
+function comLeadTimeEnvio<T extends {
+  dataAbertura: Date;
+  dataEnvioFornecedor: Date | null;
+  dataRetorno: Date | null;
+}>(
   rnc: T,
-): T & { leadTimeEnvioDias: number | null } {
+): T & { leadTimeEnvioDias: number | null; tempoRetornoDias: number | null } {
   const leadTimeEnvioDias = rnc.dataEnvioFornecedor
     ? Math.max(
         0,
@@ -40,12 +45,41 @@ function comLeadTimeEnvio<T extends { dataAbertura: Date; dataEnvioFornecedor: D
         ),
       )
     : null;
-  return { ...rnc, leadTimeEnvioDias };
+  // Corrige tambem RNCs antigas, que guardaram dias desde a abertura.
+  return {
+    ...rnc,
+    leadTimeEnvioDias,
+    tempoRetornoDias: diasRespostaRnc(rnc.dataEnvioFornecedor, rnc.dataRetorno),
+  };
+}
+
+// As RNCs antigas podem ter sido abertas sem copiar o custo do item. Nas
+// consultas, sugere o custo ATUAL da base sem alterar o valor historico salvo.
+// A mesma regra precisa atender a lista e o detalhe da RNC.
+function comValorParaExibicao<T extends {
+  item: { custoUnitario: number | null } | null;
+  quantidadePecas: number | null;
+  valorUnitario: number | null;
+  valorTotal: number | null;
+}>(rnc: T) {
+  const valorUnitario = rnc.valorUnitario ?? rnc.item?.custoUnitario ?? null;
+  const valorTotal = rnc.valorTotal ??
+    (rnc.quantidadePecas != null && valorUnitario != null
+      ? rnc.quantidadePecas * valorUnitario
+      : null);
+  return {
+    ...rnc,
+    valorUnitario,
+    valorTotal,
+    unitarioSugeridoDaBase: rnc.valorUnitario == null && valorUnitario != null,
+    valorSugeridoDaBase:
+      rnc.valorTotal == null && rnc.valorUnitario == null && valorTotal != null,
+  };
 }
 
 const includePadrao = {
   fornecedor: { select: { id: true, nome: true, codigo: true } },
-  item: { select: { id: true, descricao: true, codigo: true } },
+  item: { select: { id: true, descricao: true, codigo: true, custoUnitario: true } },
   entrega: { select: { id: true, numeroInspecao: true } },
   inspecaoVisual: { select: { id: true, resultado: true } },
   inspecaoLote: { select: { id: true, resultado: true } },
@@ -96,7 +130,7 @@ export class RncService {
       include: includePadrao,
       orderBy: { dataAbertura: 'desc' },
     });
-    return rncs.map(comLeadTimeEnvio);
+    return rncs.map((rnc) => comValorParaExibicao(comLeadTimeEnvio(rnc)));
   }
 
   async findOne(id: number) {
@@ -121,7 +155,11 @@ export class RncService {
       where: { entidadeTipo: ENTIDADE, entidadeId: id },
       orderBy: { createdAt: 'desc' },
     });
-    return { ...comLeadTimeEnvio(rnc), historico, anexos };
+    return {
+      ...comValorParaExibicao(comLeadTimeEnvio(rnc)),
+      historico,
+      anexos,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -327,6 +365,11 @@ export class RncService {
   async create(data: any, usuarioId: number) {
     const { numero, ano, sequencial } = await this.gerarNumero();
     const itemId = await this.resolverItemId(data);
+    const item = await this.prisma.item.findUnique({
+      where: { id: itemId },
+      select: { custoUnitario: true },
+    });
+    const valorUnitario = data.valorUnitario ?? item?.custoUnitario ?? null;
     const reincidencia =
       data.reincidencia ??
       (await this.sugereReincidencia({
@@ -342,8 +385,8 @@ export class RncService {
     const valorTotal =
       data.valorTotal != null
         ? data.valorTotal
-        : data.quantidadePecas != null && data.valorUnitario != null
-          ? data.quantidadePecas * data.valorUnitario
+        : data.quantidadePecas != null && valorUnitario != null
+          ? data.quantidadePecas * valorUnitario
           : null;
 
     // A semana da abertura e a de HOJE, e "hoje" vira data pura antes de entrar
@@ -370,7 +413,7 @@ export class RncService {
         reincidencia,
         descricaoDesvio: data.descricaoDesvio ?? '',
         quantidadePecas: data.quantidadePecas ?? null,
-        valorUnitario: data.valorUnitario ?? null,
+        valorUnitario,
         valorTotal,
         disposicao: data.disposicao ?? null,
         observacoes: data.observacoes ?? null,
@@ -474,16 +517,9 @@ export class RncService {
           ? quantidadePecas * valorUnitario
           : rnc.valorTotal;
 
-    const dataAbertura = rnc.dataAbertura;
     const dataRetorno = data.dataRetorno
       ? new Date(data.dataRetorno)
       : rnc.dataRetorno;
-    const tempoRetornoDias = dataRetorno
-      ? Math.round(
-          (dataRetorno.getTime() - dataAbertura.getTime()) /
-            (1000 * 60 * 60 * 24),
-        )
-      : rnc.tempoRetornoDias;
 
     // Envio ao fornecedor: a data e carimbada pelo servidor, nao escolhida por
     // quem edita - e o lead time interno da Qualidade e nao pode ser ajustado
@@ -494,6 +530,7 @@ export class RncService {
     const dataEnvioFornecedor = !enviadaFornecedor
       ? null
       : (rnc.dataEnvioFornecedor ?? new Date());
+    const tempoRetornoDias = diasRespostaRnc(dataEnvioFornecedor, dataRetorno);
 
     const statusAnterior = rnc.status;
     const novoStatus = data.status ?? rnc.status;

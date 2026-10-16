@@ -29,7 +29,6 @@ import Tabela from '../components/Tabela';
 import { CamposItem, ItemDaBase } from '../components/CamposItem';
 import { CampoValorTotal, useValorTotal } from '../components/ValorTotal';
 import { moeda, formatarMoedaInput, lerMoedaInput } from '../moeda';
-import { numeroBR } from '../formatos';
 import { TAG } from '../design/tokens';
 
 const CAMPOS_VALOR = {
@@ -282,11 +281,11 @@ export default function RncLista() {
             {
               title: 'Valor (R$)',
               dataIndex: 'valorTotal',
-              width: 120,
+              width: 150,
               align: 'right',
               sorter: (a: any, b: any) =>
                 (a.valorTotal ?? 0) - (b.valorTotal ?? 0),
-              render: (v?: number) => (v ? numeroBR(v, 2) : '-'),
+              render: (v: number | null) => moeda(v),
             },
             {
               title: 'Status',
