@@ -21,7 +21,7 @@ importação em massa por planilha e controle de acesso por módulo.
 
 ## Como instalar
 
-### No servidor da fábrica (Windows Server + WSL2) — instalação definitiva
+### No servidor da fábrica (Windows nativo) — instalação definitiva
 
 É o caminho suportado. O guia completo para o TI, com os três passos, o
 backup e o que fazer quando algo cai, está em:
@@ -31,6 +31,10 @@ backup e o que fazer quando algo cai, está em:
 Resumo: o TI baixa o `1-preparar-windows.ps1` deste repositório, roda os três
 scripts de `deploy-servidor/`, e o próprio instalador traz o código do GitHub
 para dentro do servidor. Não é preciso copiar pasta nenhuma.
+
+Node e PostgreSQL ficam instalados **direto no Windows** — sem Docker, sem
+WSL, sem Linux no meio. São dois serviços na lista de serviços do Windows,
+que o TI da fábrica já sabe operar.
 
 ### Na nuvem (Render + Supabase) — o protótipo de demonstração
 
@@ -78,7 +82,7 @@ rascunho: o que sai de circulação é apagado e fica no histórico do Git.
 | `frontend/` | React + Ant Design — as telas (`src/pages/`, uma pasta por módulo) | ao mudar tela |
 | `deploy-servidor/` | **instalar no servidor da fábrica**, backup e restauração | na instalação e na atualização |
 | `scripts/` | `fotografia.js`, a rede de regressão: grava o que as 170 rotas devolvem e confere depois | antes de dizer que uma mudança não quebrou nada |
-| `docker-compose.yml` | sobe banco + API + telas num comando só | raramente |
+| `docker-compose.yml` | sobe banco + API + telas num comando só — para desenvolver, ou para quem quiser rodar em Linux | raramente |
 | `.env.example` | modelo de configuração (o `.env` de verdade nunca é versionado) | ao criar um ambiente novo |
 | `DEPLOY.md` | como o protótipo em nuvem foi montado (Render + Supabase) | só para a nuvem |
 | `PROMPT-MESTRE-SQE.md` | **registro histórico** — fotografia do sistema em 25/07/2026, quando só existia o SQE | nunca; está desatualizado de propósito |
@@ -99,12 +103,22 @@ escolher.
 
 A versão provada no servidor está marcada como **[`v1.0.0`](../../releases/tag/v1.0.0)**.
 
-O **frontend** (nginx) é a única porta exposta na rede e encaminha `/api` para
-o **backend**. O **PostgreSQL** não fica exposto para fora.
-
 ---
 
 ## Comandos úteis
+
+**No servidor da fábrica** (PowerShell como administrador):
+
+```powershell
+Get-ScheduledTask -TaskName QualidadeSQE | Select-Object State   # "Running" = no ar
+Get-Content C:\QualidadeSQE\logs\backend.log -Tail 100           # o que o sistema registrou
+Restart-ScheduledTask -TaskName QualidadeSQE                     # reiniciar
+```
+
+Lá o backend serve as telas e a API na **mesma porta** (8080): não existe
+nginx. O PostgreSQL responde só dentro da máquina.
+
+**Na sua máquina, no Docker Compose:**
 
 ```bash
 docker compose ps              # ver se está tudo rodando
@@ -113,9 +127,10 @@ docker compose down            # parar (sem apagar nada)
 docker compose up -d --build   # subir de novo depois de mudar o código
 ```
 
-Os dados do banco e os anexos ficam em volumes do Docker (`postgres_data` e
+Aqui o **frontend** (nginx) é a porta exposta e encaminha `/api` para o
+backend. Os dados ficam em volumes do Docker (`postgres_data` e
 `uploads_data`) e sobrevivem ao `down`. **Nunca** use `docker compose down -v`
-num servidor com dados: o `-v` apaga esses volumes.
+num ambiente com dados que importam: o `-v` apaga esses volumes.
 
 ---
 
