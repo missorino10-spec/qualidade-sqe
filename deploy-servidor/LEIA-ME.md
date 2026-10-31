@@ -6,27 +6,32 @@ navegador de qualquer computador da rede.
 O sistema roda **dentro do seu servidor**. Não depende de internet, não
 depende de nuvem, e os dados não saem da empresa.
 
+**Instalação nativa no Windows:** Node.js e PostgreSQL instalados
+direto na máquina. Sem Docker, sem WSL, sem Linux no meio. São dois
+programas que o TI já conhece, dois serviços na lista de serviços do
+Windows, e tudo o que der problema aparece no Visualizador de Eventos
+como qualquer outro programa.
+
+> Se você prefere rodar em Linux com contêiner, o `docker-compose.yml` na
+> raiz do repositório continua válido e funciona. Este guia cobre o
+> caminho nativo, que é o que está em produção na fábrica.
+
 ---
 
 ## Antes de começar
 
 | O que | Mínimo |
 |---|---|
-| Sistema operacional | Windows Server 2019 ou mais novo (build 19041+) |
-| Virtualização | Habilitada na BIOS. Se o servidor for uma VM, precisa de *nested virtualization* ligada |
+| Sistema operacional | Windows Server 2019 ou mais novo (serve Windows 10/11 também) |
 | Memória | 8 GB (4 GB funciona, mas fica apertado na importação de planilha) |
 | Disco livre | 20 GB |
 | Porta na rede | 8080 (pode ser trocada) |
-| Conta | Uma conta de serviço no domínio, **com senha que não expira** |
-| Internet | Só **durante a instalação** (baixar o código e o Docker). Depois o sistema funciona sem ela |
+| Conta | Administrador local da máquina, para rodar os três passos |
+| Internet | Só **durante a instalação** (baixar o código, o Node e o PostgreSQL). Depois o sistema funciona sem ela |
 
-**Sobre a conta:** faça os três passos logado com a **mesma conta** que vai
-rodar o sistema depois. O WSL registra a distribuição Linux por usuário —
-se você instalar com a sua conta pessoal e agendar com outra, a tarefa
-agendada simplesmente não enxerga o Linux e o sistema não sobe no boot.
-
-**Sobre a senha da conta:** se ela expirar, o sistema para de subir no dia
-seguinte. Marque "a senha nunca expira" no Active Directory.
+**Nada de conta de serviço.** O sistema sobe como `SYSTEM`, a conta
+interna do Windows. Ela não tem senha, logo não expira — a causa mais
+comum de "o sistema parou de subir do nada" simplesmente não existe aqui.
 
 ---
 
@@ -36,6 +41,9 @@ Não é preciso copiar pasta nenhuma para o servidor: **o código é baixado do
 GitHub** pelo próprio instalador, de
 `github.com/missorino10-spec/qualidade-sqe` (ramo `main`, repositório
 público — não pede senha nem token).
+
+Os três passos podem ser executados **quantas vezes for preciso**. Nenhum
+deles apaga dado, nenhum deles sorteia senha de novo se já existir uma.
 
 ### Passo 1 — preparar o Windows
 
@@ -48,62 +56,85 @@ curl.exe -fsSL -o 1-preparar-windows.ps1 `
 powershell -ExecutionPolicy Bypass -File .\1-preparar-windows.ps1
 ```
 
-Liga o WSL2, instala o Ubuntu, abre a porta 8080 no firewall e cria
-`C:\QualidadeSQE\` (backups e logs).
+Instala Node.js, Git e PostgreSQL 17; cria as pastas em
+`C:\QualidadeSQE\`; abre a porta 8080 no firewall; e sorteia as senhas,
+gravando-as em **`C:\QualidadeSQE\CREDENCIAIS.txt`**.
 
-**O Windows provavelmente vai pedir para reiniciar.** Reinicie e rode o
-passo 1 de novo — ele pode ser executado quantas vezes for preciso, não
-desfaz nada.
+Dois detalhes que valem saber:
+
+- O instalador do Node é **conferido pelo SHA256** publicado pela
+  nodejs.org antes de rodar. Se não bater, o arquivo é apagado e o passo
+  para — é a diferença entre instalar o Node e instalar o que alguém pôs
+  no caminho.
+- A porta **5432 do PostgreSQL não é aberta** no firewall, de propósito.
+  Quem fala com o banco é o próprio sistema, de dentro da máquina.
 
 No fim ele mostra o **IP do servidor**. Anote: é o endereço que a fábrica
 vai usar.
 
+> **Se o PowerShell já estava aberto antes do passo 1**, feche e abra de
+> novo antes do passo 2. O instalador do Node ajusta o PATH do Windows,
+> mas uma janela já aberta continua com o PATH antigo e não acha o `node`.
+
 ### Passo 2 — instalar o sistema
 
-Ainda no PowerShell:
+PowerShell **como administrador**, em uma janela nova:
 
 ```powershell
-wsl -d Ubuntu-22.04 -u root
-curl -fsSL -o /tmp/instalar.sh \
-  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
-bash /tmp/instalar.sh
+cd C:\QualidadeSQE
+curl.exe -fsSL -o 2-instalar.ps1 `
+  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.ps1
+powershell -ExecutionPolicy Bypass -File .\2-instalar.ps1
 ```
 
-Instala o Docker, **baixa o código do GitHub** para `/opt/qualidade-sqe`,
-sorteia as senhas do banco e do acesso principal, e sobe o sistema.
+Baixa o código para `C:\QualidadeSQE\app`, cria o banco e o usuário do
+PostgreSQL, escreve o `backend\.env`, monta o sistema e as telas, e cria
+o acesso principal.
 
 Demora: a primeira vez leva alguns minutos (ele monta o sistema do zero).
 
-No fim, o script **faz um login de verdade** para provar que telas, API,
-banco e o acesso principal estão todos de pé — e grava os dados de acesso
-em `C:\QualidadeSQE\PRIMEIRO-ACESSO.txt`.
+No fim, o script **confere o resultado contra o banco**: quantas tabelas
+existem, quantos usuários, quantas máquinas, se a tela compilada está no
+lugar. Não é "deu certo" na fé — são números.
 
-### Passo 3 — ligar o início automático e o backup
+### Passo 3 — ligar o início automático
 
 PowerShell **como administrador**:
 
 ```powershell
 cd C:\QualidadeSQE
-powershell -ExecutionPolicy Bypass -File .\3-ativar-inicio-automatico.ps1
+powershell -ExecutionPolicy Bypass -File .\app\deploy-servidor\3-ativar-inicio-automatico.ps1
 ```
 
-(o passo 2 já deixou este script nessa pasta)
-
-Ele pede a senha da conta de serviço e cria três tarefas agendadas:
+Ele põe o serviço do PostgreSQL em início automático e cria **uma** tarefa
+agendada:
 
 | Tarefa | Quando | Para quê |
 |---|---|---|
-| `QualidadeSQE-Iniciar` | ao ligar o servidor | sobe o sistema |
-| `QualidadeSQE-Vigia` | a cada 10 minutos | confere e religa se caiu |
-| `QualidadeSQE-Backup` | todo dia às 20:00 | copia banco + anexos |
+| `QualidadeSQE` | ao ligar o servidor | sobe o sistema e o mantém de pé |
 
-No fim ele executa a tarefa de boot e confere o sistema **pelo IP do
-servidor** (não por `localhost`), ou seja: testa o mesmo caminho que a
-fábrica vai usar, firewall incluso.
+Uma só, e não três como na versão antiga em Docker. A tarefa roda
+`iniciar-sqe.ps1`, que **fica em pé junto com o sistema**: enquanto o
+sistema está no ar, a tarefa aparece como `Running` no Agendador. Se o
+sistema cair, a tarefa cai com ele e o Windows a reinicia sozinho (três
+tentativas, de minuto em minuto). Não existe vigia de 10 minutos porque
+não existe janela de 10 minutos.
 
-> Se der erro de permissão, a conta precisa do direito **"Fazer logon como
-> tarefa em lote"** — `secpol.msc` → Políticas Locais → Atribuição de
-> direitos de usuário.
+No fim ele **sobe a tarefa e prova que o sistema responde**, e grava os
+dados de acesso em `C:\QualidadeSQE\PRIMEIRO-ACESSO.txt`.
+
+---
+
+## A trava
+
+Os scripts que mexem em banco (`2-instalar.ps1` e `restaurar.ps1`) leem a
+`DATABASE_URL` do `.env` e **param na hora** se ela não for o banco local
+desta máquina. Endereço de nuvem (Supabase, Render, AWS, Neon) aborta a
+execução.
+
+Isso existe porque um `restaurar.ps1` apontado para o banco errado é
+irreversível. A trava não é desconfiança do TI: é que ninguém deveria
+depender de ter lido o `.env` com atenção às 23h de um sábado.
 
 ---
 
@@ -113,7 +144,8 @@ fábrica vai usar, firewall incluso.
 2. Entre com o usuário e a senha de `C:\QualidadeSQE\PRIMEIRO-ACESSO.txt`
 3. **Troque a senha** e, em *Colaboradores*, cadastre as pessoas da
    Qualidade com as permissões de cada uma
-4. Apague o `PRIMEIRO-ACESSO.txt` (ou guarde no cofre de senhas do TI)
+4. Apague o `PRIMEIRO-ACESSO.txt` e guarde o `CREDENCIAIS.txt` no cofre de
+   senhas do TI (ele tem a senha do banco — sem ela não há restauração)
 
 O sistema começa **vazio**, de propósito. Os cadastros reais entram no
 primeiro dia pela importação de planilha (*Cadastros → Importar*), a
@@ -127,67 +159,94 @@ partir do modelo em branco que o próprio sistema gera.
 
 ## O sistema volta sozinho?
 
-Sim, e por quatro caminhos diferentes — cada um cobre um jeito de cair:
+Sim:
 
 | O que aconteceu | Quem resolve | Em quanto tempo |
 |---|---|---|
-| Uma parte do sistema travou | o próprio Docker religa | ~10 segundos |
-| O serviço do Docker caiu | o systemd do Linux religa | ~30 segundos |
-| O Linux desligou | a tarefa Vigia acorda | até 10 minutos |
-| O servidor reiniciou | a tarefa Iniciar, no boot | ~1 minuto |
+| O sistema travou ou fechou | o Windows reinicia a tarefa | ~1 minuto |
+| O banco travou | o serviço `postgresql-x64-17` religa | ~30 segundos |
+| O servidor reiniciou | a tarefa `QualidadeSQE`, no boot | ~1 minuto |
 
-Quando o servidor é desligado de forma normal, o sistema recebe o aviso,
-**termina de gravar o que estava em andamento** e só então fecha o banco —
-uma importação de planilha no meio do caminho não é cortada.
+Para acompanhar: `C:\QualidadeSQE\logs\backend.log`. É tudo o que o
+sistema escreveu desde que subiu — inclusive os erros.
 
-Para acompanhar: `C:\QualidadeSQE\logs\inicio.log`. Ele só escreve quando
-**mudou** alguma coisa; se estiver quieto, é porque está tudo no ar.
+**Ver se está no ar, sem abrir navegador:**
+
+```powershell
+Get-ScheduledTask -TaskName QualidadeSQE | Select-Object State
+(Invoke-WebRequest http://localhost:8080 -UseBasicParsing).StatusCode
+```
+
+`Running` e `200` é o que se espera.
 
 ---
 
 ## Backup
 
-Todo dia às 20:00, um arquivo único em **`C:\QualidadeSQE\backups\`**:
+Um arquivo único em **`C:\QualidadeSQE\backups\`**:
 
 ```
-qualidade_2026-09-21_2000.tar.gz
+qualidade_2026-10-31_2000.zip
 ```
 
 Dentro dele vai o banco inteiro (RNCs, inspeções, fornecedores,
-histórico) **e** todas as fotos e anexos enviados pela Qualidade.
+histórico) **e** todas as fotos e anexos enviados pela Qualidade. Os dois
+juntos de propósito: um banco sem os anexos deixa a RNC apontando para
+foto que não existe mais.
 
-O arquivo fica no disco do **Windows** de propósito: assim ele entra no
-backup corporativo do servidor junto com o resto, e o TI não precisa
-saber que existe um Linux no meio.
+O script **confere que o arquivo abre e que o banco está lá dentro** antes
+de dar o backup por bom. Se algo falhou no meio, ele **apaga o arquivo
+incompleto** — um .zip pela metade na pasta engana mais que arquivo
+nenhum. Guarda 30 dias.
 
-O script **confere que o arquivo abre** antes de dar o backup por bom — um
-arquivo corrompido não é contado como backup feito. Guarda 30 dias.
-
-**Recomendação:** inclua `C:\QualidadeSQE\backups\` na rotina de fita ou
-de nuvem da empresa. Backup que fica só no mesmo servidor não protege
-contra o servidor pegar fogo.
-
-Rodar um backup na hora, sem esperar as 20:00:
+Rodar um backup na hora:
 
 ```powershell
-wsl -d Ubuntu-22.04 -u root -e bash -lc /opt/qualidade-sqe/deploy-servidor/backup.sh
+powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\app\deploy-servidor\backup.ps1
 ```
+
+### Agendar o backup diário
+
+O passo 3 não agenda o backup — essa escolha é do TI, que sabe a que hora
+a fita roda. PowerShell **como administrador**:
+
+```powershell
+$a = New-ScheduledTaskAction -Execute 'powershell.exe' `
+  -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\QualidadeSQE\app\deploy-servidor\backup.ps1"'
+$g = New-ScheduledTaskTrigger -Daily -At 20:00
+Register-ScheduledTask -TaskName 'QualidadeSQE-Backup' -Action $a -Trigger $g `
+  -User 'SYSTEM' -RunLevel Highest -Force
+```
+
+**Recomendação:** inclua `C:\QualidadeSQE\backups\` na rotina de fita ou
+de nuvem da empresa. A pasta fica no **mesmo disco** do sistema — isso não
+protege contra o disco falhar.
 
 ### Restaurar
 
 ```powershell
 # ver o que existe
-wsl -d Ubuntu-22.04 -u root -e bash -lc "/opt/qualidade-sqe/deploy-servidor/restaurar.sh --listar"
+powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\app\deploy-servidor\restaurar.ps1 -Listar
 
 # restaurar
-wsl -d Ubuntu-22.04 -u root
-/opt/qualidade-sqe/deploy-servidor/restaurar.sh /mnt/c/QualidadeSQE/backups/qualidade_2026-09-21_2000.tar.gz
+powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\app\deploy-servidor\restaurar.ps1 `
+  -Arquivo C:\QualidadeSQE\backups\qualidade_2026-10-31_2000.zip
 ```
 
-A restauração **substitui** os dados de agora, então ela pede que você
-digite `RESTAURAR` por extenso para confirmar. E antes de tocar em
-qualquer coisa ela guarda sozinha uma cópia do estado atual
-(`antes-da-restauracao_*.dump`), para o caso de ter sido o backup errado.
+A restauração **substitui** os dados de agora. Por isso ela:
+
+1. para se a `DATABASE_URL` não for o banco local (a trava);
+2. pede que você **digite o nome da máquina** para confirmar — não um
+   "S/N" que se responde no automático;
+3. **tira um backup do estado atual** antes de tocar em qualquer coisa, e
+   confere que esse backup foi criado antes de seguir;
+4. confere o banco restaurado **contando tabelas e usuários**, não
+   confiando no código de saída do `pg_restore` (que reclama de coisas
+   inofensivas);
+5. se algo der errado, mostra o caminho do backup de segurança na tela.
+
+Os anexos são **mesclados**, nunca apagados: um arquivo que existe hoje e
+não existia no backup continua lá.
 
 ---
 
@@ -195,52 +254,50 @@ qualquer coisa ela guarda sozinha uma cópia do estado atual
 
 Tudo abaixo é no PowerShell, como administrador.
 
-**Ver se está no ar:**
-```powershell
-wsl -d Ubuntu-22.04 -u root -e bash -lc "cd /opt/qualidade-sqe && docker compose ps"
-```
-
-**Forçar uma conferência (sem esperar os 10 minutos):**
-```powershell
-powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\iniciar.ps1
-```
-
 **Reiniciar o sistema:**
 ```powershell
-wsl -d Ubuntu-22.04 -u root -e bash -lc "cd /opt/qualidade-sqe && docker compose restart"
+Restart-ScheduledTask -TaskName QualidadeSQE
 ```
 
 **Ver o que o sistema registrou:**
 ```powershell
-wsl -d Ubuntu-22.04 -u root -e bash -lc "cd /opt/qualidade-sqe && docker compose logs --tail=100 backend"
+Get-Content C:\QualidadeSQE\logs\backend.log -Tail 100
 ```
 
-**Trocar a porta 8080 por outra:** edite `APP_PORT` em
-`/opt/qualidade-sqe/.env`, rode `docker compose up -d`, e repita os
-passos 1 e 3 com `-Porta <nova>` (para refazer firewall e tarefas).
+**Acompanhar ao vivo** (útil quando alguém está reclamando agora):
+```powershell
+Get-Content C:\QualidadeSQE\logs\backend.log -Wait -Tail 20
+```
+
+**Trocar a porta 8080 por outra:** edite `PORT` em
+`C:\QualidadeSQE\app\backend\.env`, rode `Restart-ScheduledTask -TaskName
+QualidadeSQE`, e repita o passo 1 com `-Porta <nova>` para refazer a regra
+do firewall.
 
 ---
 
 ## Atualizar o sistema para uma versão nova
 
 Rode o passo 2 de novo. Ele reconhece que já existe instalação:
-**não sorteia senha nova, não apaga dado nenhum** — só troca o código pelo
-que está no GitHub e reconstrói.
+**não sorteia senha nova, não reescreve o `.env`, não apaga dado nenhum**
+— só traz o código novo do GitHub e reconstrói.
 
 ```powershell
-wsl -d Ubuntu-22.04 -u root
-curl -fsSL -o /tmp/instalar.sh \
-  https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh
-bash /tmp/instalar.sh
+powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\app\deploy-servidor\2-instalar.ps1
+Restart-ScheduledTask -TaskName QualidadeSQE
 ```
 
-**Tire um backup antes** (comando na seção anterior). É a rede de segurança
-para voltar atrás se a versão nova não agradar.
+**Tire um backup antes.** É a rede de segurança para voltar atrás se a
+versão nova não agradar.
+
+Se alguém tiver mexido nos arquivos da pasta `app` à mão, o script
+**avisa e não sobrescreve** — ele prefere parar a jogar fora trabalho de
+outra pessoa.
 
 Para saber qual versão está instalada:
 
 ```powershell
-wsl -d Ubuntu-22.04 -u root -e bash -lc "git -C /opt/qualidade-sqe log -1 --format='%h %ad %s' --date=short"
+git -C C:\QualidadeSQE\app log -1 --format='%h %ad %s' --date=short
 ```
 
 ---
@@ -251,38 +308,75 @@ Na ordem, do mais comum para o mais raro:
 
 1. **Só um computador não abre** → é rede/proxy daquela máquina, não é o
    servidor. Teste o mesmo endereço em outro micro.
-2. **Ninguém da rede abre, mas no servidor funciona** → firewall ou
-   encaminhamento de porta. Rode `C:\QualidadeSQE\iniciar.ps1`: ele
-   refaz o encaminhamento (o IP interno do Linux muda a cada boot, e é a
-   causa mais comum desse sintoma).
-3. **Nem no servidor abre** → veja `docker compose ps`. Se algum item não
-   estiver "Up", veja os logs do passo anterior.
-4. **Depois de trocar a senha da conta de serviço** → as três tarefas
-   param de rodar. Rode o passo 3 de novo com a senha nova.
+2. **Ninguém da rede abre, mas no servidor funciona** → firewall. Rode o
+   passo 1 de novo; ele refaz a regra da porta.
+3. **Nem no servidor abre** → veja se a tarefa está `Running`
+   (`Get-ScheduledTask -TaskName QualidadeSQE`). Se não estiver, rode
+   `Start-ScheduledTask -TaskName QualidadeSQE` e olhe o
+   `logs\backend.log`.
+4. **Abre, mas dá "Cannot GET /"** → a pasta `backend\public` não existe
+   ou está vazia: as telas não foram compiladas. Rode o passo 2 de novo.
+5. **Abre a tela mas nada carrega** → o banco. Veja se o serviço
+   `postgresql-x64-17` está rodando (`Get-Service postgresql-x64-17`).
 
 ---
 
 ## Onde fica o quê
 
-| Caminho | O que é |
-|---|---|
-| `github.com/missorino10-spec/qualidade-sqe`, ramo `main` | o código de onde tudo vem |
-| `/opt/qualidade-sqe` (dentro do WSL) | o sistema instalado |
-| `/opt/qualidade-sqe/.env` | senhas do banco e do acesso principal — **não versionar, não compartilhar** |
-| `C:\QualidadeSQE\backups\` | os backups diários |
-| `C:\QualidadeSQE\logs\inicio.log` | o que a vigia fez |
-| `C:\QualidadeSQE\logs\backup.log` | o que o backup fez |
-| `C:\QualidadeSQE\iniciar.ps1` | o script que mantém tudo no ar |
+```
+C:\QualidadeSQE\
+├── app\                      o código, clonado do GitHub
+│   ├── backend\
+│   │   ├── .env              senhas desta máquina — NAO versionar
+│   │   ├── dist\             o sistema compilado
+│   │   └── public\           as telas compiladas
+│   └── deploy-servidor\      estes scripts
+├── uploads\                  as fotos, certificados e laudos
+├── backups\                  os .zip diários
+├── logs\
+│   ├── backend.log           o que o sistema escreveu
+│   ├── backup.log            o que o backup fez
+│   └── restauracao.log       o que a restauração fez
+├── iniciar-sqe.ps1           o que a tarefa agendada executa
+├── CREDENCIAIS.txt           senhas sorteadas no passo 1 — guardar no cofre
+└── PRIMEIRO-ACESSO.txt       usuário e senha do primeiro login — apagar depois
+```
 
-Os dados ficam em volumes do Docker (`postgres_data` e `uploads_data`),
-dentro do WSL. **Nunca** rode `docker compose down -v` no servidor: o `-v`
-apaga esses volumes, ou seja, apaga o banco e os anexos.
+| Arquivo | Para quê |
+|---|---|
+| `1-preparar-windows.ps1` | instala Node, Git e PostgreSQL; sorteia as senhas |
+| `2-instalar.ps1` | baixa o código, cria o banco, monta o sistema |
+| `3-ativar-inicio-automatico.ps1` | cria a tarefa que sobe tudo no boot |
+| `iniciar-sqe.ps1` | sobe o sistema (é o que a tarefa executa) |
+| `backup.ps1` | gera o .zip com banco + anexos |
+| `restaurar.ps1` | volta o sistema para um backup |
+| `comum.ps1` | as peças que os outros usam; não roda sozinho |
+
+**Os dados que importam são dois:** o banco `qualidade` no PostgreSQL e a
+pasta `C:\QualidadeSQE\uploads`. Todo o resto pode ser refeito rodando os
+três passos.
 
 ---
 
-## Por que WSL2 e não Docker Desktop
+## Por que existe o `comum.ps1`
 
-O Docker Desktop exige licença paga para empresas deste porte e precisa de
-alguém logado na máquina para funcionar. O WSL2 com Docker Engine é
-gratuito, roda sem ninguém logado, é o mesmo Docker por baixo e é a forma
-suportada pela Microsoft no Windows Server.
+Ele guarda as quatro coisas que todos os outros scripts precisam: ler o
+`.env`, separar a `DATABASE_URL` em pedaços, achar o PostgreSQL e
+consultar o banco. Está em arquivo separado por um motivo prático —
+repetir isso em cinco scripts é repetir o erro em cinco scripts.
+
+Duas armadilhas estão resolvidas lá dentro, e vale saber que existem antes
+de alguém "simplificar" o código:
+
+**A senha vem codificada para URL.** Na `DATABASE_URL`, um `@` na senha
+aparece como `%40`. Sem desfazer isso, o `pg_dump` recebe a senha errada e
+o backup falha de madrugada, quando ninguém está olhando.
+
+**O PowerShell não preserva aspas duplas** ao chamar um programa externo.
+Um `psql -c 'select count(*) from "Usuario"'` chega no psql como
+`from Usuario`, sem aspas, e o PostgreSQL vai procurar `usuario` em
+minúsculas — que não existe, porque o Prisma cria `Usuario` com U
+maiúsculo. O sintoma é cruel: a consulta devolve "relação usuario não
+existe" e quem lê o script jura que o banco está corrompido. Foi assim que
+a conferência da restauração acusou um banco perfeito como inutilizável.
+Por isso o SQL vai sempre em **arquivo** (`psql -f`), nunca em `psql -c`.

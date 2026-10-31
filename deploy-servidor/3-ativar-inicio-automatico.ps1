@@ -1,31 +1,31 @@
 # ============================================================
 #  Sistema de Qualidade (SQE) - Big Dutchman Brasil
-#  PASSO 3 de 3  -  INICIO AUTOMATICO E BACKUP AUTOMATICO
+#  PASSO 3 de 3  -  INICIO AUTOMATICO
 #
 #  O que este script cria:
-#    QualidadeSQE-Iniciar  -> ao ligar o servidor, sobe o sistema
-#    QualidadeSQE-Vigia    -> de 10 em 10 minutos, confere e religa se caiu
-#    QualidadeSQE-Backup   -> todo dia as 20:00, copia banco + anexos
+#    QualidadeSQE  -> ao ligar a maquina, sobe o sistema (como SYSTEM)
+#    e deixa o servico do PostgreSQL em "Automatico"
 #
 #  COMO USAR (PowerShell "Executar como administrador"):
-#     cd <pasta-do-projeto>\deploy-servidor
-#     powershell -ExecutionPolicy Bypass -File .\3-ativar-inicio-automatico.ps1
+#     powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\app\deploy-servidor\3-ativar-inicio-automatico.ps1
 #
-#  CONTA: as tarefas rodam com a MESMA conta que instalou o WSL no passo 1.
-#  O WSL registra a distribuicao por usuario - com outra conta a tarefa
-#  simplesmente nao enxerga o Linux. Essa conta precisa de senha que NAO
-#  expira, senao o sistema para de subir no dia em que a senha vencer.
+#  CONTA: a tarefa roda como SYSTEM, nao como uma pessoa. Isso e de
+#  proposito e resolve tres problemas de uma vez:
+#    - o sistema sobe sem ninguem fazer login na maquina;
+#    - nao para no dia em que a senha de um funcionario vencer;
+#    - nao depende de a pessoa continuar na empresa.
+#  Em troca, o SYSTEM precisa poder escrever na pasta de anexos - o passo 1
+#  cuida disso, e este script confere.
+#
+#  Pode ser executado varias vezes (-Force refaz a tarefa).
 # ============================================================
 
 param(
-  [string]$Distro = 'Ubuntu-22.04',
-  [int]$Porta = 8080,
-  [string]$Pasta = '/opt/qualidade-sqe',
-  [string]$Conta = "$env:USERDOMAIN\$env:USERNAME",
-  [string]$HoraBackup = '20:00'
+  [string]$Base = 'C:\QualidadeSQE',
+  [int]$Porta = 8080
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 
 function Titulo($t) { Write-Host "`n==> $t" -ForegroundColor Cyan }
 function Ok($t)     { Write-Host "  [OK] $t" -ForegroundColor Green }
@@ -41,150 +41,222 @@ if (-not $souAdmin) {
   exit 1
 }
 
+$backend = Join-Path $Base 'app\backend'
+$destino = Join-Path $Base 'iniciar-sqe.ps1'
+
 Titulo 'Ativando o inicio automatico do Sistema de Qualidade (SQE)'
-Write-Host "  Conta das tarefas : $Conta"
-Write-Host "  Distribuicao      : $Distro"
-Write-Host "  Porta             : $Porta"
+Write-Host "  Tarefa : QualidadeSQE (conta SYSTEM)"
+Write-Host "  Porta  : $Porta"
 
 # ------------------------------------------------------------
-# 1. Copiar os scripts para um lugar fixo
-#    As tarefas apontam para C:\QualidadeSQE e nao para a pasta de origem:
-#    assim mover ou apagar a pasta do projeto no Windows nao derruba o
-#    sistema (o sistema mesmo mora dentro do Linux).
+# 0. O passo 2 foi feito?
 # ------------------------------------------------------------
-Titulo 'Instalando os scripts em C:\QualidadeSQE'
-
-$destino = 'C:\QualidadeSQE'
-foreach ($p in @($destino, "$destino\backups", "$destino\logs")) {
-  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
+foreach ($arq in @("$backend\dist\src\main.js", "$backend\public\index.html", "$backend\.env")) {
+  if (-not (Test-Path $arq)) {
+    Erro "Nao achei $arq"
+    Erro 'Rode o passo 2 antes deste.'
+    exit 1
+  }
 }
+Ok 'Sistema compilado e configurado.'
 
-# Desde que o codigo passou a vir do GitHub, o passo 2 ja deixa estes scripts
-# em C:\QualidadeSQE - e e de la que o TI roda este arquivo. Nesse caso origem
-# e destino sao a mesma pasta, e copiar um arquivo sobre ele mesmo e erro no
-# Windows. So copia quando veio de outro lugar.
-$origem = $PSScriptRoot
-if ((Resolve-Path $origem).Path -ne (Resolve-Path $destino).Path) {
-  Copy-Item "$origem\iniciar.ps1" "$destino\iniciar.ps1" -Force
-  Ok "$destino\iniciar.ps1"
+# ------------------------------------------------------------
+# 1. O banco tem de subir ANTES do sistema
+#
+#    Em "Automatico" o servico do banco sobe no boot. O sistema tenta
+#    conectar logo em seguida; se o banco ainda estiver subindo, a tarefa
+#    religa o sistema (RestartCount abaixo) e na segunda tentativa funciona.
+# ------------------------------------------------------------
+Titulo 'Deixando o banco em Automatico'
+$pg = Get-Service postgresql-x64-17 -ErrorAction SilentlyContinue
+if (-not $pg) { Erro 'Servico postgresql-x64-17 nao encontrado. Rode o passo 1.'; exit 1 }
+
+Set-Service -Name postgresql-x64-17 -StartupType Automatic
+if ($pg.Status -ne 'Running') { Start-Service $pg.Name; Start-Sleep -Seconds 5 }
+$pg = Get-Service postgresql-x64-17
+Ok "$($pg.Name): $($pg.Status) / $($pg.StartType)"
+
+# ------------------------------------------------------------
+# 2. O script de inicializacao em lugar fixo
+#
+#    A tarefa aponta para C:\QualidadeSQE e nao para a pasta do codigo:
+#    atualizar o codigo (git pull) nao deve mexer no que sobe o sistema.
+# ------------------------------------------------------------
+Titulo 'Instalando o script de inicializacao'
+$origem = Join-Path $PSScriptRoot 'iniciar-sqe.ps1'
+if (-not (Test-Path $origem)) { Erro "Nao achei $origem"; exit 1 }
+
+if ((Resolve-Path $origem).Path -ne (Resolve-Path -Path $destino -ErrorAction SilentlyContinue).Path) {
+  Copy-Item $origem $destino -Force
+}
+Ok $destino
+
+# Conferir que o SYSTEM escreve nos anexos. Sem isto o sistema sobe, as
+# pessoas trabalham, e o erro aparece semanas depois na primeira foto de
+# defeito que alguem tentar anexar.
+$temSystem = (Get-Acl "$Base\uploads").Access |
+  Where-Object { $_.IdentityReference -match 'SISTEMA|SYSTEM' -and $_.FileSystemRights -match 'FullControl|Write|Modify' }
+if ($temSystem) {
+  Ok 'SYSTEM pode escrever em uploads.'
 } else {
-  Ok "$destino\iniciar.ps1 (ja estava no lugar)"
-}
-
-$scriptIniciar = "$destino\iniciar.ps1"
-
-# ------------------------------------------------------------
-# 2. Senha da conta de servico
-# ------------------------------------------------------------
-Titulo 'Senha da conta de servico'
-Write-Host '  A tarefa precisa rodar "estando o usuario conectado ou nao", e para'
-Write-Host '  isso o Windows exige a senha da conta guardada no cofre dele.'
-Write-Host "  Digite a senha de $Conta (ela nao aparece na tela):"
-$senhaSegura = Read-Host -AsSecureString
-$senha = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($senhaSegura)
-)
-
-if ([string]::IsNullOrWhiteSpace($senha)) {
-  Erro 'Senha vazia. O Windows nao aceita tarefa sem sessao com senha em branco.'
-  exit 1
+  Aviso 'SYSTEM nao aparece com permissao de escrita em uploads. Corrigindo ...'
+  icacls "$Base\uploads" /grant '*S-1-5-18:(OI)(CI)F' 2>&1 | Out-Null
+  Ok 'Permissao concedida.'
 }
 
 # ------------------------------------------------------------
-# 3. Criar as tarefas
+# 3. Derrubar o que estiver no ar
+#
+#    Duas instancias na mesma porta: a segunda morre com "address already in
+#    use" e a tarefa pareceria quebrada sem estar. So e encerrado o processo
+#    desta instalacao - outro Node da maquina nao e tocado.
 # ------------------------------------------------------------
-Titulo 'Criando as tarefas agendadas'
-
-$psExe = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$args  = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptIniciar`" -Distro $Distro -Porta $Porta -Pasta $Pasta"
-$cmdIniciar = "`"$psExe`" $args"
-
-$cmdBackup = "`"$env:SystemRoot\System32\wsl.exe`" -d $Distro -u root -e bash -lc `"$Pasta/deploy-servidor/backup.sh`""
-
-function CriarTarefa($nome, $agenda, $comando, $descricao) {
-  schtasks /Query /TN $nome 2>$null | Out-Null
-  if ($LASTEXITCODE -eq 0) {
-    schtasks /Delete /TN $nome /F | Out-Null
+Titulo 'Derrubando instancia anterior, se houver'
+$mortos = 0
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+  if ($_.CommandLine -like "*$backend\dist\src\main.js*") {
+    Write-Host "  encerrando PID $($_.ProcessId)"
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    $mortos++
   }
+}
+if ($mortos -eq 0) { Ok 'Nada rodando.' } else { Start-Sleep -Seconds 3 }
 
-  $saida = schtasks /Create /TN $nome /TR $comando /RU $Conta /RP $senha `
-    /RL HIGHEST /F @agenda 2>&1
+# ------------------------------------------------------------
+# 4. A tarefa agendada
+# ------------------------------------------------------------
+Titulo 'Registrando a tarefa QualidadeSQE'
 
-  if ($LASTEXITCODE -ne 0) {
-    Erro "Falhou ao criar '$nome':"
-    Write-Host "    $saida" -ForegroundColor Red
-    return $false
+$acao = New-ScheduledTaskAction `
+  -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+  -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$destino`""
+
+$gatilho = New-ScheduledTaskTrigger -AtStartup
+
+# RestartCount/RestartInterval: se o Node morrer, tenta de novo 3 vezes, de
+#   minuto em minuto. Cobre o caso do banco ainda estar subindo no boot.
+# ExecutionTimeLimit Zero: sem limite de tempo. O padrao do Windows e matar
+#   a tarefa depois de 3 dias - o sistema cairia sozinho no terceiro dia.
+# StartWhenAvailable: se a maquina estava desligada na hora do gatilho,
+#   roda assim que ligar.
+# MultipleInstances IgnoreNew: nunca duas instancias na mesma porta.
+$opcoes = New-ScheduledTaskSettingsSet `
+  -RestartCount 3 `
+  -RestartInterval (New-TimeSpan -Minutes 1) `
+  -ExecutionTimeLimit ([TimeSpan]::Zero) `
+  -StartWhenAvailable `
+  -MultipleInstances IgnoreNew
+
+Register-ScheduledTask -TaskName 'QualidadeSQE' `
+  -Description 'Inicia a aplicacao de Qualidade ao ligar o servidor' `
+  -Action $acao -Trigger $gatilho -Settings $opcoes `
+  -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+Ok 'Tarefa registrada.'
+
+# ------------------------------------------------------------
+# 5. Subir agora e PROVAR que respondeu
+#
+#    Registrar a tarefa nao prova nada. A prova e a tela abrindo.
+# ------------------------------------------------------------
+Titulo 'Subindo o sistema'
+Start-ScheduledTask -TaskName 'QualidadeSQE'
+
+$escutando = $false
+foreach ($i in 1..60) {
+  Start-Sleep -Seconds 1
+  if (Get-NetTCPConnection -LocalPort $Porta -State Listen -ErrorAction SilentlyContinue) {
+    $escutando = $true
+    Ok "porta $Porta escutando apos $i s"
+    break
   }
-  Ok "$nome - $descricao"
-  return $true
 }
 
-$tudoOk = $true
-$tudoOk = (CriarTarefa 'QualidadeSQE-Iniciar' @('/SC','ONSTART','/DELAY','0001:00') `
-  $cmdIniciar 'sobe o sistema quando o servidor liga') -and $tudoOk
-
-$tudoOk = (CriarTarefa 'QualidadeSQE-Vigia' @('/SC','MINUTE','/MO','10') `
-  $cmdIniciar 'confere de 10 em 10 minutos e religa se cair') -and $tudoOk
-
-$tudoOk = (CriarTarefa 'QualidadeSQE-Backup' @('/SC','DAILY','/ST',$HoraBackup) `
-  $cmdBackup "copia banco + anexos todo dia as $HoraBackup") -and $tudoOk
-
-$senha = $null
-
-if (-not $tudoOk) {
+if (-not $escutando) {
+  Erro "A porta $Porta nao abriu em 60 segundos."
   Write-Host ''
-  Aviso 'Alguma tarefa nao foi criada. Causa mais comum: a conta nao tem o'
-  Aviso 'direito "Fazer logon como tarefa em lote".'
-  Aviso 'Corrija em: secpol.msc > Politicas Locais > Atribuicao de direitos'
-  Aviso '            de usuario > Fazer logon como tarefa em lote > adicionar a conta'
+  Write-Host '  Ultimas linhas do log:' -ForegroundColor Yellow
+  Get-Content "$Base\logs\backend.log" -Tail 25 -ErrorAction SilentlyContinue
   exit 1
 }
-
-# ------------------------------------------------------------
-# 4. Provar agora: rodar a tarefa de inicializacao
-# ------------------------------------------------------------
-Titulo 'Testando a tarefa de inicializacao agora'
-
-schtasks /Run /TN 'QualidadeSQE-Iniciar' | Out-Null
-Write-Host '  Aguardando o sistema responder...'
-
-$ipServidor = (Get-NetIPAddress -AddressFamily IPv4 |
-  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } |
-  Select-Object -First 1).IPAddress
 
 $respondeu = $false
-foreach ($t in 1..24) {
-  Start-Sleep -Seconds 5
+foreach ($i in 1..12) {
   try {
-    $r = Invoke-WebRequest -Uri "http://$ipServidor`:$Porta/" -UseBasicParsing -TimeoutSec 5
+    $r = Invoke-WebRequest "http://localhost:$Porta/" -UseBasicParsing -TimeoutSec 5
     if ($r.StatusCode -eq 200) { $respondeu = $true; break }
-  } catch { }
+  } catch { Start-Sleep -Seconds 5 }
 }
 
-Write-Host ''
 if ($respondeu) {
-  Write-Host '============================================================' -ForegroundColor Green
-  Write-Host '  INSTALACAO CONCLUIDA - O SISTEMA ESTA NO AR' -ForegroundColor Green
-  Write-Host '============================================================' -ForegroundColor Green
-  Write-Host ''
-  Write-Host "  Endereco para a fabrica:  http://$ipServidor`:$Porta" -ForegroundColor Cyan
-  Write-Host ''
-  Write-Host "  Acesso principal (usuario e senha): $destino\PRIMEIRO-ACESSO.txt" -ForegroundColor Cyan
-  Write-Host '  (a mesma senha apareceu na tela, no final do passo 2)'
-  Write-Host '  Apague esse arquivo depois de guardar a senha no cofre do TI.'
-  Write-Host ''
-  Write-Host '  O sistema volta sozinho se: o conteiner morrer, o Docker cair,'
-  Write-Host '  o Linux desligar ou o servidor reiniciar.'
-  Write-Host ''
-  Write-Host "  Backups diarios em: $destino\backups"
-  Write-Host "  Registro de inicializacao em: $destino\logs\inicio.log"
+  Ok 'A tela respondeu HTTP 200.'
 } else {
-  Erro "O sistema nao respondeu em http://$ipServidor`:$Porta"
-  Write-Host ''
-  Write-Host '  Onde olhar:' -ForegroundColor Yellow
-  Write-Host "   1. $destino\logs\inicio.log"
-  Write-Host "   2. wsl -d $Distro -u root -e bash -lc 'cd $Pasta && docker compose ps'"
-  Write-Host "   3. wsl -d $Distro -u root -e bash -lc 'cd $Pasta && docker compose logs --tail=80'"
+  Erro 'A porta abriu mas a tela nao respondeu.'
+  Get-Content "$Base\logs\backend.log" -Tail 25 -ErrorAction SilentlyContinue
   exit 1
 }
+
+$t = Get-ScheduledTask -TaskName 'QualidadeSQE'
+Ok "Tarefa QualidadeSQE: $($t.State)   (Running = sistema no ar)"
+
+# ------------------------------------------------------------
+# 6. A senha do primeiro acesso
+#
+#    E a unica coisa desta instalacao que nao se descobre olhando a maquina.
+#    Por isso ela e escrita em arquivo separado, curto, facil de achar.
+# ------------------------------------------------------------
+Titulo 'Senha do primeiro acesso'
+
+$acesso = Join-Path $Base 'PRIMEIRO-ACESSO.txt'
+$valores = @{}
+Get-Content "$backend\.env" | ForEach-Object {
+  if ($_ -match '^(SEED_ADMIN_EMAIL|SEED_ADMIN_PASSWORD)=(.*)$') { $valores[$matches[1]] = $matches[2] }
+}
+
+$ip = (Get-NetIPAddress -AddressFamily IPv4 |
+  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+  Select-Object -First 1).IPAddress
+
+$conteudo = @"
+============================================================
+ SISTEMA DE QUALIDADE (SQE) - PRIMEIRO ACESSO
+ Maquina $env:COMPUTERNAME, $(Get-Date -Format 'dd/MM/yyyy HH:mm')
+============================================================
+
+ Endereco : http://$ip`:$Porta
+            http://$env:COMPUTERNAME`:$Porta
+
+ Usuario  : $($valores['SEED_ADMIN_EMAIL'])
+ Senha    : $($valores['SEED_ADMIN_PASSWORD'])
+
+ Troque a senha no primeiro acesso.
+ APAGUE ESTE ARQUIVO depois de guardar a senha no cofre do TI.
+
+ Se este arquivo for perdido, a senha ainda esta em:
+   $backend\.env            (linha SEED_ADMIN_PASSWORD)
+   $Base\CREDENCIAIS.txt    (linha ADMINPW)
+============================================================
+"@
+
+[System.IO.File]::WriteAllText($acesso, $conteudo, (New-Object System.Text.UTF8Encoding($false)))
+icacls $acesso /inheritance:r /grant:r "$($env:USERNAME):(R,W)" `
+  '*S-1-5-18:(R)' '*S-1-5-32-544:(R)' 2>&1 | Out-Null
+Ok $acesso
+
+# ------------------------------------------------------------
+# Fim
+# ------------------------------------------------------------
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Green
+Write-Host '  INSTALACAO CONCLUIDA - O SISTEMA ESTA NO AR' -ForegroundColor Green
+Write-Host '============================================================' -ForegroundColor Green
+Write-Host "  Abra na fabrica: http://$ip`:$Porta" -ForegroundColor Cyan
+Write-Host ''
+Write-Host "  Usuario e senha: $acesso" -ForegroundColor Cyan
+Write-Host '  Apague esse arquivo depois de guardar a senha no cofre do TI.'
+Write-Host ''
+Write-Host '  Daqui para frente o sistema sobe sozinho quando a maquina ligar.'
+Write-Host ''
+Write-Host '  Para conferir a qualquer momento:' -ForegroundColor Cyan
+Write-Host '     Get-ScheduledTask -TaskName QualidadeSQE | Select-Object TaskName, State'
+Write-Host "     Get-Content $Base\logs\backend.log -Tail 30"
 Write-Host ''

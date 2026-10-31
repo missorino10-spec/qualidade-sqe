@@ -1,13 +1,19 @@
 # ============================================================
 #  Sistema de Qualidade (SQE) - Big Dutchman Brasil
-#  PASSO 1 de 3  -  PREPARAR O WINDOWS SERVER
+#  PASSO 1 de 3  -  PREPARAR O WINDOWS
 #
-#  O que este script faz (lado Windows):
-#    1. Confere se a maquina aguenta virtualizacao
-#    2. Liga os recursos WSL2 (Subsistema Linux + Plataforma de Maquina Virtual)
-#    3. Instala a distribuicao Ubuntu
-#    4. Abre a porta do sistema no firewall do Windows
-#    5. Cria as pastas de backup e de log em C:\QualidadeSQE
+#  Instalacao NATIVA no Windows: sem Ubuntu, sem WSL e sem Docker.
+#  O sistema roda como um processo do Node servindo uma porta, e o banco e
+#  o servico do PostgreSQL do proprio Windows. Foi assim que o servidor da
+#  fabrica subiu, e e isso que estes tres scripts reproduzem.
+#
+#  O que este script faz:
+#    1. Confere a maquina e se ja existe instalacao anterior
+#    2. Instala o Node.js (versao fixa, conferida por SHA256)
+#    3. Instala o PostgreSQL 17 (servico postgresql-x64-17)
+#    4. Cria as pastas em C:\QualidadeSQE
+#    5. Gera as senhas desta maquina (uma vez, e nunca mais)
+#    6. Abre a porta do sistema no firewall
 #
 #  COMO USAR (PowerShell "Executar como administrador"):
 #     mkdir C:\QualidadeSQE -Force; cd C:\QualidadeSQE
@@ -15,28 +21,26 @@
 #       https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/1-preparar-windows.ps1
 #     powershell -ExecutionPolicy Bypass -File .\1-preparar-windows.ps1
 #
-#  IMPORTANTE: faca login com a MESMA conta que vai rodar o sistema depois
-#  (a conta de servico). O WSL registra a distribuicao por usuario: se voce
-#  instalar com a sua conta e agendar com outra, a tarefa nao enxerga o Ubuntu.
-#
-#  Pode ser executado varias vezes sem problema (nao desfaz nada).
+#  Pode ser executado varias vezes: ele confere antes de instalar e NUNCA
+#  regera as senhas de uma instalacao que ja existe.
 # ============================================================
 
 param(
-  [string]$Distro = 'Ubuntu-22.04',
-  [int]$Porta = 8080
+  [string]$VersaoNode = '24.21.0',
+  [int]$Porta = 8080,
+  [string]$Base = 'C:\QualidadeSQE'
 )
 
-$ErrorActionPreference = 'Stop'
+# 'Continue' de proposito: curl, msiexec e winget escrevem mensagem normal no
+# stderr e, com 'Stop', o PowerShell trata isso como falha e aborta no meio.
+# Aqui se confere $LASTEXITCODE e o resultado de cada passo.
+$ErrorActionPreference = 'Continue'
 
 function Titulo($t) { Write-Host "`n==> $t" -ForegroundColor Cyan }
 function Ok($t)     { Write-Host "  [OK] $t" -ForegroundColor Green }
 function Aviso($t)  { Write-Host "  [!] $t" -ForegroundColor Yellow }
 function Erro($t)   { Write-Host "  [ERRO] $t" -ForegroundColor Red }
 
-# ------------------------------------------------------------
-# 0. Precisa ser administrador
-# ------------------------------------------------------------
 $souAdmin = ([Security.Principal.WindowsPrincipal] `
   [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -46,122 +50,285 @@ if (-not $souAdmin) {
   exit 1
 }
 
-Titulo 'Preparando o Windows Server para o Sistema de Qualidade (SQE)'
-Write-Host "  Conta atual      : $env:USERDOMAIN\$env:USERNAME"
-Write-Host "  Distribuicao WSL : $Distro"
-Write-Host "  Porta do sistema : $Porta"
-
-# ------------------------------------------------------------
-# 1. A maquina aguenta virtualizacao?
-# ------------------------------------------------------------
-Titulo 'Conferindo a maquina'
-
+Titulo 'Preparando o Windows para o Sistema de Qualidade (SQE)'
 $so = Get-CimInstance Win32_OperatingSystem
-Write-Host "  Sistema: $($so.Caption) build $($so.BuildNumber)"
-if ([int]$so.BuildNumber -lt 19041) {
-  Erro 'O WSL2 exige build 19041 ou superior. Atualize o Windows antes de continuar.'
-  exit 1
-}
-Ok 'Versao do Windows compativel com WSL2.'
+Write-Host "  Sistema : $($so.Caption) build $($so.BuildNumber)"
+Write-Host "  Conta   : $env:USERDOMAIN\$env:USERNAME"
+Write-Host "  Pasta   : $Base"
+Write-Host "  Porta   : $Porta"
 
-# Em servidor fisico a virtualizacao vem do processador; em VM (VMware/Hyper-V)
-# e preciso que o hipervisor exponha a virtualizacao aninhada para a VM.
-$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-if (-not $cpu.VirtualizationFirmwareEnabled -and -not (Get-CimInstance Win32_ComputerSystem).HypervisorPresent) {
-  Aviso 'A virtualizacao parece DESLIGADA no BIOS/hipervisor.'
-  Aviso 'Se este servidor for uma maquina virtual, peca a virtualizacao aninhada'
-  Aviso '(nested virtualization) ao time que administra o hipervisor.'
+# ------------------------------------------------------------
+# 1. Ja existe instalacao nesta maquina?
+#
+#    Conferir ANTES de mexer em qualquer coisa. Se alguem rodar este script
+#    por engano num servidor que ja atende a fabrica, ele precisa descobrir
+#    isso aqui - e nao depois de ter instalado algo por cima.
+# ------------------------------------------------------------
+Titulo 'Conferindo o que ja existe'
+
+$achados = @()
+if (Test-Path "$Base\app")                 { $achados += "codigo em $Base\app" }
+if (Test-Path "$Base\app\backend\.env")    { $achados += "configuracao em $Base\app\backend\.env" }
+if (Get-Service postgresql-x64-17 -ErrorAction SilentlyContinue) { $achados += 'servico postgresql-x64-17' }
+if (Get-ScheduledTask -TaskName 'QualidadeSQE' -ErrorAction SilentlyContinue) { $achados += 'tarefa agendada QualidadeSQE' }
+
+if ($achados) {
+  Aviso 'Esta maquina JA tem parte do sistema instalada:'
+  foreach ($a in $achados) { Write-Host "      - $a" }
+  Aviso 'Nada sera apagado. O script apenas completa o que falta.'
 } else {
-  Ok 'Virtualizacao disponivel.'
+  Ok 'Maquina limpa - instalacao nova.'
 }
 
 # ------------------------------------------------------------
-# 2. Ligar os recursos do WSL2
+# 2. Node.js
+#
+#    Versao FIXA, e nao "a mais nova": o Prisma 5.22 esta homologado nesta
+#    e trocar o Node por conta propria e trocar a base do sistema. O
+#    instalador oficial em .msi e usado de proposito, porque os gerenciadores
+#    de pacote entregam a versao que quiserem.
 # ------------------------------------------------------------
-Titulo 'Ligando os recursos do WSL2'
+Titulo "Instalando o Node.js $VersaoNode"
 
-$precisaReiniciar = $false
-foreach ($recurso in @('Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform')) {
-  $estado = (Get-WindowsOptionalFeature -Online -FeatureName $recurso -ErrorAction SilentlyContinue)
-  if ($null -eq $estado) {
-    Aviso "Recurso $recurso nao encontrado nesta edicao do Windows."
-    continue
-  }
-  if ($estado.State -eq 'Enabled') {
-    Ok "$recurso ja estava ligado."
-  } else {
-    Write-Host "  Ligando $recurso ..."
-    $r = Enable-WindowsOptionalFeature -Online -FeatureName $recurso -All -NoRestart
-    Ok "$recurso ligado."
-    if ($r.RestartNeeded) { $precisaReiniciar = $true }
-  }
-}
+$nodeExe = 'C:\Program Files\nodejs\node.exe'
 
-if ($precisaReiniciar) {
-  Write-Host ''
-  Aviso 'O Windows precisa ser REINICIADO para terminar de ligar o WSL2.'
-  Aviso 'Reinicie o servidor e rode este mesmo script outra vez.'
-  exit 0
-}
+# O instalador poe a pasta no PATH da MAQUINA, mas um terminal que ja estava
+# aberto continua com o PATH antigo. Sem esta linha, o "npm ci" do passo 2
+# falha com "node nao e reconhecido" - o erro mais confuso desta instalacao.
+if ($env:Path -notlike '*nodejs*') { $env:Path = 'C:\Program Files\nodejs;' + $env:Path }
 
-# ------------------------------------------------------------
-# 3. Instalar / conferir a distribuicao Ubuntu
-# ------------------------------------------------------------
-Titulo 'Instalando a distribuicao Linux'
+$versaoAtual = ''
+if (Test-Path $nodeExe) { $versaoAtual = (& $nodeExe -v) -replace '^v', '' }
 
-# wsl.exe escreve em UTF-16; sem isto o texto volta picotado e nenhum
-# "match" funciona.
-$codificacaoAnterior = [Console]::OutputEncoding
-[Console]::OutputEncoding = [System.Text.Encoding]::Unicode
+if ($versaoAtual -eq $VersaoNode) {
+  Ok "Node $VersaoNode ja instalado."
+} else {
+  if ($versaoAtual) { Aviso "Esta instalado o Node $versaoAtual; instalando o $VersaoNode por cima." }
 
-try {
-  & wsl.exe --set-default-version 2 | Out-Null
+  $msi = Join-Path $env:TEMP "node-v$VersaoNode-x64.msi"
+  $urlMsi  = "https://nodejs.org/dist/v$VersaoNode/node-v$VersaoNode-x64.msi"
+  $urlHash = "https://nodejs.org/dist/v$VersaoNode/SHASUMS256.txt"
 
-  $instaladas = (& wsl.exe --list --quiet) -replace "`0", '' |
-    ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-
-  if ($instaladas -contains $Distro) {
-    Ok "$Distro ja esta instalada."
-  } else {
-    Write-Host "  Baixando e instalando $Distro (pode demorar alguns minutos)..."
-    # --no-launch evita a tela interativa que pede usuario e senha do Linux:
-    # o sistema roda como root dentro da distro, nao precisa de usuario comum.
-    & wsl.exe --install -d $Distro --no-launch
-    if ($LASTEXITCODE -ne 0) {
-      Erro 'Nao foi possivel instalar automaticamente.'
-      Write-Host ''
-      Write-Host '  Servidor sem loja/sem internet direta? Instale manualmente:' -ForegroundColor Yellow
-      Write-Host '   1. Baixe o pacote da distribuicao em uma maquina com internet:'
-      Write-Host '      https://aka.ms/wslubuntu2204'
-      Write-Host '   2. Copie o arquivo .AppxBundle para o servidor'
-      Write-Host '   3. No servidor:  Add-AppxPackage .\Ubuntu2204.AppxBundle'
-      Write-Host '   4. Rode este script de novo'
-      exit 1
-    }
-    Ok "$Distro instalada."
+  Write-Host "  Baixando $urlMsi ..."
+  # TLS 1.2 explicito: Windows Server mais antigo ainda negocia TLS 1.0 por
+  # padrao e o nodejs.org recusa a conexao.
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  try {
+    Invoke-WebRequest $urlMsi -OutFile $msi -UseBasicParsing -TimeoutSec 600
+  } catch {
+    Erro "Nao foi possivel baixar o Node: $($_.Exception.Message)"
+    Write-Host '  Servidor sem internet? Baixe o .msi em outra maquina, copie para' -ForegroundColor Yellow
+    Write-Host "  $msi e rode este script de novo." -ForegroundColor Yellow
+    exit 1
   }
 
-  # Primeiro boot da distro (cria o sistema de arquivos).
-  & wsl.exe -d $Distro -u root -e /bin/true 2>&1 | Out-Null
-  $versao = (& wsl.exe --list --verbose) -replace "`0", ''
-  if ($versao -match "$Distro\s+\S+\s+1") {
-    Write-Host "  Convertendo $Distro para WSL 2 ..."
-    & wsl.exe --set-version $Distro 2
+  # Confere a impressao digital do arquivo contra a lista oficial. Instalar
+  # um .msi baixado sem conferir e aceitar qualquer coisa que tenha chegado
+  # pela rede.
+  Write-Host '  Conferindo a assinatura SHA256 ...'
+  $esperado = ((Invoke-WebRequest $urlHash -UseBasicParsing -TimeoutSec 120).Content -split "`n" |
+               Where-Object { $_ -match "node-v$([regex]::Escape($VersaoNode))-x64\.msi" }) -split '\s+' |
+               Select-Object -First 1
+  $obtido = (Get-FileHash $msi -Algorithm SHA256).Hash
+
+  if (-not $esperado) {
+    Erro "A versao $VersaoNode nao aparece na lista oficial de assinaturas."
+    exit 1
   }
-  Ok 'Distribuicao pronta e rodando em WSL 2.'
-}
-finally {
-  [Console]::OutputEncoding = $codificacaoAnterior
+  if ($obtido -ne $esperado.ToUpper()) {
+    Erro 'A assinatura do arquivo NAO confere. O download sera descartado.'
+    Write-Host "  esperado: $($esperado.ToUpper())"
+    Write-Host "  obtido  : $obtido"
+    Remove-Item $msi -Force -ErrorAction SilentlyContinue
+    exit 1
+  }
+  Ok 'Assinatura confere.'
+
+  Write-Host '  Instalando (silencioso) ...'
+  $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait -PassThru
+  if ($p.ExitCode -ne 0) { Erro "msiexec devolveu $($p.ExitCode)"; exit 1 }
+  Remove-Item $msi -Force -ErrorAction SilentlyContinue
+
+  if (-not (Test-Path $nodeExe)) { Erro 'O Node nao apareceu em C:\Program Files\nodejs.'; exit 1 }
+  Ok "Node $(& $nodeExe -v) / npm $(& 'C:\Program Files\nodejs\npm.cmd' -v)"
 }
 
 # ------------------------------------------------------------
-# 4. Abrir a porta no firewall
+# 3. Git
+# ------------------------------------------------------------
+Titulo 'Conferindo o Git'
+if (Get-Command git -ErrorAction SilentlyContinue) {
+  Ok "$((git --version))"
+} else {
+  Aviso 'Git nao encontrado. Instalando pelo winget ...'
+  & winget install --id Git.Git --exact --silent --accept-source-agreements --accept-package-agreements
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Erro 'Instale o Git manualmente: https://git-scm.com/download/win'
+    exit 1
+  }
+  Ok 'Git instalado.'
+}
+
+# ------------------------------------------------------------
+# 4. Pastas
+# ------------------------------------------------------------
+Titulo 'Criando as pastas'
+foreach ($p in @($Base, "$Base\uploads", "$Base\logs", "$Base\backups")) {
+  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
+}
+Ok "$Base\uploads   (anexos: foto de defeito, certificado, laudo)"
+Ok "$Base\logs      (saida do sistema)"
+Ok "$Base\backups   (copias de seguranca - inclua no backup corporativo)"
+
+# O sistema roda como SYSTEM (ver passo 3). Se o SYSTEM nao escrever em
+# uploads, todo anexo falha no momento de salvar - e o erro aparece so quando
+# alguem tenta anexar uma foto, semanas depois.
+icacls "$Base\uploads" /grant '*S-1-5-18:(OI)(CI)F' 2>&1 | Out-Null
+Ok 'SYSTEM pode escrever em uploads.'
+
+# ------------------------------------------------------------
+# 5. Senhas desta maquina
+#
+#    Geradas AQUI, uma unica vez, e guardadas em um arquivo so. As senhas de
+#    um servidor nao valem para outro e nao vao para o GitHub.
+#
+#    Somente letras e numeros: a senha do banco entra dentro da DATABASE_URL,
+#    que e uma URL. Um "@" ou "/" na senha quebraria a URL em pedacos e a
+#    conexao falharia com um erro que nao aponta para a causa.
+# ------------------------------------------------------------
+Titulo 'Gerando as senhas desta maquina'
+
+$arqCred = "$Base\CREDENCIAIS.txt"
+
+if (Test-Path $arqCred) {
+  Aviso "$arqCred ja existe - MANTIDO como esta."
+  Aviso 'Regerar as senhas agora deixaria o sistema sem acesso ao proprio banco.'
+} else {
+  function Senha([int]$tamanho) {
+    $alfabeto = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    $bytes = [byte[]]::new($tamanho * 4)
+    # Gerador criptografico, nao Get-Random: Get-Random e previsivel e isto
+    # aqui e a senha do banco de dados da Qualidade.
+    ([System.Security.Cryptography.RandomNumberGenerator]::Create()).GetBytes($bytes)
+    -join (0..($tamanho - 1) | ForEach-Object {
+      $n = [BitConverter]::ToUInt32($bytes, $_ * 4)
+      $alfabeto[$n % $alfabeto.Length]
+    })
+  }
+
+  $texto = @"
+============================================================
+ SISTEMA DE QUALIDADE (SQE) - SENHAS DESTA MAQUINA
+ Geradas em $(Get-Date -Format 'dd/MM/yyyy HH:mm') por $env:USERDOMAIN\$env:USERNAME
+ Maquina: $env:COMPUTERNAME
+============================================================
+
+ GUARDE ESTE CONTEUDO NO COFRE DE SENHAS DO TI.
+
+ Estas senhas valem SO para esta maquina. Nao estao no GitHub e nao
+ podem ser recuperadas se este arquivo for perdido: sem elas nao da
+ para fazer manutencao no banco nem restaurar um backup.
+
+ 1) PostgreSQL - administrador do banco (usuario "postgres")
+    Usado so para manutencao e para criar o banco do sistema.
+    PGSUPER=$(Senha 24)
+
+ 2) PostgreSQL - usuario do sistema (usuario "qualidade")
+    E esta que entra na DATABASE_URL do backend\.env.
+    PGAPP=$(Senha 24)
+
+ 3) Primeiro acesso ao sistema (administrador da Qualidade)
+    ADMINPW=$(Senha 20)
+
+ 4) Chave que assina o login (JWT_SECRET)
+    Trocar esta chave desloga todo mundo na hora.
+    JWT=$(Senha 64)
+
+============================================================
+"@
+
+  # UTF8 SEM BOM. O passo 2 le este arquivo linha por linha; com BOM a
+  # primeira chave viraria "\ufeffPGSUPER" e nao seria encontrada.
+  [System.IO.File]::WriteAllText($arqCred, $texto, (New-Object System.Text.UTF8Encoding($false)))
+
+  # Fecha o arquivo: so SYSTEM, Administradores e quem instalou.
+  # Os SIDs sao usados no lugar dos nomes porque "Administrators" nao existe
+  # no Windows em portugues - com o nome, o icacls falha e o arquivo fica
+  # legivel por "Usuarios autenticados", ou seja, por qualquer um.
+  icacls $arqCred /inheritance:r /grant:r "$($env:USERNAME):(R,W)" `
+    '*S-1-5-18:(R)' '*S-1-5-32-544:(R)' 2>&1 | Out-Null
+
+  Ok "$arqCred criado e protegido."
+}
+
+# ------------------------------------------------------------
+# 6. PostgreSQL 17
+# ------------------------------------------------------------
+Titulo 'Instalando o PostgreSQL 17'
+
+$servico = Get-Service postgresql-x64-17 -ErrorAction SilentlyContinue
+
+if ($servico) {
+  Ok "Servico $($servico.Name) ja existe ($($servico.Status))."
+} else {
+  # Le a senha do superusuario do arquivo que acabou de ser gerado.
+  $cred = @{}
+  Get-Content $arqCred -Encoding UTF8 | ForEach-Object {
+    if ($_ -match '^\s*([A-Z]+)=(.+)$') { $cred[$matches[1]] = $matches[2].Trim() }
+  }
+  if (-not $cred['PGSUPER']) { Erro "PGSUPER nao encontrado em $arqCred"; exit 1 }
+
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Erro 'winget nao esta disponivel nesta maquina.'
+    Write-Host '  Instale o PostgreSQL 17 manualmente:' -ForegroundColor Yellow
+    Write-Host '    https://www.enterprisedb.com/downloads/postgres-postgresql-downloads' -ForegroundColor Yellow
+    Write-Host '    - porta 5432, local 127.0.0.1' -ForegroundColor Yellow
+    Write-Host "    - senha do usuario postgres: a linha PGSUPER de $arqCred" -ForegroundColor Yellow
+    Write-Host '  Depois rode este script de novo.' -ForegroundColor Yellow
+    exit 1
+  }
+
+  # A senha vai em ARQUIVO, nunca na linha de comando: linha de comando fica
+  # visivel para qualquer processo da maquina e cai no historico do console.
+  $optFile = Join-Path $env:TEMP "sqe-pg-$([guid]::NewGuid().ToString('N')).opt"
+  try {
+    Set-Content $optFile "--superpassword=`"$($cred['PGSUPER'])`" --serverport=5432 --enable_acledit=1" -Encoding ASCII
+    Write-Host '  Instalando (pode demorar alguns minutos) ...'
+    & winget install --id PostgreSQL.PostgreSQL.17 --exact --silent `
+        --accept-source-agreements --accept-package-agreements `
+        --custom "--optionfile `"$optFile`""
+  } finally {
+    # Apaga a senha do disco mesmo se a instalacao falhar no meio.
+    Remove-Item $optFile -Force -ErrorAction SilentlyContinue
+  }
+
+  $servico = Get-Service postgresql-x64-17 -ErrorAction SilentlyContinue
+  if (-not $servico) { Erro 'O servico postgresql-x64-17 nao apareceu.'; exit 1 }
+  Ok 'PostgreSQL 17 instalado.'
+}
+
+if ($servico.Status -ne 'Running') { Start-Service $servico.Name; Start-Sleep -Seconds 5 }
+Set-Service -Name postgresql-x64-17 -StartupType Automatic
+$servico = Get-Service postgresql-x64-17
+Ok "$($servico.Name): $($servico.Status) / $($servico.StartType)"
+
+if (Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue) {
+  Ok 'Banco escutando na porta 5432.'
+} else {
+  Aviso 'A porta 5432 nao esta escutando. Confira o servico antes do passo 2.'
+}
+
+# ------------------------------------------------------------
+# 7. Firewall
+#
+#    Somente a porta do sistema. A 5432 NAO e aberta de proposito: o banco
+#    so e acessado pelo proprio servidor (127.0.0.1) e abrir o banco para a
+#    rede da fabrica seria expor todo o historico da Qualidade.
 # ------------------------------------------------------------
 Titulo 'Liberando a porta no firewall do Windows'
-
 $regra = "Sistema de Qualidade (SQE) - porta $Porta"
 if (Get-NetFirewallRule -DisplayName $regra -ErrorAction SilentlyContinue) {
-  Ok 'Regra de firewall ja existia.'
+  Ok 'Regra ja existia.'
 } else {
   New-NetFirewallRule -DisplayName $regra -Direction Inbound -Action Allow `
     -Protocol TCP -LocalPort $Porta -Profile Any | Out-Null
@@ -169,20 +336,9 @@ if (Get-NetFirewallRule -DisplayName $regra -ErrorAction SilentlyContinue) {
 }
 
 # ------------------------------------------------------------
-# 5. Pastas de apoio no disco C:
-# ------------------------------------------------------------
-Titulo 'Criando as pastas de apoio'
-
-foreach ($pasta in @('C:\QualidadeSQE', 'C:\QualidadeSQE\backups', 'C:\QualidadeSQE\logs')) {
-  if (-not (Test-Path $pasta)) { New-Item -ItemType Directory -Path $pasta | Out-Null }
-}
-Ok 'C:\QualidadeSQE\backups  (copias de seguranca - inclua no backup corporativo)'
-Ok 'C:\QualidadeSQE\logs     (registro de cada inicializacao do sistema)'
-
-# ------------------------------------------------------------
 # Fim
 # ------------------------------------------------------------
-$ipServidor = (Get-NetIPAddress -AddressFamily IPv4 |
+$ip = (Get-NetIPAddress -AddressFamily IPv4 |
   Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
   Select-Object -First 1).IPAddress
 
@@ -190,12 +346,12 @@ Write-Host ''
 Write-Host '============================================================' -ForegroundColor Green
 Write-Host '  PASSO 1 CONCLUIDO' -ForegroundColor Green
 Write-Host '============================================================' -ForegroundColor Green
-Write-Host "  IP deste servidor: $ipServidor"
-Write-Host "  O sistema vai atender em: http://$ipServidor`:$Porta"
+Write-Host "  Maquina : $env:COMPUTERNAME  ($ip)"
+Write-Host "  Endereco futuro do sistema: http://$ip`:$Porta"
+Write-Host "  Senhas  : $arqCred  (guarde no cofre do TI)"
 Write-Host ''
-Write-Host '  PROXIMO PASSO (passo 2) - instalar o sistema dentro do Linux:' -ForegroundColor Cyan
-Write-Host "     wsl -d $Distro -u root"
-Write-Host '     curl -fsSL -o /tmp/instalar.sh \'
-Write-Host '       https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.sh'
-Write-Host '     bash /tmp/instalar.sh'
+Write-Host '  PROXIMO PASSO (passo 2) - baixar e preparar o sistema:' -ForegroundColor Cyan
+Write-Host '     curl.exe -fsSL -o C:\QualidadeSQE\2-instalar.ps1 `'
+Write-Host '       https://raw.githubusercontent.com/missorino10-spec/qualidade-sqe/main/deploy-servidor/2-instalar.ps1'
+Write-Host '     powershell -ExecutionPolicy Bypass -File C:\QualidadeSQE\2-instalar.ps1'
 Write-Host ''
